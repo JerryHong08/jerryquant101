@@ -38,104 +38,126 @@ print(splits.sort(["execution_date"]).filter(pl.col("ticker") == "BIVI"))
 # └─────────────────────────────────┴────────────────┴────────────┴──────────┴────────┘
 
 
-def apply_split_adjustments(
-    lf, splits, price_decimals: int = 4, volume_integer: bool = False
-):
-    # 1) 预处理拆分表：得到 split_date 和 ratio = from/to
-    splits_processed = splits.with_columns(
-        [
-            (pl.col("execution_date").str.to_date() - pl.duration(days=1)).alias(
-                "split_date"
-            ),
-            (pl.col("split_from") / pl.col("split_to")).alias("split_ratio"),
-        ]
-    ).select(["ticker", "split_date", "split_ratio"])
+def splits_adjust(lf, splits, price_decimals: int = 4):
+    # 获取数据范围
+    date_min = lf.select(pl.col("datetime").min()).collect()[0, 0]
+    date_max = lf.select(pl.col("datetime").max()).collect()[0, 0]
 
-    # 2) 按 ticker、日期降序，得到“从该行起到未来”的累计因子 cum_factor
-    splits_with_factor = (
-        splits_processed.sort(
-            ["ticker", "split_date"], descending=[False, True]
-        ).with_columns(
-            pl.col("split_ratio").cum_prod().over("ticker").alias("cum_factor")
+    tickers = lf.select(pl.col("ticker").unique()).collect().to_series(0).to_list()
+
+    splits_filtered = splits.filter(
+        (pl.col("ticker").is_in(tickers))
+        & (
+            pl.col("execution_date")
+            .str.to_date()
+            .is_between(date_min - pl.duration(days=1), date_max + pl.duration(days=1))
         )
-        # asof-join 需要按 on-key 升序排序（这里是 split_date）
-        .sort(["ticker", "split_date"])
     )
 
-    # 3) 行情按日期（天）对齐，并保证按 asof 要求排序
-    df_with_date = lf.with_columns(
-        pl.col("datetime").dt.date().alias("data_date")
-    ).sort(["ticker", "data_date"])
-
-    # 4) 关键改动：使用 strategy="forward" —— 找“下一次”拆分
-    adjusted = (
-        df_with_date.join_asof(
-            splits_with_factor,
-            left_on="data_date",
-            right_on="split_date",
-            by="ticker",
-            strategy="forward",  # ←←← 从 backward 改为 forward
-        )
-        .with_columns(pl.col("cum_factor").fill_null(1.0).alias("factor"))
-        .with_columns(
+    if splits_filtered.is_empty():
+        lf = lf.with_columns(
             [
-                # 价格复权：乘以 factor，并做四舍五入
-                (pl.col("open") * pl.col("factor"))
-                .round(price_decimals)
-                .alias("open_adj"),
-                (pl.col("high") * pl.col("factor"))
-                .round(price_decimals)
-                .alias("high_adj"),
-                (pl.col("low") * pl.col("factor"))
-                .round(price_decimals)
-                .alias("low_adj"),
-                (pl.col("close") * pl.col("factor"))
-                .round(price_decimals)
-                .alias("close_adj"),
-                # 成交量复权：除以 factor，可选是否取整
-                (
-                    (pl.col("volume") / pl.col("factor"))
-                    if not volume_integer
-                    else (pl.col("volume") / pl.col("factor")).round(0).cast(pl.Int64)
-                ).alias("volume_adj"),
+                pl.col("open").alias("open_adj"),
+                pl.col("high").alias("high_adj"),
+                pl.col("low").alias("low_adj"),
+                pl.col("close").alias("close_adj"),
+                pl.col("volume").alias("volume_adj"),
             ]
         )
-    )
+    else:
+        splits_processed = splits_filtered.with_columns(
+            [
+                (pl.col("execution_date").str.to_date() - pl.duration(days=1)).alias(
+                    "split_date"
+                ),
+                (pl.col("split_from") / pl.col("split_to")).alias("split_ratio"),
+            ]
+        ).select(["ticker", "split_date", "split_ratio"])
 
-    return adjusted.select(
+        splits_with_factor = (
+            splits_processed.sort(["ticker", "split_date"], descending=[False, True])
+            .with_columns(
+                pl.col("split_ratio")
+                .cum_prod()
+                .over("ticker")
+                .alias("cumulative_split_ratio")
+            )
+            .sort(["ticker", "split_date"])
+        )
+
+        # 由于 Polars join_asof 需要对齐日期类型，可以先添加辅助列
+        lf_adj = (
+            lf.with_columns(pl.col("datetime").dt.date().alias("date_only"))
+            .join_asof(
+                splits_with_factor.lazy(),
+                left_on="date_only",
+                right_on="split_date",
+                by="ticker",
+                strategy="forward",
+            )
+            .with_columns(
+                pl.col("cumulative_split_ratio").fill_null(1.0).alias("factor")
+            )
+            .with_columns(
+                [
+                    (pl.col("open") * pl.col("factor"))
+                    .round(price_decimals)
+                    .alias("open_adj"),
+                    (pl.col("high") * pl.col("factor"))
+                    .round(price_decimals)
+                    .alias("high_adj"),
+                    (pl.col("low") * pl.col("factor"))
+                    .round(price_decimals)
+                    .alias("low_adj"),
+                    (pl.col("close") * pl.col("factor"))
+                    .round(price_decimals)
+                    .alias("close_adj"),
+                    (pl.col("volume") / pl.col("factor"))
+                    .round(0)
+                    .cast(pl.Int64)
+                    .alias("volume_adj"),
+                ]
+            )
+            .drop("date_only")
+        )
+
+    return lf_adj
+
+
+lf = pl.scan_parquet(data_dir).with_columns(
+    pl.from_epoch(pl.col("window_start"), time_unit="ns")
+    .dt.convert_time_zone("America/New_York")
+    .alias("datetime")
+)
+# .filter(pl.col("ticker") == "BIVI")
+
+# splits event process for historical data
+lf_adj = splits_adjust(lf, splits, price_decimals=4)
+
+df_test = lf.filter(pl.col("ticker") == "BIVI").collect()
+df_adj_test = (
+    lf_adj.filter(pl.col("ticker") == "BIVI")
+    .select(
         [
             "ticker",
+            "volume_adj",
             "open_adj",
             "high_adj",
             "low_adj",
             "close_adj",
-            "volume_adj",
-            "datetime",
             "transactions",
+            "datetime",
         ]
     )
+    .sort(["datetime"])
+    .collect()
+)
 
+# print(f"before head:{df_test.head(1)}")
+# print(f"before tail:{df_test.tail(1)}")
 
-lf = (
-    pl.scan_parquet(data_dir).with_columns(
-        pl.from_epoch(pl.col("window_start"), time_unit="ns")
-        .dt.convert_time_zone("America/New_York")
-        .alias("datetime")
-    )
-).collect(engine="streaming")
-# .filter(pl.col("ticker") == "BIVI")
-
-print(f"before:{lf.head(5)}")
-print(f"before tail:{lf.tail(5)}")
-
-# splits event process for historical data
-lf = apply_split_adjustments(lf, splits, volume_integer=True).sort(["datetime"])
-
-df_test = lf.filter(pl.col("ticker") == "BIVI").sort(["datetime"])
-# df_bivi = lf.filter(pl.col("ticker") == "BIVI").collect(engine='streaming')
-
-# print(f'bivi before:{df_test.height}')
-print(f"after:{df_test.head(5)}")
+# print(f"after head:{df_adj_test.head(1)}")
+# print(f"after tail:{df_adj_test.tail(1)}")
 
 
 def resample_ohlcv(df, timeframe):
@@ -162,10 +184,10 @@ def resample_ohlcv(df, timeframe):
 
 # ----------------------------------------
 # 选择要聚合的时间框架
-timeframe = "1d"  # 可以改为: "5m", "15m", "30m", "1h", "4h", "1d"
+timeframe = "15m"  # 可以改为: "5m", "15m", "30m", "1h", "4h", "1d"
 
 # 重采样数据
-df_resampled = resample_ohlcv(df_test, timeframe).to_pandas()
+df_resampled = resample_ohlcv(df_adj_test, timeframe).to_pandas()
 
 # -----------------PLOT-------------------
 format_candleinfo_en = """\
@@ -200,7 +222,7 @@ class Chart(mc.SliderChart):
 
 
 c = Chart()
-c.watermark = "JerryQuant101"  # watermark not display
+c.watermark = f'{df_adj_test.select(pl.col("ticker").unique()).to_series().to_list()[0]}-{timeframe}'  # watermark
 
 c.date = "datetime"
 c.Open = "open"
