@@ -4,7 +4,9 @@ From BASIC To DOPE:
 1. Polygon.io flat file downloader. Use prefix to download specific file，date range etc
     1.1. prepare your data directory.
     For my case, in Linux Ubuntu, I use link command to link my data directory to my SSD driver.
-    ''' --bash ln -s /mnt/d/quant_data/polygon_data data'''
+    ```
+    --bash ln -s /mnt/d/quant_data/polygon_data data
+    ```
     And then, I can access the data directory just like I put it under my code project directory. And you can use link method to share the data to your other projects.
 
 2. Splits adjust pre process. After downloading splits data from polygon.io.There is few steps to correctly adjust your historical data price and volume. 
