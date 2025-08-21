@@ -11,7 +11,7 @@ From BASIC To DOPE:
 
 2. Splits adjust pre process. After downloading splits data from polygon.io.There is few steps to correctly adjust your historical data price and volume. 
     2.1. There are some discrepancy in spilts data from polygon.io.
-    So you need to delete by yourself as you found out the splits data and filter it by running 'src/quant101/1_data/splits_error.py' and customize your filter.
+    So you need to delete by yourself as you found out the splits data and filter it by running 'src/quant101/data_1/splits_error.py' and customize your filter.
     
     My spilts discrepancy copy is in the same directory of splits_error.py. you can move this file to your splits_error directory.
     for everytime splits use:

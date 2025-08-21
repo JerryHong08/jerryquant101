@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *.so
+.pytest_cache/
 
 # Virtual environments
 .env/
@@ -26,3 +27,6 @@ data
 
 # Secrets
 .env
+
+# AI
+claude/

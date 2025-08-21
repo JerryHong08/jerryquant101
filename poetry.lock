@@ -1064,6 +1064,64 @@ files = [
 ]
 
 [[package]]
+name = "longport"
+version = "3.0.12"
+description = "A Python library for LongPort Open API"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "longport-3.0.12-cp310-cp310-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:46c2eec8548c362c8813fb37df0c5ee5f5f0b8838196b681394cb97c6bea9f6f"},
+    {file = "longport-3.0.12-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:4c08a9b6725e704e968c287801e2ae40f06705612199653f60ec5945f3b6cf79"},
+    {file = "longport-3.0.12-cp310-cp310-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:379571bfed66e8591857f0d891f244698001f70c3b21be3192a5abf9bc632137"},
+    {file = "longport-3.0.12-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3feaffd967a163394a24eb75481c4acee17f1010d3bd862e1cdefa44d4463202"},
+    {file = "longport-3.0.12-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:b7fbd93b4c4ff61c3a636fd46d0596e01e27e5e006a14b563768d796220d7f0a"},
+    {file = "longport-3.0.12-cp310-cp310-win32.whl", hash = "sha256:9a53272c4aed4d855dd27a6388912cc2b3c0d0af51f3aabd22d69c542370efdf"},
+    {file = "longport-3.0.12-cp310-cp310-win_amd64.whl", hash = "sha256:d285f16b2ab06e82fbffa31f408c6a0c3c27e1f5d8aea55d5478c80a41b149c9"},
+    {file = "longport-3.0.12-cp311-cp311-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:69b000a933f4b91402126a80e1aea1fa4d58c87e2aa970b2220e36420ea4233b"},
+    {file = "longport-3.0.12-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:0483486b9612202230e38507ffc95e341a548fbd1bfb2a7d8c29ec6b04673f25"},
+    {file = "longport-3.0.12-cp311-cp311-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:0415cc92fe46372c31836d01740264240691055df035d4ff32f3f2113213ad06"},
+    {file = "longport-3.0.12-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:08bbf4d43e4e113ed5a6b7808618eafe7ea2705f2ee7310ac85b38762c17a27a"},
+    {file = "longport-3.0.12-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:9acc6a359a482ffed46a90d1af4202f8ab670eaeb855dbf0a73926e444bb94ca"},
+    {file = "longport-3.0.12-cp311-cp311-win32.whl", hash = "sha256:21453a98ac9d3e0243ab621c127ac2340ae260b5d824d93dc7e4494ede6d021c"},
+    {file = "longport-3.0.12-cp311-cp311-win_amd64.whl", hash = "sha256:7fb0acace0e21e0d53cef81ccd85f5251cebafe526a9ef7efccb4c6115c257a3"},
+    {file = "longport-3.0.12-cp312-cp312-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:6f5a9f517af41a6add803f913aec73b0b73dbee8182b58673f93fc013a8820ae"},
+    {file = "longport-3.0.12-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:7f04f74954e6157a7a90bb9986ac03ad9f70c3cbe3735479f77633b0493184b5"},
+    {file = "longport-3.0.12-cp312-cp312-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:99bc10a68a01f3834642b7ae59fb6d4a4485ca30bf223a5a6b9e94f5aa7c3cc4"},
+    {file = "longport-3.0.12-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0d30f7e389c7f2edc69be9a8dbd9a396b86eca4b65134b773c0b673d70a863d5"},
+    {file = "longport-3.0.12-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:d042e28c74e0479c00ddd97e82538916b0e91c734ed58f6b21de6888793e0fee"},
+    {file = "longport-3.0.12-cp312-cp312-win32.whl", hash = "sha256:fca4717238fe5b768dda4898921bf7e86d4952307e1f27a23afc960e2d2c601e"},
+    {file = "longport-3.0.12-cp312-cp312-win_amd64.whl", hash = "sha256:1142a5ed7cbf08c27739ab2905664f393cecc84eeaef7a40f9fcd0875c5ccebf"},
+    {file = "longport-3.0.12-cp313-cp313-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:d6d44a3f31836b79f2abeb8113d3aae272d0d6db0d9fc5d7b1b1c4a582fd693d"},
+    {file = "longport-3.0.12-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:2994466aa0436561ebddc3b17732ed1011717d0da525dafc531e347ba8dea7f9"},
+    {file = "longport-3.0.12-cp313-cp313-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:9dc15ae35c813382bbef5b4d73460078192d718dbb06f246681b7870a7283ad9"},
+    {file = "longport-3.0.12-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:23f2f13024d3c123a063477647adbafa3ef31ec1621e1ffaab37ace3afadacf8"},
+    {file = "longport-3.0.12-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:9c3b7b69f20cd9224ae8c73b6569dd35173ce7d8d4f2c4891725ef15e8e3806f"},
+    {file = "longport-3.0.12-cp313-cp313-win32.whl", hash = "sha256:ed0bc1dd95ec59cbb7916602c188f41bcab65d6f624e48a451d5bebb696a2022"},
+    {file = "longport-3.0.12-cp313-cp313-win_amd64.whl", hash = "sha256:d8e8ac0cb9b062688a98fe2a38690ed1e93633f3bc3ec3d3f0709ee38579681e"},
+    {file = "longport-3.0.12-cp37-cp37m-macosx_10_12_x86_64.whl", hash = "sha256:910dac15efe206ae765faeb7bf4f00ecfa69b1d71f4678ec3e901c32f6bd1a59"},
+    {file = "longport-3.0.12-cp37-cp37m-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:b50fa26525068c116d879f25cffc9b2789a4cf9d5fc4d6c790712f0791453bd6"},
+    {file = "longport-3.0.12-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:35ab6788d561abd8d163157e9845b1257397a8f47ccffeb4fcb4dbbed5805f75"},
+    {file = "longport-3.0.12-cp37-cp37m-manylinux_2_28_aarch64.whl", hash = "sha256:16505d3118b8b3ab6bca0f8750e573780a879b7df8f95953ac9ca31e41942b89"},
+    {file = "longport-3.0.12-cp37-cp37m-win32.whl", hash = "sha256:c1aef8fbc0d824dd69809ae36c742b99b7a670e2c5b0ba99ec72899e32f2c1b1"},
+    {file = "longport-3.0.12-cp37-cp37m-win_amd64.whl", hash = "sha256:b8fcb8fc3cd898c82ac13ce7792211700c380ca7b204da354471b481f601442c"},
+    {file = "longport-3.0.12-cp38-cp38-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:24a7102572f36650567e6fcaa1f3403283c5c3f19e2471a320cab6d3836d9dd4"},
+    {file = "longport-3.0.12-cp38-cp38-macosx_10_12_x86_64.whl", hash = "sha256:9608d0d24cf1e45b1dc6dff2bf2ad8550cc8b56f0bb4e81380fcd75739cab9f8"},
+    {file = "longport-3.0.12-cp38-cp38-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:13d24ec37328761fffb0636dfa90cccee11342b5f0f1aa7656125c834678363e"},
+    {file = "longport-3.0.12-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b594eaaf884fb29c325e185d9466f3508f741ed93dfe1aac2b22dd84a73d56e9"},
+    {file = "longport-3.0.12-cp38-cp38-manylinux_2_28_aarch64.whl", hash = "sha256:3b054fd9488cd5c9c0dd85670ce161f933c58ee694fc471f0d21ed31bae0ad69"},
+    {file = "longport-3.0.12-cp38-cp38-win32.whl", hash = "sha256:21daf726fe153066e83d289a822231cd8c5fee75a8ac4ddb316bf243dae8592f"},
+    {file = "longport-3.0.12-cp38-cp38-win_amd64.whl", hash = "sha256:f0e0036dead21c2bfa7d642bcac99d15c0a407fd2dd7ae57050c2b4ad1d056cb"},
+    {file = "longport-3.0.12-cp39-cp39-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:39863fc988b74ea54c05997570984fee039b5540d6515e923bc43b7972f6548f"},
+    {file = "longport-3.0.12-cp39-cp39-macosx_10_12_x86_64.whl", hash = "sha256:2bee07f4c01ce9255c25c950d3fab6378dbe6081edab1f6232187ba69d790074"},
+    {file = "longport-3.0.12-cp39-cp39-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:6fd2dc1d2ee7325efa44aa932e5da43761fdaf3dee960cfc23e3a93c8d1da371"},
+    {file = "longport-3.0.12-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:69357eb1c25e7c3f1f1c108493e88a66b7976f3af15b0a062a363d03f2761769"},
+    {file = "longport-3.0.12-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:120aa6c86fe3fd27ee65853b6beddc59f5925d8273772ebd780b9a253ee7768b"},
+    {file = "longport-3.0.12-cp39-cp39-win32.whl", hash = "sha256:887b128ac9fe44c6be2c742f720c1d0970a7d3037fefcabe6858769ee0188e0d"},
+    {file = "longport-3.0.12-cp39-cp39-win_amd64.whl", hash = "sha256:80b84f978d2da87999571208e1c55e33721e30ff7d7968583f99bb9415f0b38d"},
+]
+
+[[package]]
 name = "matplotlib"
 version = "3.10.5"
 description = "Python plotting package"
@@ -2463,4 +2521,4 @@ repair = ["scipy (>=1.6.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "9eb741e1175f0e15f88348da76f2e3a8f7bda1142685504b91cdb0a76d9ff299"
+content-hash = "1b2fc4393ece0c46a2a42b9513d050f14e12808e6fdc887e319b632ebe1c926b"

@@ -1,5 +1,7 @@
+import glob
 import warnings
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import matplotlib
 import matplotlib.dates as mdates
@@ -10,10 +12,6 @@ import seolpyo_mplchart as mc
 # warnings.filterwarnings("ignore", message=".*Font family.*not found.*")
 matplotlib.rcParams["font.family"] = "DejaVu Sans"
 
-# 数据路径（7月份所有 parquet 文件）
-# valid columns: ["ticker", "volume", "open", "close", "high", "low", "window_start", "transactions"]
-data_dir = "data/lake/us_stocks_sip/minute_aggs_v1/2025/07/*.parquet"
-
 # splits data
 splits_dir = "data/raw/us_stocks_sip/splits/splits.parquet"
 splits_error_dir = "data/raw/us_stocks_sip/splits/splits_error.parquet"
@@ -23,7 +21,7 @@ splits_errors = pl.read_parquet(splits_error_dir)
 
 splits = splits_original.filter(~pl.col("id").is_in(splits_errors["id"].implode()))
 
-print(splits.sort(["execution_date"]).filter(pl.col("ticker") == "BIVI"))
+# print(splits.sort(["execution_date"]).filter(pl.col("ticker") == "BIVI"))
 # splits.head()
 # ┌─────────────────────────────────┬────────────────┬────────────┬──────────┬────────┐
 # │ id                              ┆ execution_date ┆ split_from ┆ split_to ┆ ticker │
@@ -40,8 +38,8 @@ print(splits.sort(["execution_date"]).filter(pl.col("ticker") == "BIVI"))
 
 def splits_adjust(lf, splits, price_decimals: int = 4):
     # 获取数据范围
-    date_min = lf.select(pl.col("datetime").min()).collect()[0, 0]
-    date_max = lf.select(pl.col("datetime").max()).collect()[0, 0]
+    date_min = lf.select(pl.col("timestamps").min()).collect()[0, 0]
+    date_max = lf.select(pl.col("timestamps").max()).collect()[0, 0]
 
     tickers = lf.select(pl.col("ticker").unique()).collect().to_series(0).to_list()
 
@@ -54,17 +52,7 @@ def splits_adjust(lf, splits, price_decimals: int = 4):
         )
     )
 
-    if splits_filtered.is_empty():
-        lf = lf.with_columns(
-            [
-                pl.col("open").alias("open_adj"),
-                pl.col("high").alias("high_adj"),
-                pl.col("low").alias("low_adj"),
-                pl.col("close").alias("close_adj"),
-                pl.col("volume").alias("volume_adj"),
-            ]
-        )
-    else:
+    if splits_filtered.height > 0:
         splits_processed = splits_filtered.with_columns(
             [
                 (pl.col("execution_date").str.to_date() - pl.duration(days=1)).alias(
@@ -86,8 +74,8 @@ def splits_adjust(lf, splits, price_decimals: int = 4):
         )
 
         # 由于 Polars join_asof 需要对齐日期类型，可以先添加辅助列
-        lf_adj = (
-            lf.with_columns(pl.col("datetime").dt.date().alias("date_only"))
+        lf = (
+            lf.with_columns(pl.col("timestamps").dt.date().alias("date_only"))
             .join_asof(
                 splits_with_factor.lazy(),
                 left_on="date_only",
@@ -100,64 +88,17 @@ def splits_adjust(lf, splits, price_decimals: int = 4):
             )
             .with_columns(
                 [
-                    (pl.col("open") * pl.col("factor"))
-                    .round(price_decimals)
-                    .alias("open_adj"),
-                    (pl.col("high") * pl.col("factor"))
-                    .round(price_decimals)
-                    .alias("high_adj"),
-                    (pl.col("low") * pl.col("factor"))
-                    .round(price_decimals)
-                    .alias("low_adj"),
-                    (pl.col("close") * pl.col("factor"))
-                    .round(price_decimals)
-                    .alias("close_adj"),
-                    (pl.col("volume") / pl.col("factor"))
-                    .round(0)
-                    .cast(pl.Int64)
-                    .alias("volume_adj"),
+                    (pl.col("open") * pl.col("factor")).round(price_decimals),
+                    (pl.col("high") * pl.col("factor")).round(price_decimals),
+                    (pl.col("low") * pl.col("factor")).round(price_decimals),
+                    (pl.col("close") * pl.col("factor")).round(price_decimals),
+                    (pl.col("volume") / pl.col("factor")).round(0).cast(pl.Int64),
                 ]
             )
             .drop("date_only")
         )
 
-    return lf_adj
-
-
-lf = pl.scan_parquet(data_dir).with_columns(
-    pl.from_epoch(pl.col("window_start"), time_unit="ns")
-    .dt.convert_time_zone("America/New_York")
-    .alias("datetime")
-)
-# .filter(pl.col("ticker") == "BIVI")
-
-# splits event process for historical data
-lf_adj = splits_adjust(lf, splits, price_decimals=4)
-
-df_test = lf.filter(pl.col("ticker") == "BIVI").collect()
-df_adj_test = (
-    lf_adj.filter(pl.col("ticker") == "BIVI")
-    .select(
-        [
-            "ticker",
-            "volume_adj",
-            "open_adj",
-            "high_adj",
-            "low_adj",
-            "close_adj",
-            "transactions",
-            "datetime",
-        ]
-    )
-    .sort(["datetime"])
-    .collect()
-)
-
-# print(f"before head:{df_test.head(1)}")
-# print(f"before tail:{df_test.tail(1)}")
-
-# print(f"after head:{df_adj_test.head(1)}")
-# print(f"after tail:{df_adj_test.tail(1)}")
+    return lf
 
 
 def resample_ohlcv(df, timeframe):
@@ -166,15 +107,15 @@ def resample_ohlcv(df, timeframe):
     timeframe: '5m', '15m', '30m', '1h', '4h', '1d' 等
     """
     return (
-        df.sort("datetime")
-        .group_by_dynamic("datetime", every=timeframe, closed="left")  # 左闭合区间
+        df.sort("timestamps")
+        .group_by_dynamic("timestamps", every=timeframe, closed="left")  # 左闭合区间
         .agg(
             [
-                pl.col("open_adj").first().alias("open"),
-                pl.col("high_adj").max().alias("high"),
-                pl.col("low_adj").min().alias("low"),
-                pl.col("close_adj").last().alias("close"),
-                pl.col("volume_adj").sum().alias("volume"),
+                pl.col("open").first().alias("open"),
+                pl.col("high").max().alias("high"),
+                pl.col("low").min().alias("low"),
+                pl.col("close").last().alias("close"),
+                pl.col("volume").sum().alias("volume"),
                 pl.col("transactions").sum().alias("transactions"),
             ]
         )
@@ -182,14 +123,64 @@ def resample_ohlcv(df, timeframe):
     )
 
 
+# 数据路径
+# valid columns: ["ticker", "volume", "open", "close", "high", "low", "window_start", "transactions"]
+months = ["06", "07", "08"]
+data_dir = []
+for m in months:
+    data_dir.extend(
+        glob.glob(f"data/lake/us_stocks_sip/minute_aggs_v1/2025/{m}/*.parquet")
+    )
+
+lf = (
+    pl.scan_parquet(data_dir)
+    .with_columns(
+        pl.from_epoch(pl.col("window_start"), time_unit="ns")
+        .dt.convert_time_zone("America/New_York")
+        .alias("timestamps")
+    )
+    .filter(
+        (pl.col("timestamps").dt.time().gt(time(9, 30)))
+        & (pl.col("timestamps").dt.time().lt(time(16, 0)))
+    )
+)
+
+# splits event process for historical data
+lf_adj = splits_adjust(lf, splits, price_decimals=4)
+
+# df_test = lf.filter(pl.col("ticker") == "AAPL").collect()
+df = (
+    lf_adj.filter(pl.col("ticker") == "TSLA")
+    .sort(["timestamps"])
+    .filter(
+        (
+            pl.col("timestamps")
+            > datetime(2025, 6, 1, tzinfo=ZoneInfo("America/New_York"))
+        )
+        & (
+            pl.col("timestamps")
+            < datetime(2025, 8, 20, tzinfo=ZoneInfo("America/New_York"))
+        )
+    )
+    .collect()
+)
+
+# print(f"before head:{df.head(1)}")
+# print(f"before tail:{df.tail(1)}")
+
+# print(f"after head:{df.head(1)}")
+# print(f"after tail:{df.tail(1)}")
+
 # ----------------------------------------
+
 # 选择要聚合的时间框架
-timeframe = "15m"  # 可以改为: "5m", "15m", "30m", "1h", "4h", "1d"
+timeframe = "1h"  # 可以改为: "5m", "15m", "30m", "1h", "4h", "1d"
 
 # 重采样数据
-df_resampled = resample_ohlcv(df_adj_test, timeframe).to_pandas()
+df = resample_ohlcv(df, timeframe).to_pandas()
 
 # -----------------PLOT-------------------
+
 format_candleinfo_en = """\
 {dt}
 
@@ -222,15 +213,15 @@ class Chart(mc.SliderChart):
 
 
 c = Chart()
-c.watermark = f'{df_adj_test.select(pl.col("ticker").unique()).to_series().to_list()[0]}-{timeframe}'  # watermark
+c.watermark = f'{df.select(pl.col("ticker").unique()).to_series().to_list()[0]}-{timeframe}'  # watermark
 
-c.date = "datetime"
+c.date = "timestamps"
 c.Open = "open"
 c.high = "high"
 c.low = "low"
 c.close = "close"
 c.volume = "volume"
 
-c.set_data(df_resampled)
+c.set_data(df)
 
 mc.show()  # same as matplotlib.pyplot.show()

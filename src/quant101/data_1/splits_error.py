@@ -5,7 +5,7 @@ import polars as pl
 
 splits_dir = "data/raw/us_stocks_sip/splits/splits.parquet"
 splits_error_dir = "data/raw/us_stocks_sip/splits/splits_error.parquet"
-splits_error_dir_copy = "src/quant101/1_data/splits_error.parquet"
+splits_error_dir_copy = "src/quant101/data_1/splits_error.parquet"
 
 os.makedirs(os.path.dirname(splits_dir), exist_ok=True)
 os.makedirs(os.path.dirname(splits_error_dir), exist_ok=True)
