@@ -7,7 +7,8 @@ import matplotlib
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import polars as pl
-import seolpyo_mplchart as mc
+
+from quant101.core_2.plotter import plot_candlestick
 
 # warnings.filterwarnings("ignore", message=".*Font family.*not found.*")
 matplotlib.rcParams["font.family"] = "DejaVu Sans"
@@ -165,7 +166,6 @@ def data_dir_calculate(start_date: str, end_date: str):
     Returns:
         List of parquet file paths
     """
-    from datetime import datetime
 
     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
@@ -217,8 +217,6 @@ def load_stock_minute_aggs(
             )
             print(df.head())
     """
-    from datetime import datetime, timedelta
-    from zoneinfo import ZoneInfo
 
     # Validate inputs
     if not start_date or not end_date:
@@ -263,7 +261,9 @@ def load_stock_minute_aggs(
     ) + timedelta(days=1)
 
     # Filter by date range
-    lf = lf.filter((pl.col("timestamps") >= start_dt) & (pl.col("timestamps") < end_dt))
+    lf = lf.filter(
+        (pl.col("timestamps") >= start_dt) & (pl.col("timestamps") <= end_dt)
+    )
 
     # Filter to regular trading hours if requested
     if not whole_market_time:
@@ -277,65 +277,194 @@ def load_stock_minute_aggs(
 
     # Resample to requested timeframe if not 1m
     if timeframe != "1m":
-        lf_adj = resample_ohlcv(lf_adj, timeframe)
+        lf_adj = resample_ohlcv(lf_adj, timeframe).collect()
+    else:
+        lf_adj = lf_adj.collect()
 
-    return lf_adj.collect()
+    # -------------fill missing timestamp-----------------
+
+    if lf_adj.height == 0:
+        return lf_adj
+
+    # 按ticker分组处理
+    result_dfs = []
+
+    for ticker_name in lf_adj["ticker"].unique():
+        ticker_df = lf_adj.filter(pl.col("ticker") == ticker_name)
+
+        if ticker_df.height == 0:
+            continue
+
+        # 获取数据的时间范围
+        min_time = ticker_df["timestamps"].min()
+        max_time = ticker_df["timestamps"].max()
+
+        # 创建完整的交易时间序列 - 基于实际交易日的健壮方法
+
+        # 首先获取数据中实际存在的交易日
+        actual_trading_days = (
+            ticker_df.select(pl.col("timestamps").dt.date().alias("trade_date"))
+            .unique()
+            .sort("trade_date")
+            .get_column("trade_date")
+            .to_list()
+        )
+
+        if not actual_trading_days:
+            continue
+
+        time_points = []
+
+        for trade_date in actual_trading_days:
+            if whole_market_time:
+                # 盘前盘后时间：4:00 AM - 8:00 PM EDT
+                day_start = datetime.combine(trade_date, time(4, 0)).replace(
+                    tzinfo=ZoneInfo("America/New_York")
+                )
+                day_end = datetime.combine(trade_date, time(20, 0)).replace(
+                    tzinfo=ZoneInfo("America/New_York")
+                )
+            else:
+                # 正常交易时间：9:30 AM - 4:00 PM EDT
+                day_start = datetime.combine(trade_date, time(9, 30)).replace(
+                    tzinfo=ZoneInfo("America/New_York")
+                )
+                day_end = datetime.combine(trade_date, time(16, 0)).replace(
+                    tzinfo=ZoneInfo("America/New_York")
+                )
+
+            # 对于重采样的数据，需要调整起始时间以匹配重采样后的时间戳格式
+            if timeframe != "1m":
+                if timeframe == "1d":
+                    # 1日K线时间戳从午夜开始
+                    day_start = datetime.combine(trade_date, time(0, 0)).replace(
+                        tzinfo=ZoneInfo("America/New_York")
+                    )
+                    day_end = day_start + timedelta(days=1)
+                else:
+                    continue
+
+            # 创建当天的时间序列
+            day_times = (
+                pl.select(
+                    pl.datetime_range(
+                        day_start, day_end, interval=timeframe, closed="left"
+                    ).alias("timestamps")
+                )
+                .get_column("timestamps")
+                .to_list()
+            )
+
+            time_points.extend(day_times)
+
+        # 保留完整的时间序列，但确保在合理的日期范围内
+        # 只按日期过滤，不按具体时间过滤，这样可以保留完整的交易时段用于前向填充
+        min_date = min_time.date()
+        max_date = max_time.date()
+        time_points = [t for t in time_points if min_date <= t.date() <= max_date]
+
+        # 创建时间序列DataFrame
+        if not time_points:
+            continue  # 如果没有有效时间点，跳过这个ticker
+
+        time_range = pl.DataFrame({"timestamps": time_points}).with_columns(
+            # 确保时间戳类型匹配
+            pl.col("timestamps")
+            .dt.cast_time_unit("ns")
+            .dt.convert_time_zone("America/New_York")
+        )
+
+        # 添加ticker列
+        time_range = time_range.with_columns(pl.lit(ticker_name).alias("ticker"))
+
+        # 左连接以保留所有时间点
+        filled_df = time_range.join(ticker_df, on=["ticker", "timestamps"], how="left")
+
+        # 前向填充价格数据
+        # 对于没有交易的时间点，OHLC都应该等于前一个收盘价
+        filled_df = (
+            filled_df.with_columns(
+                [
+                    # 首先前向填充close价格
+                    pl.col("close")
+                    .forward_fill()
+                    .alias("close_filled")
+                ]
+            )
+            .with_columns(
+                [
+                    # 对于有实际交易的点，保持原值；对于null点，使用前向填充的close值
+                    pl.when(pl.col("open").is_not_null())
+                    .then(pl.col("open"))
+                    .otherwise(pl.col("close_filled"))
+                    .alias("open"),
+                    pl.when(pl.col("high").is_not_null())
+                    .then(pl.col("high"))
+                    .otherwise(pl.col("close_filled"))
+                    .alias("high"),
+                    pl.when(pl.col("low").is_not_null())
+                    .then(pl.col("low"))
+                    .otherwise(pl.col("close_filled"))
+                    .alias("low"),
+                    pl.when(pl.col("close").is_not_null())
+                    .then(pl.col("close"))
+                    .otherwise(pl.col("close_filled"))
+                    .alias("close"),
+                    # volume和transactions用0填充缺失值
+                    pl.col("volume").fill_null(0),
+                    pl.col("transactions").fill_null(0),
+                ]
+            )
+            .drop("close_filled")
+        )
+
+        # 处理开头可能仍然为null的情况（当时间序列从交易日开始但数据更晚开始时）
+        # 找到第一个有效的价格数据，用它填充之前的null值
+        first_valid_idx = (
+            filled_df.with_row_index()
+            .filter(pl.col("close").is_not_null())
+            .select("index")
+            .head(1)
+        )
+
+        if first_valid_idx.height > 0:
+            first_idx = first_valid_idx["index"][0]
+            first_close = filled_df[first_idx, "close"]
+
+            # 使用第一个有效收盘价填充前面的null值
+            filled_df = filled_df.with_columns(
+                [
+                    pl.col("open").fill_null(first_close),
+                    pl.col("high").fill_null(first_close),
+                    pl.col("low").fill_null(first_close),
+                    pl.col("close").fill_null(first_close),
+                ]
+            )
+
+        result_dfs.append(filled_df)
+
+    # 合并所有ticker的数据
+    if result_dfs:
+        result = pl.concat(result_dfs)
+        return result
+    else:
+        return lf_adj
 
 
 # -----------------PLOT-------------------
+# valid_timeframes = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
 timeframe = "30m"
-ticker = "TQQQ"
-df = load_stock_minute_aggs(
-    start_date="2025-06-02",
-    end_date="2025-07-03",
-    timeframe=timeframe,
-    ticker=ticker,
-    whole_market_time=True,
-).to_pandas()
+ticker = "BURU"  # 使用流动性更好的股票以便看到更明显的蜡烛图效果
 
-# print(df.head())
+if __name__ == "__main__":
+    df = load_stock_minute_aggs(
+        start_date="2025-06-01",
+        end_date="2025-08-15",
+        timeframe=timeframe,
+        ticker=ticker,
+        whole_market_time=0,
+    )
 
-format_candleinfo_en = """\
-{dt}
+    print(df.head(), df.shape)
 
-close:      {close}
-rate:        {rate}
-compare: {compare}
-open:      {open}({rate_open})
-high:       {high}({rate_high})
-low:        {low}({rate_low})
-volume:  {volume}({rate_volume})\
-"""
-format_volumeinfo_en = """\
-{dt}
-
-volume:      {volume}
-volume rate: {rate_volume}
-compare:     {compare}\
-"""
-
-
-class Chart(mc.SliderChart):
-    digit_price = 3
-    digit_volume = 1
-
-    unit_price = "$"
-    unit_volume = "Vol"
-    format_ma = "ma{}"
-    format_candleinfo = format_candleinfo_en
-    format_volumeinfo = format_volumeinfo_en
-
-
-c = Chart()
-c.watermark = f"{ticker}-{timeframe}"  # watermark
-
-c.date = "timestamps"
-c.Open = "open"
-c.high = "high"
-c.low = "low"
-c.close = "close"
-c.volume = "volume"
-
-c.set_data(df)
-
-mc.show()  # same as matplotlib.pyplot.show()
+    plot_candlestick(df.to_pandas(), ticker, timeframe)
