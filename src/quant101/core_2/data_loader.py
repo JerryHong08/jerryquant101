@@ -1,21 +1,30 @@
 import glob
+import os
 import warnings
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+import exchange_calendars as xcals
 import matplotlib
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import polars as pl
 
+from quant101.core_2.config import data_dir
 from quant101.core_2.plotter import plot_candlestick
 
 # warnings.filterwarnings("ignore", message=".*Font family.*not found.*")
 matplotlib.rcParams["font.family"] = "DejaVu Sans"
 
 # splits data
-splits_dir = "data/raw/us_stocks_sip/splits/splits.parquet"
-splits_error_dir = "data/raw/us_stocks_sip/splits/splits_error.parquet"
+# splits_dir = "data/raw/us_stocks_sip/splits/splits.parquet"
+# splits_error_dir = "data/raw/us_stocks_sip/splits/splits_error.parquet"
+# /mnt/blackdisk/quant_data/polygon_data
+
+splits_dir = os.path.join(data_dir, "raw/us_stocks_sip/splits/splits.parquet")
+splits_error_dir = os.path.join(
+    data_dir, "raw/us_stocks_sip/splits/splits_error.parquet"
+)
 
 splits_original = pl.read_parquet(splits_dir)
 splits_errors = pl.read_parquet(splits_error_dir)
@@ -170,7 +179,7 @@ def data_dir_calculate(start_date: str, end_date: str):
     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
 
-    data_dir = []
+    data_dirs = []
 
     for y in range(start_dt.year, end_dt.year + 1):
         start_month = start_dt.month if y == start_dt.year else 1
@@ -179,11 +188,72 @@ def data_dir_calculate(start_date: str, end_date: str):
         for m in range(start_month, end_month + 1):
             month_str = f"{m:02d}"  # Format as two digits
             file_pattern = (
-                f"data/lake/us_stocks_sip/minute_aggs_v1/{y}/{month_str}/*.parquet"
+                f"{data_dir}lake/us_stocks_sip/minute_aggs_v1/{y}/{month_str}/*.parquet"
             )
-            data_dir.extend(glob.glob(file_pattern))
+            data_dirs.extend(glob.glob(file_pattern))
 
-    return data_dir
+    return data_dirs
+
+
+def generate_full_timestamp(start_date, end_date, timeframe):
+
+    # 纽约证券交易所 (美国)
+    xnys = xcals.get_calendar("XNYS")
+    snys_schedule = xnys.schedule.loc[start_date:end_date]
+
+    # 转换为 Polars DataFrame
+    df_schedule = pl.from_pandas(snys_schedule.reset_index())
+
+    df_schedule = df_schedule.with_columns(
+        [
+            pl.col("open").dt.convert_time_zone("America/New_York"),
+            pl.col("close").dt.convert_time_zone("America/New_York"),
+        ]
+    )
+
+    # 为每个交易日生成时间戳
+    all_timestamps = []
+
+    for row in df_schedule.iter_rows(named=True):
+        open_time = row["open"]
+        close_time = row["close"]
+
+        # 根据 timeframe 生成当日的所有交易时间戳
+        if timeframe == "1d":
+            # 日K线只需要一个时间戳，使用交易日的午夜时间
+            trade_date = open_time.date()
+            daily_timestamp = datetime.combine(trade_date, time(0, 0)).replace(
+                tzinfo=ZoneInfo("America/New_York")
+            )
+            all_timestamps.append(daily_timestamp)
+        else:
+            # 分钟、小时级别的时间戳
+            day_timestamps = (
+                pl.select(
+                    pl.datetime_range(
+                        open_time,
+                        close_time,
+                        interval=timeframe,
+                        closed="left",  # 不包括收盘时间
+                    ).alias("timestamps")
+                )
+                .get_column("timestamps")
+                .to_list()
+            )
+            all_timestamps.extend(day_timestamps)
+
+    # 创建完整的时间戳DataFrame
+    generated_trade_timestamp = (
+        pl.DataFrame({"timestamps": all_timestamps})
+        .with_columns(
+            pl.col("timestamps")
+            .dt.cast_time_unit("ns")
+            .dt.convert_time_zone("America/New_York")
+        )
+        .sort("timestamps")
+    )
+
+    return generated_trade_timestamp
 
 
 def load_stock_minute_aggs(
@@ -273,13 +343,13 @@ def load_stock_minute_aggs(
         )
 
     # Apply stock splits adjustment
-    lf_adj = splits_adjust(lf, splits, price_decimals=4)
+    lf = splits_adjust(lf, splits, price_decimals=4)
 
     # Resample to requested timeframe if not 1m
     if timeframe != "1m":
-        lf_adj = resample_ohlcv(lf_adj, timeframe).collect()
+        lf_adj = resample_ohlcv(lf, timeframe).collect()
     else:
-        lf_adj = lf_adj.collect()
+        lf_adj = lf.collect()
 
     # -------------fill missing timestamp-----------------
 
@@ -453,18 +523,83 @@ def load_stock_minute_aggs(
 
 # -----------------PLOT-------------------
 # valid_timeframes = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
-timeframe = "30m"
-ticker = "BURU"  # 使用流动性更好的股票以便看到更明显的蜡烛图效果
+timeframe = "1d"
+ticker = "AAPL"  # 使用流动性更好的股票以便看到更明显的蜡烛图效果
+start_date = "2015-01-01"
+end_date = "2025-08-19"
 
 if __name__ == "__main__":
     df = load_stock_minute_aggs(
-        start_date="2025-06-01",
-        end_date="2025-08-15",
+        start_date=start_date,
+        end_date=end_date,
         timeframe=timeframe,
         ticker=ticker,
-        whole_market_time=0,
+        whole_market_time=False,
+    )
+    print(df.shape)
+    print(df.head())
+
+    generated_timestamp = generate_full_timestamp(start_date, end_date, timeframe)
+    print(generated_timestamp.shape)
+    print(generated_timestamp.head())
+
+    diff1 = generated_timestamp.filter(
+        ~pl.col("timestamps").is_in(df["timestamps"].implode())
+    )
+    diff2 = df.filter(
+        ~pl.col("timestamps").is_in(generated_timestamp["timestamps"].implode())
+    )
+    with pl.Config(tbl_rows=40):
+        print(diff1, diff2)
+
+    # plot_candlestick(df.to_pandas(), ticker, timeframe)
+
+    # ---------------------------
+    # - 查找时间戳
+    # # target_date = datetime.strptime('2018-08-07', '%Y-%m-%d').date()
+    target_date = datetime(2025, 7, 7, 12, 0).replace(
+        tzinfo=ZoneInfo("America/New_York")
     )
 
-    print(df.head(), df.shape)
+    print(f"\n=== 查找 {target_date} 的时间戳 ===")
 
-    plot_candlestick(df.to_pandas(), ticker, timeframe)
+    # 在 generated_timestamp 中查找这一天的时间戳
+    # gen_target_day = generated_timestamp.filter(
+    #     (pl.col("timestamps").dt.date() == target_date.date()) & (pl.col("timestamps").dt.hour() == target_date.hour)
+    # )
+    # print(f"generated_timestamp 中 {target_date} 的时间戳:")
+    # print(gen_target_day)
+
+    # 在 df 中查找这一天的时间戳
+    df_target_day = df.filter(
+        (
+            (pl.col("timestamps").dt.date() == target_date.date())
+            & (
+                pl.col("timestamps")
+                .dt.hour()
+                .is_in([target_date.hour, target_date.hour + 1])
+            )
+            & (pl.col("volume") != 0)
+        )
+        | (
+            (pl.col("timestamps").dt.date() == (target_date.date() + timedelta(days=4)))
+            & (pl.col("timestamps").dt.hour() == 9)
+            & (pl.col("timestamps").dt.minute().is_in([30, 31, 32]))
+        )
+    )
+    print(f"\ndf 中 {target_date} 的时间戳:")
+    with pl.Config(tbl_rows=100):
+        print(
+            df_target_day.select(
+                [
+                    "ticker",
+                    "volume",
+                    "open",
+                    "close",
+                    "high",
+                    "low",
+                    "timestamps",
+                    "transactions",
+                ]
+            ).tail(8)
+        )

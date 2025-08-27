@@ -19,6 +19,8 @@ from botocore.exceptions import ClientError, EndpointConnectionError
 from dotenv import load_dotenv
 from tqdm import tqdm
 
+from quant101.core_2.config import data_dir
+
 load_dotenv()
 
 ACCESS_KEY_ID = os.getenv("ACCESS_KEY_ID")
@@ -28,7 +30,7 @@ ENDPOINT_URL = "https://files.polygon.io"
 BUCKET_NAME = "flatfiles"
 
 # Base directory for downloaded files
-BASE_DIR = "data/raw"
+BASE_DIR = os.path.join(data_dir, "raw")
 
 # Asset classes and their data types
 ASSET_CLASSES = {
@@ -227,9 +229,20 @@ def main():
             print(f"  ... and {len(files) - 20} more files")
 
     elif args.specific_file:
-        result = downloader.download_specific_file(
-            args.specific_file, not args.no_decompress
-        )
+        # Extract year and month from the file name
+        # Example: us_stocks_sip/minute_aggs_v1/2020-11-17.csv.gz
+        s3_key = args.specific_file
+        print(f"Original s3_key: {s3_key}")
+        # Split to get the base path and filename
+        base_path, filename = os.path.split(s3_key)
+        # Extract year and month from filename
+        date_part = filename.split(".")[0]  # "2020-11-17"
+        year, month, _ = date_part.split("-")
+        # Reconstruct the s3_key with year/month in the path
+        s3_key = f"{base_path}/{year}/{month}/{filename}"
+        print(f"Resolved s3_key: {s3_key}")
+
+        result = downloader.download_specific_file(s3_key, not args.no_decompress)
         if result:
             print(f"Successfully downloaded: {result}")
 
@@ -268,9 +281,30 @@ def main():
             "  Download date range: python polygon_downloader.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
         )
         print(
-            "  Download specific file: python polygon_downloader.py --specific-file us_stocks_sip/trades_v1/2024/03/2024-03-07.csv.gz"
+            "  Download specific file: python src/quant101/data_1/polygon_downloader.py --specific-file us_stocks_sip/minute_aggs_v1/2024/03/2024-03-07.csv.gz"
         )
 
 
 if __name__ == "__main__":
     main()
+
+
+# │ 2020-11-17 00:00:00 ┆ 2020-11-17 09:30:00 EST        ┆ null              ┆ null              ┆ 2020-11-17 16:00:00 EST        │
+# │ 2020-11-20 00:00:00 ┆ 2020-11-20 09:30:00 EST        ┆ null              ┆ null              ┆ 2020-11-20 16:00:00 EST        │
+# │ 2020-11-23 00:00:00 ┆ 2020-11-23 09:30:00 EST        ┆ null              ┆ null              ┆ 2020-11-23 16:00:00 EST        │
+# │ 2020-12-03 00:00:00 ┆ 2020-12-03 09:30:00 EST        ┆ null              ┆ null              ┆ 2020-12-03 16:00:00 EST        │
+# │ 2020-12-04 00:00:00 ┆ 2020-12-04 09:30:00 EST        ┆ null              ┆ null              ┆ 2020-12-04 16:00:00 EST        │
+# │ 2020-12-08 00:00:00 ┆ 2020-12-08 09:30:00 EST        ┆ null              ┆ null              ┆ 2020-12-08 16:00:00 EST        │
+# │ 2020-12-10 00:00:00 ┆ 2020-12-10 09:30:00 EST        ┆ null              ┆ null              ┆ 2020-12-10 16:00:00 EST        │
+# │ 2020-12-15 00:00:00 ┆ 2020-12-15 09:30:00 EST        ┆ null              ┆ null              ┆ 2020-12-15 16:00:00 EST        │
+# │ 2020-12-24 00:00:00 ┆ 2020-12-24 09:30:00 EST        ┆ null              ┆ null              ┆ 2020-12-24 13:00:00 EST        │
+# │ 2021-01-07 00:00:00 ┆ 2021-01-07 09:30:00 EST        ┆ null              ┆ null              ┆ 2021-01-07 16:00:00 EST        │
+# │ 2021-01-25 00:00:00 ┆ 2021-01-25 09:30:00 EST        ┆ null              ┆ null              ┆ 2021-01-25 16:00:00 EST        │
+# │ 2021-01-28 00:00:00 ┆ 2021-01-28 09:30:00 EST        ┆ null              ┆ null              ┆ 2021-01-28 16:00:00 EST        │
+# │ 2021-02-01 00:00:00 ┆ 2021-02-01 09:30:00 EST        ┆ null              ┆ null              ┆ 2021-02-01 16:00:00 EST        │
+# │ 2021-02-03 00:00:00 ┆ 2021-02-03 09:30:00 EST        ┆ null              ┆ null              ┆ 2021-02-03 16:00:00 EST        │
+# │ 2021-02-05 00:00:00 ┆ 2021-02-05 09:30:00 EST        ┆ null              ┆ null              ┆ 2021-02-05 16:00:00 EST        │
+# │ 2021-02-11 00:00:00 ┆ 2021-02-11 09:30:00 EST        ┆ null              ┆ null              ┆ 2021-02-11 16:00:00 EST        │
+# │ 2021-02-16 00:00:00 ┆ 2021-02-16 09:30:00 EST        ┆ null              ┆ null              ┆ 2021-02-16 16:00:00 EST        │
+# │ 2021-02-19 00:00:00 ┆ 2021-02-19 09:30:00 EST        ┆ null              ┆ null              ┆ 2021-02-19 16:00:00 EST        │
+# │ 2021-02-25 00:00:00 ┆ 2021-02-25 09:30:00 EST        ┆ null              ┆ null              ┆ 2021-02-25 16:00:00 EST        │

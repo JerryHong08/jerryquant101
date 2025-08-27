@@ -18,9 +18,11 @@ from typing import Any, Dict, List, Optional
 import polars as pl
 from tqdm import tqdm
 
+from quant101.core_2.config import data_dir
+
 # Base directories
-RAW_DIR = "data/raw"
-PARQUET_DIR = "data/lake"
+RAW_DIR = os.path.join(data_dir, "raw")
+PARQUET_DIR = os.path.join(data_dir, "lake")
 
 # Schema definitions for different data types using Polars
 SCHEMAS = {
@@ -37,7 +39,7 @@ SCHEMAS = {
     },
     "day_aggs_v1": {
         "ticker": pl.String,
-        "volume": pl.UInt32,
+        "volume": pl.UInt64,
         "open": pl.Float32,
         "close": pl.Float32,
         "high": pl.Float32,
@@ -567,11 +569,11 @@ def main():
         print("\nUsage examples:")
         print("  Convert single file:")
         print(
-            "    python csvgz_to_parquet.py --file data/raw/us_stocks_sip/trades_v1/2024/03/2024-03-01.csv.gz"
+            "    python csvgz_to_parquet.py --file /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/2024/03/2024-03-01.csv.gz"
         )
         print("\n  Convert directory:")
         print(
-            "    python csvgz_to_parquet.py --directory data/raw/us_stocks_sip/trades_v1/"
+            "    python csvgz_to_parquet.py --directory /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/"
         )
         print("\n  Convert by asset class:")
         print(
@@ -583,7 +585,7 @@ def main():
         )
         print("\n  Show file info:")
         print(
-            "    python csvgz_to_parquet.py --info data/lake/us_stocks_sip/trades_v1/2024/03/2024-03-01.parquet"
+            "    python csvgz_to_parquet.py --info /mnt/blackdisk/quant_data/polygon_data/lake/us_stocks_sip/trades_v1/2024/03/2024-03-01.parquet"
         )
         print("\n  List schemas:")
         print("    python csvgz_to_parquet.py --list-schemas")
