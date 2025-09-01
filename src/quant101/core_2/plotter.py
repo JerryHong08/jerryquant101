@@ -1,4 +1,7 @@
+import matplotlib
 import seolpyo_mplchart as mc
+
+matplotlib.rcParams["font.family"] = "DejaVu Sans"
 
 
 def plot_candlestick(df, ticker: str = None, timeframe: str = "1d"):

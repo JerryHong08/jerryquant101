@@ -5,6 +5,8 @@ import polars as pl
 from dotenv import load_dotenv
 from polygon import RESTClient
 
+from quant101.core_2.config import splits_dir
+
 load_dotenv()
 
 polygon_api_key = os.getenv("POLYGON_API_KEY")
@@ -40,8 +42,6 @@ for i, s in enumerate(
         break
 
 splits_new = pl.DataFrame(splits)
-
-splits_dir = "data/raw/us_stocks_sip/splits/splits.parquet"
 
 os.makedirs(os.path.dirname(splits_dir), exist_ok=True)
 
