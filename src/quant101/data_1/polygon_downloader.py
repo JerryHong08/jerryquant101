@@ -242,7 +242,7 @@ def main():
         s3_key = f"{base_path}/{year}/{month}/{filename}"
         print(f"Resolved s3_key: {s3_key}")
 
-        result = downloader.download_specific_file(s3_key, not args.no_decompress)
+        result = downloader.download_specific_file(s3_key, args.no_decompress)
         if result:
             print(f"Successfully downloaded: {result}")
 
@@ -252,7 +252,7 @@ def main():
                 args.asset_class,
                 args.data_type,
                 args.recent_days,
-                not args.no_decompress,
+                args.no_decompress,
             )
             print(f"\nDownloaded {len(files)} files")
 
@@ -260,7 +260,7 @@ def main():
             start = datetime.strptime(args.start_date, "%Y-%m-%d").date()
             end = datetime.strptime(args.end_date, "%Y-%m-%d").date()
             files = downloader.download_date_range(
-                args.asset_class, args.data_type, start, end, not args.no_decompress
+                args.asset_class, args.data_type, start, end, args.no_decompress
             )
             print(f"\nDownloaded {len(files)} files")
 
@@ -272,13 +272,13 @@ def main():
     else:
         print("\nUsage examples:")
         print(
-            "  List files: python polygon_downloader.py --list --prefix us_stocks_sip/trades_v1/2024/"
+            "  List files: python src/quant101/data_1/polygon_downloader.py --list --prefix us_stocks_sip/trades_v1/2024/"
         )
         print(
-            "  Download recent 7 days: python polygon_downloader.py --asset-class us_stocks_sip --data-type trades_v1 --recent-days 7"
+            "  Download recent 7 days: python src/quant101/data_1/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days 7"
         )
         print(
-            "  Download date range: python polygon_downloader.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
+            "  Download date range: python src/quant101/data_1/polygon_downloader.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
         )
         print(
             "  Download specific file: python src/quant101/data_1/polygon_downloader.py --specific-file us_stocks_sip/minute_aggs_v1/2024/03/2024-03-07.csv.gz"

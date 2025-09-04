@@ -569,26 +569,26 @@ def main():
         print("\nUsage examples:")
         print("  Convert single file:")
         print(
-            "    python csvgz_to_parquet.py --file /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/2024/03/2024-03-01.csv.gz"
+            "    python src/quant101/data_1/csvgz_to_parquet.py --file /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/2024/03/2024-03-01.csv.gz"
         )
         print("\n  Convert directory:")
         print(
-            "    python csvgz_to_parquet.py --directory /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/"
+            "    python src/quant101/data_1/csvgz_to_parquet.py --directory /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/"
         )
         print("\n  Convert by asset class:")
         print(
-            "    python csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1"
+            "    python src/quant101/data_1/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1"
         )
         print("\n  Convert date range:")
         print(
-            "    python csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
+            "    python src/quant101/data_1/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
         )
         print("\n  Show file info:")
         print(
-            "    python csvgz_to_parquet.py --info /mnt/blackdisk/quant_data/polygon_data/lake/us_stocks_sip/trades_v1/2024/03/2024-03-01.parquet"
+            "    python src/quant101/data_1/csvgz_to_parquet.py --info /mnt/blackdisk/quant_data/polygon_data/lake/us_stocks_sip/trades_v1/2024/03/2024-03-01.parquet"
         )
         print("\n  List schemas:")
-        print("    python csvgz_to_parquet.py --list-schemas")
+        print("    python src/quant101/data_1/csvgz_to_parquet.py --list-schemas")
 
 
 if __name__ == "__main__":

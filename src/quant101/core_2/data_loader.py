@@ -59,7 +59,7 @@ def data_dir_calculate(
     return data_dirs
 
 
-def generate_full_timestamp(start_date, end_date, full_hour: bool = False):
+def generate_full_timestamp(start_date, end_date, timeframe, full_hour: bool = False):
 
     # 纽约证券交易所 (美国)
     xnys = xcals.get_calendar("XNYS")
@@ -75,63 +75,80 @@ def generate_full_timestamp(start_date, end_date, full_hour: bool = False):
         ]
     )
 
-    # 为每个交易日生成时间戳
-    all_timestamps = []
+    if timeframe == "1d":
 
-    for row in df_schedule.iter_rows(named=True):
-        is_half_day = row["close"].hour == 13
-
-        # 确定时间段
-        if not full_hour:
-            time_segments = [(row["open"], row["close"])]
-        elif is_half_day:
-            # 半日分两段
-            time_segments = [
-                (
-                    row["open"].replace(hour=4, minute=0, second=0),
-                    row["open"].replace(hour=13, minute=0, second=0),
-                ),
-                (
-                    row["open"].replace(hour=16, minute=0, second=0),
-                    row["open"].replace(hour=17, minute=0, second=0),
-                ),
-            ]
-        else:
-            # 正常全天
-            time_segments = [
-                (
-                    row["open"].replace(hour=4, minute=0, second=0),
-                    row["close"].replace(hour=20, minute=0, second=0),
-                )
-            ]
-
-        # 生成所有时间段的时间戳
-        for start_time, end_time in time_segments:
-            timestamps = (
-                pl.select(
-                    pl.datetime_range(
-                        start_time,
-                        end_time,
-                        interval="1m",
-                        closed="left",
-                        time_unit="ns",
-                    ).alias("timestamps")
-                )
-                .get_column("timestamps")
-                .to_list()
-            )
-            all_timestamps.extend(timestamps)
-
-    # 创建完整的时间戳DataFrame
-    generated_trade_timestamp = (
-        pl.DataFrame({"timestamps": all_timestamps})
-        .with_columns(
-            pl.col("timestamps")
-            .dt.cast_time_unit("ns")
-            .dt.convert_time_zone("America/New_York")
+        # 直接使用交易所日历中的交易日，而不是生成连续日期
+        trading_days_df = df_schedule.select(
+            pl.col("open").dt.date().alias("trade_date")
         )
-        .sort("timestamps")
-    )
+
+        # 创建时间戳DataFrame，使用交易日
+        generated_trade_timestamp = trading_days_df.with_columns(
+            pl.col("trade_date")
+            .cast(pl.Datetime)
+            .dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            .dt.replace_time_zone("America/New_York")
+            .alias("timestamps")
+        ).select("timestamps")
+
+    else:
+        # 为每个交易日生成时间戳
+        all_timestamps = []
+
+        for row in df_schedule.iter_rows(named=True):
+            is_half_day = row["close"].hour == 13
+
+            # 确定时间段
+            if not full_hour:
+                time_segments = [(row["open"], row["close"])]
+            elif is_half_day:
+                # 半日分两段
+                time_segments = [
+                    (
+                        row["open"].replace(hour=4, minute=0, second=0),
+                        row["open"].replace(hour=13, minute=0, second=0),
+                    ),
+                    (
+                        row["open"].replace(hour=16, minute=0, second=0),
+                        row["open"].replace(hour=17, minute=0, second=0),
+                    ),
+                ]
+            else:
+                # 正常全天
+                time_segments = [
+                    (
+                        row["open"].replace(hour=4, minute=0, second=0),
+                        row["close"].replace(hour=20, minute=0, second=0),
+                    )
+                ]
+
+            # 生成所有时间段的时间戳
+            for start_time, end_time in time_segments:
+                timestamps = (
+                    pl.select(
+                        pl.datetime_range(
+                            start_time,
+                            end_time,
+                            interval="1m",
+                            closed="left",
+                            time_unit="ns",
+                        ).alias("timestamps")
+                    )
+                    .get_column("timestamps")
+                    .to_list()
+                )
+                all_timestamps.extend(timestamps)
+
+        # 创建完整的时间戳DataFrame
+        generated_trade_timestamp = (
+            pl.DataFrame({"timestamps": all_timestamps})
+            .with_columns(
+                pl.col("timestamps")
+                .dt.cast_time_unit("ns")
+                .dt.convert_time_zone("America/New_York")
+            )
+            .sort("timestamps")
+        )
 
     return generated_trade_timestamp
 
@@ -406,6 +423,15 @@ def data_loader(
     end_date: str = "",
     full_hour: bool = False,
 ):
+    # 解析timeframe以确定数据源
+    import re
+
+    match = re.match(r"(\d+)([mhd]|w|mo|q|y)", timeframe.lower())
+    if not match:
+        raise ValueError(f"Invalid timeframe: {timeframe}")
+
+    value, unit = int(match.group(1)), match.group(2)
+    is_daily_or_above = unit in ["d", "w", "mo", "q", "y"]
 
     lake_file_paths = data_dir_calculate(
         asset=asset,
@@ -414,6 +440,8 @@ def data_loader(
         end_date=end_date,
         # lake=False
     )
+
+    print("1. data path loaded.")
 
     lf = (
         pl.scan_parquet(
@@ -429,32 +457,61 @@ def data_loader(
 
     if tickers == None:
         tickers = lf.select("ticker").unique().collect()["ticker"]
+        print(f"All tickers count: {len(tickers)}")
     else:
         lf = lf.filter(pl.col("ticker").is_in(tickers))
+
+    print("2. data loaded.")
 
     lf = splits_adjust(lf, splits_data, price_decimals=4)
     # print(lf.collect().head(1))
 
-    generated_timestamp_1min = generate_full_timestamp(
-        start_date, end_date, timeframe="1m", full_hour=full_hour
+    print("3. splits adjusted.")
+
+    ticker_date_ranges = (
+        lf.group_by("ticker")
+        .agg(
+            [
+                pl.col("timestamps").min().alias("first_trade_time"),
+                pl.col("timestamps").max().alias("last_trade_time"),
+            ]
+        )
+        .collect()
     )
 
-    # with pandas.option_context('display.max_rows', 100, 'display.max_columns', None):
-    #     print(generated_timestamp_1min.head(100).to_pandas())
+    all_time_ranges = []
 
-    time_range_lf = (
-        pl.DataFrame(
+    for row in ticker_date_ranges.iter_rows(named=True):
+        ticker_name = row["ticker"]
+        first_time = row["first_trade_time"].strftime("%Y-%m-%d")
+        last_time = row["last_trade_time"].strftime("%Y-%m-%d")
+
+        if is_daily_or_above:
+            generated_timestamp = generate_full_timestamp(
+                first_time, last_time, timeframe="1d", full_hour=full_hour
+            )
+        else:
+            generated_timestamp = generate_full_timestamp(
+                first_time, last_time, timeframe="1m", full_hour=full_hour
+            )
+
+        ticker_time_range = pl.DataFrame(
             {
-                "ticker": [
-                    t for t in tickers for _ in range(len(generated_timestamp_1min))
-                ],
-                "timestamps": generated_timestamp_1min["timestamps"].to_list()
-                * len(tickers),
+                "ticker": [ticker_name] * len(generated_timestamp),
+                "timestamps": generated_timestamp["timestamps"].to_list(),
             }
         )
-        .with_columns(pl.col("timestamps").dt.cast_time_unit("ns"))
-        .lazy()
-    )
+
+        all_time_ranges.append(ticker_time_range)
+
+    print("4. timeframe prepare 1.")
+
+    if all_time_ranges:
+        time_range_lf = (
+            pl.concat(all_time_ranges)
+            .with_columns(pl.col("timestamps").dt.cast_time_unit("ns"))
+            .lazy()
+        )
 
     # 先在1 min timeframe上forward fill，再resample到目标timeframe
     # 所有操作都在 LazyFrame 中进行
@@ -486,22 +543,28 @@ def data_loader(
         .drop("close_filled")
     )
 
-    if timeframe != "1m":
+    print("6. timeframe fillna.")
+
+    if timeframe not in ("1m", "1d"):
         lf_full = resample_ohlcv(lf_full, timeframe)
+
+    print("7. resample done.")
 
     return lf_full
 
 
 if __name__ == "__main__":
-    tickers = ["NVDA", "TSLA"]
-    # tickers = None
-    timeframe = "1h"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
+    # tickers = ['NVDA','TSLA','FIG']
+    tickers = None
+    timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
     asset = "us_stocks_sip"
     data_type = "day_aggs_v1" if timeframe == "1d" else "minute_aggs_v1"
-    start_date = "2025-07-01"
-    end_date = "2025-07-08"
-    full_hour = True
+    start_date = "2025-09-03"
+    end_date = "2025-09-03"
+    full_hour = False
+    # plot = True
     plot = False
+    ticker_plot = "NVDA"
 
     lf_result = data_loader(
         tickers=tickers,
@@ -513,8 +576,14 @@ if __name__ == "__main__":
         full_hour=full_hour,
     ).collect()
 
-    print(lf_result.head())
-    print(lf_result.tail())
+    df = lf_result.select(pl.col("ticker").unique())
+    for t in df["ticker"]:
+        print(t)
+    # print(lf_result.tail())
 
     if plot:
-        plot_candlestick(lf_result.to_pandas(), tickers[0], timeframe)
+        plot_candlestick(
+            lf_result.filter(pl.col("ticker") == "NVDA").to_pandas(),
+            ticker_plot,
+            timeframe,
+        )

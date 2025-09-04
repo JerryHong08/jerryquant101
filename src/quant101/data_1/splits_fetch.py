@@ -7,6 +7,8 @@ from polygon import RESTClient
 
 from quant101.core_2.config import splits_dir
 
+os.makedirs(os.path.dirname(splits_dir), exist_ok=True)
+
 load_dotenv()
 
 polygon_api_key = os.getenv("POLYGON_API_KEY")
@@ -43,14 +45,13 @@ for i, s in enumerate(
 
 splits_new = pl.DataFrame(splits)
 
-os.makedirs(os.path.dirname(splits_dir), exist_ok=True)
-
 splits_original = pl.read_parquet(splits_dir)
+
 
 # 合并 splits_original 和 splits_new，只保留 splits_new 中 splits_original 没有的行
 # splits_diff = splits_new.filter(~pl.col('id').is_in(splits_original['id'].implode()))
-splits = pl.concat([splits_original, splits_new]).unique()
 
+splits = pl.concat([splits_original, splits_new]).unique()
 splits.write_parquet(splits_dir, compression="snappy")
 
 splits_read = pl.read_parquet(splits_dir)
@@ -58,5 +59,5 @@ splits_read = pl.read_parquet(splits_dir)
 # 需要将排序后的 DataFrame 赋值回来，否则排序不会生效
 splits_read = splits_read.sort("execution_date", descending=True)
 
-# with pl.Config(tbl_rows=100, tbl_cols=10):
-#     print(splits_read.head(100))
+with pl.Config(tbl_rows=100, tbl_cols=10):
+    print(splits_read.head(100))
