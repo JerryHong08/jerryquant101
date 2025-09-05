@@ -52,30 +52,30 @@ else:
     print(f"Saved {all_tickers_file}")
 
 all_tickers = pl.read_parquet(all_tickers_file)
-# with pl.Config(tbl_rows=50, tbl_cols=20):
-#     print(all_tickers.shape)
-#     # print(all_tickers.describe())
-#     print(
-#         all_tickers.filter(
-#             (pl.col('active') == True)
-#             # & (pl.col('type').is_in(['ADRC', 'CS', 'ETF', 'ETN', 'ETS', 'ETV']))
-#         ).select('ticker')
-#     )
+with pl.Config(tbl_rows=50, tbl_cols=20):
+    print(all_tickers.shape)
+    # print(all_tickers.describe())
+    print(
+        all_tickers.filter(
+            (pl.col("active") == True)
+            # & (pl.col('type').is_in(['ADRC', 'CS', 'ETF', 'ETN', 'ETS', 'ETV']))
+        ).select("ticker")
+    )
 
-import sys
+# import sys
 
-tickers_from_daily = [
-    line.strip()
-    for line in sys.stdin
-    if line.strip() and not any(ch.isdigit() for ch in line.strip())
-]
-df_daily = pl.DataFrame({"ticker": tickers_from_daily})
-df_all = all_tickers.filter(
-    (pl.col("active")) & (pl.col("type").is_in(["ADRC", "CS"]))
-).select("ticker")
+# tickers_from_daily = [
+#     line.strip()
+#     for line in sys.stdin
+#     if line.strip() and not any(ch.isdigit() for ch in line.strip())
+# ]
+# df_daily = pl.DataFrame({"ticker": tickers_from_daily})
+# df_all = all_tickers.filter(
+#     (pl.col("active")) & (pl.col("type").is_in(["ADRC", "CS"]))
+# ).select("ticker")
 
-with pl.Config(tbl_rows=400, tbl_cols=20):
-    print("only in all:", df_all.join(df_daily, on="ticker", how="anti"))
-    print("only in daily:", df_daily.join(df_all, on="ticker", how="anti"))
+# with pl.Config(tbl_rows=400, tbl_cols=20):
+#     print("only in all:", df_all.join(df_daily, on="ticker", how="anti"))
+#     print("only in daily:", df_daily.join(df_all, on="ticker", how="anti"))
 
 # python src/quant101/core_2/data_loader.py | python src/quant101/data_1/all_tickers_fetch.py

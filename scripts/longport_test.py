@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import date
 
@@ -18,14 +19,17 @@ try:
         app_secret=os.getenv("LONGPORT_APP_SECRET"),
         access_token=os.getenv("LONGPORT_ACCESS_TOKEN"),
     )
-
-    print(config)
-
     # Create a context for quote APIs
     ctx = QuoteContext(config)
 
-    resp = ctx.trading_days(Market.US, date(2025, 1, 1), date(2025, 2, 1))
-    print(resp)
+    watchlist = ctx.watchlist()
+    # print(watchlist)
+    for group in watchlist:
+        if group.name == "py_bbiboll":
+            watchlist_id = group.id
+            watchlist_symbols = [s.symbol.replace(".US", "") for s in group.securities]
+            # print(f"Using watchlist '{group.name}' with {len(watchlist_symbols)} symbols")
+            print(json.dumps(watchlist_symbols))
 
 finally:
     # 恢复代理设置，以免影响其他需要代理的操作
