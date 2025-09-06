@@ -1,4 +1,6 @@
 import glob
+import hashlib
+import json
 import os
 from datetime import datetime, time, timedelta
 
@@ -414,6 +416,40 @@ def splits_adjust(lf, splits, price_decimals: int = 4):
     return lf
 
 
+def generate_cache_key(
+    tickers, timeframe, asset, data_type, start_date, end_date, full_hour
+):
+    """Generate a unique cache key based on parameters"""
+    cache_params = {
+        "tickers": sorted(tickers) if tickers else None,
+        "timeframe": timeframe,
+        "asset": asset,
+        "data_type": data_type,
+        "start_date": start_date,
+        "end_date": end_date,
+        "full_hour": full_hour,
+    }
+
+    # Convert to JSON string and create hash
+    params_str = json.dumps(cache_params, sort_keys=True, default=str)
+    cache_key = hashlib.md5(params_str.encode()).hexdigest()
+    return cache_key
+
+
+def get_cache_path(asset, data_type, cache_key):
+    """Get the cache file path"""
+    cache_dir = os.path.join(data_dir, "processed", asset, data_type)
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, f"cache_{cache_key}.parquet")
+
+
+def save_cache_metadata(cache_path, params):
+    """Save cache metadata for debugging"""
+    metadata_path = cache_path.replace(".parquet", "_metadata.json")
+    with open(metadata_path, "w") as f:
+        json.dump(params, f, indent=2, default=str)
+
+
 def data_loader(
     tickers: str = None,
     timeframe: str = "1m",
@@ -422,7 +458,26 @@ def data_loader(
     start_date: str = "",
     end_date: str = "",
     full_hour: bool = False,
+    use_cache: bool = True,
 ):
+    # Generate cache key
+    cache_key = generate_cache_key(
+        tickers, timeframe, asset, data_type, start_date, end_date, full_hour
+    )
+    cache_path = get_cache_path(asset, data_type, cache_key)
+
+    # Check if cache exists and use_cache is True
+    if use_cache and os.path.exists(cache_path):
+        print(f"Loading from cache: {cache_path}")
+        try:
+            cached_data = pl.scan_parquet(cache_path)
+            print("Cache loaded successfully.")
+            return cached_data
+        except Exception as e:
+            print(f"Failed to load cache: {e}, proceeding with normal data loading...")
+
+    print("Processing data from source...")
+
     # 解析timeframe以确定数据源
     import re
 
@@ -549,6 +604,31 @@ def data_loader(
         lf_full = resample_ohlcv(lf_full, timeframe)
 
     print("7. resample done.")
+    # Save to cache if use_cache is True
+    if use_cache:
+        try:
+            print(f"Saving to cache: {cache_path}")
+            lf_full.collect().write_parquet(cache_path)
+
+            # Save metadata for debugging
+            cache_params = {
+                "tickers": tickers,
+                "timeframe": timeframe,
+                "asset": asset,
+                "data_type": data_type,
+                "start_date": start_date,
+                "end_date": end_date,
+                "full_hour": full_hour,
+                "cache_key": cache_key,
+                "created_at": datetime.now().isoformat(),
+            }
+            save_cache_metadata(cache_path, cache_params)
+            print("Cache saved successfully.")
+
+            # Return lazy frame of cached data
+            return pl.scan_parquet(cache_path)
+        except Exception as e:
+            print(f"Failed to save cache: {e}, returning processed data...")
 
     return lf_full
 

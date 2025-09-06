@@ -1,81 +1,67 @@
 import os
+import time
 
 import polars as pl
 from dotenv import load_dotenv
 from polygon import RESTClient
 
-from quant101.core_2.config import all_tickers_dir
-
-os.makedirs(all_tickers_dir, exist_ok=True)
+from quant101.core_2.config import all_indices_dir, all_tickers_dir
 
 load_dotenv()
-import time
+polygon_api_key = os.getenv("POLYGON_API_KEY")
+client = RESTClient(polygon_api_key)
 
 updated_time = time.strftime("%Y%m%d", time.localtime())
-all_tickers_file = os.path.join(all_tickers_dir, f"all_tickers_{updated_time}.parquet")
 
-if os.path.exists(all_tickers_file):
-    print(f"{all_tickers_file} already exists.")
-else:
-    polygon_api_key = os.getenv("POLYGON_API_KEY")
-    client = RESTClient(polygon_api_key)
+ASSET_CONFIG = {
+    "stocks": all_tickers_dir,
+    "indices": all_indices_dir,
+}
 
-    active_tickers = []
-    for t in client.list_tickers(
-        market="stocks",
-        active="True",
-        order="asc",
-        limit="1000",
-        sort="ticker",
-    ):
-        active_tickers.append(t)
 
-    deactive_tickers = []
-    for t in client.list_tickers(
-        market="stocks",
-        active="False",
-        order="asc",
-        limit="1000",
-        sort="ticker",
-    ):
-        deactive_tickers.append(t)
+def fetch_and_save(asset_type: str, out_dir: str):
+    os.makedirs(out_dir, exist_ok=True)
+    out_file = os.path.join(out_dir, f"all_{asset_type}_{updated_time}.parquet")
 
-    all_tickers = active_tickers + deactive_tickers
-    all_tickers = pl.DataFrame(all_tickers)
+    if os.path.exists(out_file):
+        print(f"{out_file} already exists.")
+        return out_file
 
+    all_records = []
+    for active_flag in ["True", "False"]:
+        tickers = []
+        for t in client.list_tickers(
+            market=asset_type,
+            active=active_flag,
+            order="asc",
+            limit="1000",
+            sort="ticker",
+        ):
+            tickers.append(t)
+        all_records.extend(tickers)
+
+    df = pl.DataFrame(all_records)
     # delete last updated all_ticker file(s)
-    for f in os.listdir(all_tickers_dir):
-        if f.startswith("all_tickers_") and f.endswith(".parquet"):
-            os.remove(os.path.join(all_tickers_dir, f))
+    for f in os.listdir(out_dir):
+        if f.startswith("all_{asset_type}_") and f.endswith(".parquet"):
+            os.remove(os.path.join(out_dir, f))
 
-    all_tickers.write_parquet(all_tickers_file, compression="snappy")
-    print(f"Saved {all_tickers_file}")
+    df.write_parquet(out_file, compression="snappy")
+    print(f"Saved {out_file}")
 
-all_tickers = pl.read_parquet(all_tickers_file)
+
+for asset, outdir in ASSET_CONFIG.items():
+    fetch_and_save(asset, outdir)
+
 with pl.Config(tbl_rows=50, tbl_cols=20):
-    print(all_tickers.shape)
-    # print(all_tickers.describe())
+    asset = "indices"
+    all_asset = pl.read_parquet(
+        os.path.join(ASSET_CONFIG[asset], f"all_{asset}_{updated_time}.parquet")
+    )
+    print(all_asset.shape)
     print(
-        all_tickers.filter(
+        all_asset.filter(
             (pl.col("active") == True)
             # & (pl.col('type').is_in(['ADRC', 'CS', 'ETF', 'ETN', 'ETS', 'ETV']))
-        ).select("ticker")
+        )
     )
-
-# import sys
-
-# tickers_from_daily = [
-#     line.strip()
-#     for line in sys.stdin
-#     if line.strip() and not any(ch.isdigit() for ch in line.strip())
-# ]
-# df_daily = pl.DataFrame({"ticker": tickers_from_daily})
-# df_all = all_tickers.filter(
-#     (pl.col("active")) & (pl.col("type").is_in(["ADRC", "CS"]))
-# ).select("ticker")
-
-# with pl.Config(tbl_rows=400, tbl_cols=20):
-#     print("only in all:", df_all.join(df_daily, on="ticker", how="anti"))
-#     print("only in daily:", df_daily.join(df_all, on="ticker", how="anti"))
-
-# python src/quant101/core_2/data_loader.py | python src/quant101/data_1/all_tickers_fetch.py

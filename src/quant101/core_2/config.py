@@ -16,3 +16,4 @@ splits_errors = pl.read_parquet(splits_error_dir)
 splits_data = splits_original.filter(~pl.col("id").is_in(splits_errors["id"].implode()))
 
 all_tickers_dir = os.path.join(data_dir, "raw/us_stocks_sip/us_all_tickers")
+all_indices_dir = os.path.join(data_dir, "raw/us_indices/us_all_indices")
