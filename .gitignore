@@ -21,6 +21,7 @@ data
 *.csv
 *.db
 *.sqlite
+*.parquet
 
 # Logs
 *.log

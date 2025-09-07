@@ -63,5 +63,6 @@ with pl.Config(tbl_rows=50, tbl_cols=20):
         all_asset.filter(
             (pl.col("active") == True)
             # & (pl.col('type').is_in(['ADRC', 'CS', 'ETF', 'ETN', 'ETS', 'ETV']))
+            & (pl.col("ticker").str.contains("SPX"))
         )
     )

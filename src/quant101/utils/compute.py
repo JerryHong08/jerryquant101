@@ -82,96 +82,95 @@ def calculate_signal_duration(signals_df):
         print(f"最短平均持续天数: {avg_durations['avg_duration_days'].min():.2f} 天")
 
 
-# def prepare_trades(lf_result, signal_table):
-#     """
-#     根据信号生成交易，并计算收益和组合曲线
-#     - lf_result: 包含所有股票日线数据 [ticker, timestamps, open, close]
-#     - signal_table: 包含信号 [ticker, timestamps, signal]
-#     """
+def prepare_trades_old(lf_result, signal_table):
+    """
+    根据信号生成交易，并计算收益和组合曲线
+    - lf_result: 包含所有股票日线数据 [ticker, timestamps, open, close]
+    - signal_table: 包含信号 [ticker, timestamps, signal]
+    """
 
-#     # 先按 ticker+date 排序
-#     signal_table = signal_table.sort(["ticker", "timestamps"])
+    # 先按 ticker+date 排序
+    signal_table = signal_table.sort(["ticker", "timestamps"])
 
-#     # 标记连续段落 (信号连续时属于同一个 block)
-#     signal_table = signal_table.with_columns(
-#         (pl.col("timestamps").diff().dt.total_days().fill_null(999) > 1)
-#         .cum_sum()
-#         .over("ticker")
-#         .alias("block_id")
-#     )
+    # 标记连续段落 (信号连续时属于同一个 block)
+    signal_table = signal_table.with_columns(
+        (pl.col("timestamps").diff().dt.total_days().fill_null(999) > 1)
+        .cum_sum()
+        .over("ticker")
+        .alias("block_id")
+    )
 
-#     # 每个段落只保留最后一个信号
-#     last_signals = (
-#         signal_table.group_by(["ticker", "block_id"])
-#         .agg(pl.col("timestamps").max().alias("signal_date"))
-#     )
+    # 每个段落只保留最后一个信号
+    last_signals = signal_table.group_by(["ticker", "block_id"]).agg(
+        pl.col("timestamps").max().alias("signal_date")
+    )
 
-#     # 股票价格数据，加上 row_id 方便 shift
-#     prices = lf_result.select(["ticker", "timestamps", "open", "close"]).sort(
-#         ["ticker", "timestamps"]
-#     )
-#     prices = prices.with_columns(
-#         pl.arange(0, pl.count()).over("ticker").alias("row_id")
-#     )
+    # 股票价格数据，加上 row_id 方便 shift
+    prices = lf_result.select(["ticker", "timestamps", "open", "close"]).sort(
+        ["ticker", "timestamps"]
+    )
+    prices = prices.with_columns(
+        pl.arange(0, pl.count()).over("ticker").alias("row_id")
+    )
 
-#     # 将信号日期 merge 进价格表，得到 row_id
-#     last_signals = last_signals.join(
-#         prices.rename({"timestamps": "signal_date"}),
-#         on=["ticker", "signal_date"],
-#         how="left",
-#     )
+    # 将信号日期 merge 进价格表，得到 row_id
+    last_signals = last_signals.join(
+        prices.rename({"timestamps": "signal_date"}),
+        on=["ticker", "signal_date"],
+        how="left",
+    )
 
-#     # 卖出日期 = 最后信号日 + 4 行
-#     last_signals = last_signals.with_columns(
-#         (pl.col("row_id") + 4).alias("sell_row_id")
-#     )
+    # 卖出日期 = 最后信号日 + 4 行
+    last_signals = last_signals.with_columns(
+        (pl.col("row_id") + 4).alias("sell_row_id")
+    )
 
-#     sells = last_signals.join(
-#         prices.rename({"timestamps": "sell_date", "open": "sell_open"}).select(
-#             ["ticker", "row_id", "sell_date", "sell_open"]
-#         ),
-#         left_on=["ticker", "sell_row_id"],
-#         right_on=["ticker", "row_id"],
-#         how="left",
-#     )
+    sells = last_signals.join(
+        prices.rename({"timestamps": "sell_date", "open": "sell_open"}).select(
+            ["ticker", "row_id", "sell_date", "sell_open"]
+        ),
+        left_on=["ticker", "sell_row_id"],
+        right_on=["ticker", "row_id"],
+        how="left",
+    )
 
-#     # 买入日期 = signal_date 的下一行 (+1)
-#     buys = last_signals.with_columns((pl.col("row_id") + 1).alias("buy_row_id"))
-#     buys = buys.join(
-#         prices.rename({"timestamps": "buy_date", "open": "buy_open"}).select(
-#             ["ticker", "row_id", "buy_date", "buy_open"]
-#         ),
-#         left_on=["ticker", "buy_row_id"],
-#         right_on=["ticker", "row_id"],
-#         how="left",
-#     )
+    # 买入日期 = signal_date 的下一行 (+1)
+    buys = last_signals.with_columns((pl.col("row_id") + 1).alias("buy_row_id"))
+    buys = buys.join(
+        prices.rename({"timestamps": "buy_date", "open": "buy_open"}).select(
+            ["ticker", "row_id", "buy_date", "buy_open"]
+        ),
+        left_on=["ticker", "buy_row_id"],
+        right_on=["ticker", "row_id"],
+        how="left",
+    )
 
-#     # 用 block_id 合并买卖，避免一买多卖
-#     trades = buys.join(
-#         sells.select(["ticker", "block_id", "sell_date", "sell_open"]),
-#         on=["ticker", "block_id"],
-#         how="left",
-#     ).select(["ticker", "buy_date", "buy_open", "sell_date", "sell_open"])
+    # 用 block_id 合并买卖，避免一买多卖
+    trades = buys.join(
+        sells.select(["ticker", "block_id", "sell_date", "sell_open"]),
+        on=["ticker", "block_id"],
+        how="left",
+    ).select(["ticker", "buy_date", "buy_open", "sell_date", "sell_open"])
 
-#     # 收益
-#     trades = trades.with_columns(
-#         ((pl.col("sell_open") / pl.col("buy_open")) - 1).alias("return")
-#     )
+    # 收益
+    trades = trades.with_columns(
+        ((pl.col("sell_open") / pl.col("buy_open")) - 1).alias("return")
+    )
 
-#     # === 组合收益曲线 ===
-#     # 按 buy_date 聚合（等权平均当天所有股票的收益）
-#     portfolio = (
-#         trades.group_by("buy_date")
-#         .agg(pl.col("return").mean().alias("daily_return"))
-#         .sort("buy_date")
-#     )
+    # === 组合收益曲线 ===
+    # 按 buy_date 聚合（等权平均当天所有股票的收益）
+    portfolio = (
+        trades.group_by("buy_date")
+        .agg(pl.col("return").mean().alias("daily_return"))
+        .sort("buy_date")
+    )
 
-#     # 累计权益曲线
-#     portfolio = portfolio.with_columns(
-#         (1 + pl.col("daily_return")).cum_prod().alias("equity_curve")
-#     )
+    # 累计权益曲线
+    portfolio = portfolio.with_columns(
+        (1 + pl.col("daily_return")).cum_prod().alias("equity_curve")
+    )
 
-#     return trades, portfolio
+    return trades, portfolio
 
 
 def prepare_trades(lf_result: pl.DataFrame, signal_table: pl.DataFrame):

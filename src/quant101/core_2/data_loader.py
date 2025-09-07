@@ -4,14 +4,93 @@ import json
 import os
 from datetime import datetime, time, timedelta
 
+import duckdb
 import exchange_calendars as xcals
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas
 import polars as pl
+import s3fs
+from dotenv import load_dotenv
 
 from quant101.core_2.config import data_dir, splits_data, splits_error_dir
 from quant101.core_2.plotter import plot_candlestick
+
+load_dotenv()
+
+ACCESS_KEY_ID = os.getenv("ACCESS_KEY_ID")
+SECRET_ACCESS_KEY = os.getenv("SECRET_ACCESS_KEY")
+
+# 创建 S3 文件系统对象
+fs = s3fs.S3FileSystem(
+    key=ACCESS_KEY_ID,
+    secret=SECRET_ACCESS_KEY,
+    endpoint_url="https://files.polygon.io",
+    client_kwargs={"region_name": "us-east-1"},
+)
+
+
+def s3_data_dir_calculate(asset: str, data_type: str, start_date: str, end_date: str):
+    """
+    Calculate data directory paths based on asset type, timeframe, date range.
+
+    Args:
+        start_date: Start date in format 'YYYY-MM-DD'
+        end_date: End date in format 'YYYY-MM-DD'
+
+    Returns:
+        List of S3 file paths
+    """
+
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+
+    data_dirs = []
+
+    for y in range(start_dt.year, end_dt.year + 1):
+        start_month = start_dt.month if y == start_dt.year else 1
+        end_month = end_dt.month if y == end_dt.year else 12
+
+        for m in range(start_month, end_month + 1):
+            month_str = f"{m:02d}"  # Format as two digits
+            # S3 路径
+            s3_prefix = f"flatfiles/{asset}/{data_type}/{y}/{month_str}/"
+            file_extension = "csv.gz"
+
+            print(f"Searching in S3 path: {s3_prefix}")
+
+            try:
+                # 列出该路径下的所有文件
+                all_files = fs.ls(s3_prefix)
+                # 过滤出正确扩展名的文件
+                month_all_file = [
+                    f"s3://{f}" for f in all_files if f.endswith(file_extension)
+                ]
+
+                print(f"Found {len(month_all_file)} files")
+
+                if m in [start_month, end_month]:
+                    filtered_files = []
+                    for file in month_all_file:
+                        # 从 s3://flatfiles/... 中提取文件名
+                        file_name = os.path.basename(file).split(".")[0]
+                        try:
+                            file_date = datetime.strptime(file_name, "%Y-%m-%d").date()
+                        except ValueError:
+                            continue  # skip files that don't match the date format
+                        if (m == start_month and file_date < start_dt.date()) or (
+                            m == end_month and file_date > end_dt.date()
+                        ):
+                            continue  # skip files outside the range
+                        filtered_files.append(file)
+                    data_dirs.extend(filtered_files)
+                else:
+                    data_dirs.extend(month_all_file)
+            except Exception as e:
+                print(f"Error accessing S3 path {s3_prefix}: {e}")
+                continue
+
+    return data_dirs
 
 
 def data_dir_calculate(
@@ -452,12 +531,60 @@ def save_cache_metadata(cache_path, params):
 
 def data_loader(
     tickers: str = None,
+    asset: str = "us_stocks_sip",
+    data_type: str = "minute_aggs_v1",
+    start_date: str = "",
+    end_date: str = "",
+    use_s3: bool = False,
+):
+    if use_s3:
+        lake_file_paths = s3_data_dir_calculate(
+            asset=asset,
+            data_type=data_type,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    else:
+        lake_file_paths = data_dir_calculate(
+            asset=asset,
+            data_type=data_type,
+            start_date=start_date,
+            end_date=end_date,
+            # lake=False
+        )
+
+    print("1. data path loaded.")
+
+    # local lake/*/.parquet
+    if all(f.endswith(".parquet") for f in lake_file_paths):
+        lf = pl.scan_parquet(lake_file_paths)
+    # s3 */.csv.gz
+    elif use_s3:
+        lf = pl.scan_csv(
+            lake_file_paths,
+            storage_options={
+                "aws_access_key_id": ACCESS_KEY_ID,
+                "aws_secret_access_key": SECRET_ACCESS_KEY,
+                "aws_endpoint": "https://files.polygon.io",
+                "aws_region": "us-east-1",
+            },
+        )
+    # local raw/*/.csv.gz
+    else:
+        lf = pl.scan_csv(lake_file_paths)
+
+    return lf
+
+
+def stock_load_process(
+    tickers: str = None,
     timeframe: str = "1m",
     asset: str = "us_stocks_sip",
     data_type: str = "minute_aggs_v1",
     start_date: str = "",
     end_date: str = "",
     full_hour: bool = False,
+    use_s3: bool = False,
     use_cache: bool = True,
 ):
     # Generate cache key
@@ -488,27 +615,20 @@ def data_loader(
     value, unit = int(match.group(1)), match.group(2)
     is_daily_or_above = unit in ["d", "w", "mo", "q", "y"]
 
-    lake_file_paths = data_dir_calculate(
+    lf = data_loader(
+        tickers=tickers,
         asset=asset,
         data_type=data_type,
         start_date=start_date,
         end_date=end_date,
-        # lake=False
+        use_s3=use_s3,
     )
 
-    print("1. data path loaded.")
-
-    lf = (
-        pl.scan_parquet(
-            lake_file_paths,
-        )
-        .with_columns(
-            pl.from_epoch(pl.col("window_start"), time_unit="ns")
-            .dt.convert_time_zone("America/New_York")
-            .alias("timestamps")
-        )
-        .sort("ticker", "timestamps")
-    )
+    lf = lf.with_columns(
+        pl.from_epoch(pl.col("window_start"), time_unit="ns")
+        .dt.convert_time_zone("America/New_York")
+        .alias("timestamps")
+    ).sort("ticker", "timestamps")
 
     if tickers == None:
         tickers = lf.select("ticker").unique().collect()["ticker"]
@@ -605,7 +725,7 @@ def data_loader(
 
     print("7. resample done.")
     # Save to cache if use_cache is True
-    if use_cache:
+    if use_cache and not use_s3:
         try:
             print(f"Saving to cache: {cache_path}")
             lf_full.collect().write_parquet(cache_path)
@@ -646,7 +766,7 @@ if __name__ == "__main__":
     plot = False
     ticker_plot = "NVDA"
 
-    lf_result = data_loader(
+    lf_result = stock_load_process(
         tickers=tickers,
         timeframe=timeframe,
         asset=asset,
