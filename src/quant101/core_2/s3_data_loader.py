@@ -6,7 +6,7 @@ import polars as pl
 import s3fs
 from dotenv import load_dotenv
 
-from quant101.core_2.data_loader import s3_data_dir_calculate
+from quant101.core_2.data_loader import data_loader
 
 load_dotenv()
 
@@ -21,12 +21,14 @@ SECRET_ACCESS_KEY = os.getenv("SECRET_ACCESS_KEY")
 # local_data_dir .csv.gz duckdb :13s
 # local_data_dir .parquet duckdb :0s
 
-lake_file_paths = s3_data_dir_calculate(
-    asset="us_options_opra",
-    data_type="trades_v1",
+lake_file_paths = data_loader(
+    asset="us_stocks_sip",
+    data_type="day_aggs_v1",
     start_date="2022-01-01",
     end_date="2025-09-05",
+    use_s3=True,
 )
+
 
 print(f"Found files: {lake_file_paths}")
 

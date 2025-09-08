@@ -65,10 +65,13 @@ def calculate_bbiboll(df: pl.DataFrame, boll_length: int = 11, boll_multiple: in
             ]
         )
 
+        # pct_window = 2
         min_periods = min(50, pct_window // 3)
 
         # 创建expanding window的排名
         dev_ranks = []
+        rank_starts = []
+        rank_ends = []
         dev_values = result.select("dev").to_numpy().flatten()
 
         for i in range(len(dev_values)):
@@ -76,13 +79,23 @@ def calculate_bbiboll(df: pl.DataFrame, boll_length: int = 11, boll_multiple: in
             window_values = dev_values[start_idx : i + 1]
 
             if len(window_values) >= min_periods:
-                # 计算当前值在窗口中的排名
+                # 计算当前值在窗口中的排名 (转换为百分位)
                 rank = np.sum(window_values <= dev_values[i])
                 dev_ranks.append(rank)
+                rank_starts.append(start_idx)
+                rank_ends.append(i)
             else:
                 dev_ranks.append(np.nan)
+                rank_starts.append(start_idx)
+                rank_ends.append(i)
 
-        result = result.with_columns([pl.Series("dev_pct", dev_ranks)])
+        result = result.with_columns(
+            [
+                pl.Series("dev_pct", dev_ranks),
+                pl.Series("rank_start", rank_starts),
+                pl.Series("rank_end", rank_ends),
+            ]
+        )
 
         result = result.with_columns(
             [

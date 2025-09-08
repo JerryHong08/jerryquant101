@@ -578,9 +578,9 @@ def data_loader(
 
 def stock_load_process(
     tickers: str = None,
-    timeframe: str = "1m",
+    timeframe: str = "1d",
     asset: str = "us_stocks_sip",
-    data_type: str = "minute_aggs_v1",
+    data_type: str = "day_aggs_v1",
     start_date: str = "",
     end_date: str = "",
     full_hour: bool = False,
@@ -754,17 +754,17 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    # tickers = ['NVDA','TSLA','FIG']
-    tickers = None
+    tickers = ["ARYE"]
+    # tickers = None
     timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
     asset = "us_stocks_sip"
     data_type = "day_aggs_v1" if timeframe == "1d" else "minute_aggs_v1"
-    start_date = "2025-09-03"
-    end_date = "2025-09-03"
+    start_date = "2015-01-01"
+    end_date = "2025-09-05"
     full_hour = False
-    # plot = True
-    plot = False
-    ticker_plot = "NVDA"
+    plot = True
+    # plot = False
+    ticker_plot = "ARYE"
 
     lf_result = stock_load_process(
         tickers=tickers,
@@ -776,14 +776,11 @@ if __name__ == "__main__":
         full_hour=full_hour,
     ).collect()
 
-    df = lf_result.select(pl.col("ticker").unique())
-    for t in df["ticker"]:
-        print(t)
-    # print(lf_result.tail())
+    print(lf_result.tail())
 
     if plot:
         plot_candlestick(
-            lf_result.filter(pl.col("ticker") == "NVDA").to_pandas(),
+            lf_result.filter(pl.col("ticker") == ticker_plot).to_pandas(),
             ticker_plot,
             timeframe,
         )
