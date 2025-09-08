@@ -317,7 +317,7 @@ if __name__ == "__main__":
     end_date = "2025-09-05"
 
     # load data
-    data_df = (
+    ohlcv_data_df = (
         stock_load_process(
             tickers=pre_select_tickers.to_series().to_list(),
             timeframe=timeframe,
@@ -327,9 +327,11 @@ if __name__ == "__main__":
         .drop(["split_date", "window_start", "split_ratio"])
         .collect()
     )
-    print(f"Memory size of lf_result: {data_df.estimated_size('mb'):.2f} MB")
+    print(
+        f"Memory size of market_ohlcv_data: {ohlcv_data_df.estimated_size('mb'):.2f} MB"
+    )
 
-    strategy = BBIBOLL_Strategy(data_df, pre_select_tickers)
+    strategy = BBIBOLL_Strategy(ohlcv_data_df, pre_select_tickers)
     indicators = strategy.indicators_bbiboll(cached=True)
     signals = strategy.compute_signals(indicators)
     trades, portfolio = strategy.trade_rules_porfolio(signals)
