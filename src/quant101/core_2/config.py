@@ -2,8 +2,8 @@ import os
 
 import polars as pl
 
-blackdisk_data_dir = "/mnt/blackdisk/quant_data/polygon_data/"
-nftsdisk_data_dir = "data/polygon_data/"
+blackdisk_data_dir = "/mnt/blackdisk/quant_data/polygon_data"
+nftsdisk_data_dir = "data/polygon_data"
 data_dir = blackdisk_data_dir
 
 splits_dir = os.path.join(data_dir, "raw/us_stocks_sip/splits/splits.parquet")

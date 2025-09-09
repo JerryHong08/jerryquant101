@@ -1,42 +1,30 @@
 import os
 
 import duckdb
+import polars as pl
 from dotenv import load_dotenv
 
-load_dotenv()
+from quant101.core_2.data_loader import data_loader
 
-ACCESS_KEY_ID = os.getenv("ACCESS_KEY_ID")
-SECRET_ACCESS_KEY = os.getenv("SECRET_ACCESS_KEY")
-
-# 连接数据库（内存模式）
 con = duckdb.connect()
 
-# 加载 DuckDB 的 S3 插件
-con.execute("INSTALL httpfs;")
-con.execute("LOAD httpfs;")
+# query ="""
+#     SELECT * FROM read_csv_auto('backtest_output/BBIBOLL_trades.csv')
+# """
 
-# 配置 S3 连接参数
-con.execute("SET s3_region='us-east-1';")
-con.execute("SET s3_endpoint='files.polygon.io';")
-# -- 重点：Polygon flat files 的 endpoint
-con.execute(f"SET s3_access_key_id='{ACCESS_KEY_ID}';")
-con.execute(f"SET s3_secret_access_key='{SECRET_ACCESS_KEY}';")
-con.execute("SET s3_url_style='path';")
-# -- 避免走 virtual-host 风格 URL
-
-# 直接在远程 S3 上跑 SQL
 query = """
-SELECT *
-FROM read_csv_auto('/mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/day_aggs_v1/202[2-5]/*/*.csv.gz')
-ORDER BY volume DESC
-LIMIT 1;
+    SELECT * FROM read_parquet('I:SPXday20150101_20250905.parquet')
 """
-# FROM read_csv_auto('s3://flatfiles/us_stocks_sip/day_aggs_v1/202[2-5]/*/*.csv.gz')
-# FROM read_parquet('/mnt/blackdisk/quant_data/polygon_data/lake/us_stocks_sip/day_aggs_v1/202[2-5]/*/*.parquet')
 
-# WHERE ticker = 'TSLA'
-# ORDER BY sip_timestamp DESC
+df = con.execute(query).fetchdf()
+df = pl.from_pandas(df)
 
-
-result = con.execute(query).fetchdf()
-print(result)
+df = df.with_columns(
+    pl.from_epoch(pl.col("timestamp"), time_unit="ms")
+    .dt.convert_time_zone("America/New_York")
+    .dt.replace(hour=0, minute=0, second=0)
+    .cast(pl.Datetime("ns", "America/New_York"))
+    .alias("date")
+)
+with pl.Config(tbl_rows=5, tbl_cols=20):
+    print(df)

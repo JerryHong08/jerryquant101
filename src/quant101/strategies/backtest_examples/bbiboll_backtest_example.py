@@ -14,7 +14,7 @@ from quant101.core_2.data_loader import stock_load_process
 from quant101.strategies.bbiboll_optimized import BBIBOLLStrategy
 
 
-def load_spx_benchmark():
+def load_spx_benchmark(start, end):
     """加载SPX基准数据"""
     try:
         spx = pl.read_parquet("I:SPXday20150101_20250905.parquet")
@@ -26,6 +26,17 @@ def load_spx_benchmark():
             .alias("date")
         )
 
+        spx = spx.filter(
+            (
+                pl.col("date").dt.date()
+                >= datetime.datetime.strptime(start, "%Y-%m-%d").date()
+            )
+            & (
+                pl.col("date").dt.date()
+                <= datetime.datetime.strptime(end, "%Y-%m-%d").date()
+            )
+        ).sort("date")
+
         # 计算基准收益曲线（归一化）
         spx = spx.with_columns(
             (pl.col("close") / pl.col("close").first()).alias("benchmark_return")
@@ -35,16 +46,6 @@ def load_spx_benchmark():
     except Exception as e:
         print(f"加载SPX基准数据失败: {e}")
         return None
-
-
-def load_tickers_data():
-    """加载股票列表数据"""
-    try:
-        # 这里简化处理，直接返回指定股票
-        return ["FDUS", "NVDA", "TSLA", "AAPL", "MSFT"]
-    except Exception as e:
-        print(f"加载股票列表失败: {e}")
-        return ["FDUS"]
 
 
 def only_common_stocks():
@@ -90,12 +91,13 @@ def main():
     strategy_config = {
         "boll_length": 11,
         "boll_multiple": 6,
-        "max_dev_pct": 1.0,
-        "hold_days": 3,
+        "max_dev_pct": 1,
+        "hold_days": 2,
         "start_date": "2023-02-13",
-        "selected_tickers": ["TPET"],  # 可以改为 'random' 随机选择
+        "selected_tickers": ["SFWL"],  # 可以改为 'random' 随机选择
+        # "selected_tickers": ['SILA', 'RS', 'NLSP', 'XWEL', 'RIVN', 'CHKP', 'SANA', 'BAP', 'SBSW', 'FRSH', 'CHW', 'WLY', 'RLYB', 'LUCD', 'ZBH', 'AWK', 'WLMS', 'TFC', 'WPRT', 'WBX', 'TCVA', 'LGHL', 'ABTS', 'PWR', 'FIX', 'INGR', 'MRAI', 'BMRA', 'TALK', 'CTV', 'ADPT', 'WDS', 'INAB', 'LIN', 'MXCT', 'PSNL', 'PLRX', 'AVNW', 'BGSF', 'IQST', 'PMI', 'FWONK', 'MGOL', 'WGS', 'PNC', 'WIRE', 'ULBI', 'SKIL', 'SGFY', 'DMAC', 'APRN', 'JANX', 'ABR', 'HLVX', 'EQT', 'TRUE', 'SLAM', 'EEX', 'ATTO', 'ERIE', 'INFA', 'SMPL', 'NUKK', 'ARTV', 'ALNY', 'KSPI', 'BSX', 'ACRO', 'DUK', 'CBZ', 'ENR', 'CABA', 'CMPR', 'BHVN', 'ACOR', 'CENQ', 'INLF', 'AMRZ', 'TGB', 'GORO', 'SMBC', 'NYMTI', 'WEN', 'TRGP', 'FRME', 'CAPT', 'JNCE', 'RGR', 'EVCM', 'SNWV', 'MAIA', 'INTU', 'DAIC', 'PHI', 'SSNC', 'GDST', 'SBIG', 'ASPA', 'ACOG', 'MDNA'],
         # 'selected_tickers': ['random'],  # 可以改为 'random' 随机选择
-        "random_count": 7348,
+        "random_count": 100,
         "min_turnover": 0,
     }
 
@@ -112,6 +114,7 @@ def main():
                 end_date=config["end_date"],
             )
             .drop(["split_date", "window_start", "split_ratio"])
+            .filter(pl.col("volume") != 0)
             .collect()
         )
 
@@ -150,19 +153,27 @@ def main():
     # 8. 绘制结果图表
     print("生成回测图表...")
     try:
-        # 资金曲线图
-        engine.plot_results(
-            strategy_name="BBIBOLL",
-            plot_equity=True,
-            plot_performance=True,
-            plot_monthly=True,
-            save_plots=True,
-            output_dir="backtest_output",
-        )
+        if len(strategy_config.get("selected_tickers", [])) > 1:
+            # 资金曲线图
+            engine.plot_results(
+                strategy_name="BBIBOLL",
+                plot_equity=True,
+                plot_performance=True,
+                plot_monthly=True,
+                save_plots=True,
+                output_dir="backtest_output",
+            )
 
         # 个股K线图和交易信号（示例）
         visualizer = BacktestVisualizer()
         selected_ticker = strategy_config["selected_tickers"][0]
+        if (
+            len(strategy_config.get("selected_tickers", [])) > 1
+            or selected_ticker == "random"
+        ):
+            selected_ticker = (
+                results["trades"].select("ticker").unique().to_series().sample(1)[0]
+            )
 
         print(f"绘制 {selected_ticker} 的K线图和交易信号...")
         visualizer.plot_candlestick_with_signals(
@@ -211,12 +222,12 @@ def run_multiple_strategies_example():
     print("=" * 60)
 
     # 加载数据（复用上面的函数）
-    tickers = load_tickers_data()
+    tickers = only_common_stocks()
 
     try:
         ohlcv_data = (
             stock_load_process(
-                tickers=tickers,
+                tickers=tickers.to_series().to_list(),
                 timeframe="1d",
                 start_date="2022-01-01",
                 end_date="2025-09-05",
@@ -238,10 +249,12 @@ def run_multiple_strategies_example():
     conservative_config = {
         "boll_length": 11,
         "boll_multiple": 6,
-        "max_dev_pct": 0.5,
+        "max_dev_pct": 1,
         "hold_days": 2,
         "start_date": "2023-02-13",
-        "selected_tickers": ["FDUS"],
+        # "selected_tickers": ["FDUS"],
+        "selected_tickers": ["random"],  # 可以改为 'random' 随机选择
+        "random_count": 7367,
         "min_turnover": 0,
     }
     conservative_strategy = BBIBOLLStrategy(config=conservative_config)
@@ -252,10 +265,11 @@ def run_multiple_strategies_example():
     aggressive_config = {
         "boll_length": 11,
         "boll_multiple": 6,
-        "max_dev_pct": 1.5,
+        "max_dev_pct": 1,
         "hold_days": 5,
         "start_date": "2023-02-13",
-        "selected_tickers": ["FDUS"],
+        "selected_tickers": ["random"],  # 可以改为 'random' 随机选择
+        "random_count": 7367,
         "min_turnover": 0,
     }
     aggressive_strategy = BBIBOLLStrategy(config=aggressive_config)

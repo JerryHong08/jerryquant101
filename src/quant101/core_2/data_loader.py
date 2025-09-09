@@ -118,7 +118,7 @@ def data_dir_calculate(
 
         for m in range(start_month, end_month + 1):
             month_str = f"{m:02d}"  # Format as two digits
-            file_pattern = f"{data_dir}{'lake' if lake else 'raw'}/{asset}/{data_type}/{y}/{month_str}/*.{'parquet' if lake else 'csv.gz'}"
+            file_pattern = f"{data_dir}/{'lake' if lake else 'raw'}/{asset}/{data_type}/{y}/{month_str}/*.{'parquet' if lake else 'csv.gz'}"
             month_all_file = glob.glob(file_pattern)
             if m in [start_month, end_month]:
                 filtered_files = []
@@ -536,42 +536,84 @@ def data_loader(
     start_date: str = "",
     end_date: str = "",
     use_s3: bool = False,
+    duck_db=False,
 ):
-    if use_s3:
-        lake_file_paths = s3_data_dir_calculate(
-            asset=asset,
-            data_type=data_type,
-            start_date=start_date,
-            end_date=end_date,
-        )
-    else:
-        lake_file_paths = data_dir_calculate(
-            asset=asset,
-            data_type=data_type,
-            start_date=start_date,
-            end_date=end_date,
-            # lake=False
-        )
+    if not duck_db:
+        if use_s3:
+            lake_file_paths = s3_data_dir_calculate(
+                asset=asset,
+                data_type=data_type,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        else:
+            lake_file_paths = data_dir_calculate(
+                asset=asset,
+                data_type=data_type,
+                start_date=start_date,
+                end_date=end_date,
+                # lake=False
+            )
 
-    print("1. data path loaded.")
+        print("1. data path loaded.")
 
-    # local lake/*/.parquet
-    if all(f.endswith(".parquet") for f in lake_file_paths):
-        lf = pl.scan_parquet(lake_file_paths)
-    # s3 */.csv.gz
-    elif use_s3:
-        lf = pl.scan_csv(
-            lake_file_paths,
-            storage_options={
-                "aws_access_key_id": ACCESS_KEY_ID,
-                "aws_secret_access_key": SECRET_ACCESS_KEY,
-                "aws_endpoint": "https://files.polygon.io",
-                "aws_region": "us-east-1",
-            },
-        )
-    # local raw/*/.csv.gz
+        # local lake/*/.parquet
+        if all(f.endswith(".parquet") for f in lake_file_paths):
+            lf = pl.scan_parquet(lake_file_paths)
+        # s3 */.csv.gz
+        elif use_s3:
+            lf = pl.scan_csv(
+                lake_file_paths,
+                storage_options={
+                    "aws_access_key_id": ACCESS_KEY_ID,
+                    "aws_secret_access_key": SECRET_ACCESS_KEY,
+                    "aws_endpoint": "https://files.polygon.io",
+                    "aws_region": "us-east-1",
+                },
+            )
+        # local raw/*/.csv.gz
+        else:
+            lf = pl.scan_csv(lake_file_paths)
     else:
-        lf = pl.scan_csv(lake_file_paths)
+        # 连接数据库（内存模式）
+        con = duckdb.connect()
+        if use_s3:
+            # 加载 DuckDB 的 S3 插件
+            con.execute("INSTALL httpfs;")
+            con.execute("LOAD httpfs;")
+
+            # 配置 S3 连接参数
+            con.execute("SET s3_region='us-east-1';")
+            con.execute("SET s3_endpoint='files.polygon.io';")
+            # -- 重点：Polygon flat files 的 endpoint
+            con.execute(f"SET s3_access_key_id='{ACCESS_KEY_ID}';")
+            con.execute(f"SET s3_secret_access_key='{SECRET_ACCESS_KEY}';")
+            con.execute("SET s3_url_style='path';")
+            # -- 避免走 virtual-host 风格 URL
+
+            # 直接在远程 S3 上跑 SQL
+
+            # Calculate the appropriate file patterns based on date range
+            s3_paths = s3_data_dir_calculate(asset, data_type, start_date, end_date)
+
+            query = f"""
+            SELECT *
+            FROM read_csv_auto({s3_paths})
+            ;
+            """
+        else:
+            local_paths = data_dir_calculate(
+                asset, data_type, start_date, end_date, lake=True
+            )
+            # Format as array for DuckDB
+            local_paths_array = "['" + "', '".join(local_paths) + "']"
+            query = f"""
+            SELECT *
+            FROM read_parquet({local_paths_array})
+            ;
+            """
+        print(query)
+        lf = con.execute(query).fetchdf()
 
     return lf
 
@@ -586,6 +628,7 @@ def stock_load_process(
     full_hour: bool = False,
     use_s3: bool = False,
     use_cache: bool = True,
+    duck_db: bool = False,
 ):
     # Generate cache key
     cache_key = generate_cache_key(
@@ -622,6 +665,7 @@ def stock_load_process(
         start_date=start_date,
         end_date=end_date,
         use_s3=use_s3,
+        duck_db=duck_db,
     )
 
     lf = lf.with_columns(
