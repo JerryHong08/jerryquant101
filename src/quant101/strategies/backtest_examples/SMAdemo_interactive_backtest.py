@@ -2,6 +2,7 @@
 使用新的交互式K线图功能的完整示例
 """
 
+import os
 import random
 from datetime import datetime, timedelta
 
@@ -9,11 +10,9 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from quant101.backtesting import (BacktestEngine, BacktestVisualizer,
-                                  StrategyBase)
+from quant101.backtesting import BacktestEngine, BacktestVisualizer, StrategyBase
 from quant101.core_2.data_loader import stock_load_process
-from quant101.strategies.backtest_examples.bbiboll_backtest_example import (
-    load_spx_benchmark, only_common_stocks)
+from quant101.strategies.pre_data import load_spx_benchmark, only_common_stocks
 
 
 class SimpleMAStrategy(StrategyBase):
@@ -212,6 +211,10 @@ def demo_interactive_backtest():
         config={"short_window": 5, "long_window": 15, "hold_days": 3}
     )
 
+    strategy_name = strategy.name
+    output_dir = os.path.join("backtest_output", strategy_name)
+    os.makedirs(output_dir, exist_ok=True)
+
     engine.add_strategy(strategy, ohlcv_data, tickers)
 
     # 3. 运行回测
@@ -219,14 +222,14 @@ def demo_interactive_backtest():
     results = engine.run_backtest(
         strategy, benchmark_data=benchmark_data, use_cached_indicators=False
     )
-    print(results)
+    # print(results['indicators'])
     engine.plot_results(
         strategy_name=strategy.name,
         plot_equity=True,
         plot_performance=True,
         plot_monthly=True,
         save_plots=False,
-        output_dir="backtest_output",
+        output_dir=output_dir,
     )
 
     # 4. 展示交互式K线图
@@ -248,7 +251,7 @@ def demo_interactive_backtest():
                 start_date="2023-03-01",
                 end_date="2025-09-05",
                 indicators=results["indicators"],
-                save_path=f"demo_{ticker}_interactive.png",
+                save_path=f"{output_dir}/demo_{ticker}_interactive.png",
             )
 
             print(f"   ✅ {ticker} 图表保存为: demo_{ticker}_interactive.png")

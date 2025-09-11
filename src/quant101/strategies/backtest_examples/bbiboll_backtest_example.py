@@ -2,7 +2,6 @@
 BBIBOLL策略回测示例 - 使用新的回测框架
 """
 
-import datetime
 import os
 
 import polars as pl
@@ -11,66 +10,8 @@ from quant101.backtesting.engine import BacktestEngine
 from quant101.backtesting.visualizer import BacktestVisualizer
 from quant101.core_2.config import all_tickers_dir
 from quant101.core_2.data_loader import stock_load_process
-from quant101.strategies.bbiboll_optimized import BBIBOLLStrategy
-
-
-def load_spx_benchmark(start, end):
-    """加载SPX基准数据"""
-    try:
-        spx = pl.read_parquet("I:SPXday20150101_20250905.parquet")
-        spx = spx.with_columns(
-            pl.from_epoch(pl.col("timestamp"), time_unit="ms")
-            .dt.convert_time_zone("America/New_York")
-            .dt.replace(hour=0, minute=0, second=0)
-            .cast(pl.Datetime("ns", "America/New_York"))
-            .alias("date")
-        )
-
-        spx = spx.filter(
-            (
-                pl.col("date").dt.date()
-                >= datetime.datetime.strptime(start, "%Y-%m-%d").date()
-            )
-            & (
-                pl.col("date").dt.date()
-                <= datetime.datetime.strptime(end, "%Y-%m-%d").date()
-            )
-        ).sort("date")
-
-        # 计算基准收益曲线（归一化）
-        spx = spx.with_columns(
-            (pl.col("close") / pl.col("close").first()).alias("benchmark_return")
-        ).select(["date", "close", "benchmark_return"])
-
-        return spx
-    except Exception as e:
-        print(f"加载SPX基准数据失败: {e}")
-        return None
-
-
-def only_common_stocks():
-    all_tickers_file = os.path.join(all_tickers_dir, f"all_tickers_*.parquet")
-    all_tickers = pl.read_parquet(all_tickers_file)
-
-    tickers = all_tickers.filter(
-        (pl.col("type").is_in(["CS", "ADRC"]))
-        & (
-            (pl.col("active") == True)
-            | (
-                pl.col("delisted_utc").is_not_null()
-                & (
-                    pl.col("delisted_utc")
-                    .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%SZ", strict=False)
-                    .dt.date()
-                    > datetime.date(2023, 1, 1)
-                )
-            )
-        )
-    ).select(pl.col(["ticker", "delisted_utc"]))
-
-    print(f"Using {all_tickers_file}, total {len(tickers)} active tickers")
-
-    return tickers
+from quant101.strategies.bbibollStrategy import BBIBOLLStrategy
+from quant101.strategies.pre_data import load_spx_benchmark, only_common_stocks
 
 
 def main():
@@ -128,7 +69,7 @@ def main():
 
     # 3. 加载基准数据
     print("加载基准数据...")
-    benchmark_data = load_spx_benchmark()
+    benchmark_data = load_spx_benchmark(config["start_date"], config["end_date"])
 
     # 4. 创建回测引擎
     engine = BacktestEngine(initial_capital=config["initial_capital"])
@@ -136,19 +77,22 @@ def main():
     # 5. 创建策略实例
     print("创建BBIBOLL策略...")
 
-    bbiboll_strategy = BBIBOLLStrategy(config=strategy_config)
+    strategy = BBIBOLLStrategy(config=strategy_config)
 
     # 6. 添加数据到策略
-    engine.add_strategy(bbiboll_strategy, ohlcv_data, tickers)
+    engine.add_strategy(strategy, ohlcv_data, tickers)
 
     # 7. 运行回测
     print("开始回测...")
     results = engine.run_backtest(
-        strategy=bbiboll_strategy,
+        strategy=strategy,
         benchmark_data=benchmark_data,
         use_cached_indicators=True,  # 使用缓存以加快速度
         save_results=True,
     )
+
+    strategy_name = strategy.name
+    output_dir = os.path.join("backtest_output", strategy_name)
 
     # 8. 绘制结果图表
     print("生成回测图表...")
@@ -156,12 +100,12 @@ def main():
         if len(strategy_config.get("selected_tickers", [])) > 1:
             # 资金曲线图
             engine.plot_results(
-                strategy_name="BBIBOLL",
+                strategy_name=strategy_name,
                 plot_equity=True,
                 plot_performance=True,
                 plot_monthly=True,
                 save_plots=True,
-                output_dir="backtest_output",
+                output_dir=output_dir,
             )
 
         # 个股K线图和交易信号（示例）
@@ -183,7 +127,7 @@ def main():
             start_date="2022-01-01",
             end_date="2025-09-05",
             indicators=results.get("indicators"),
-            save_path=f"backtest_output/{selected_ticker}_signals.png",
+            save_path=f"{output_dir}/{selected_ticker}_signals.png",
         )
 
     except Exception as e:
@@ -192,7 +136,7 @@ def main():
     # 9. 导出结果
     print("导出回测结果...")
     try:
-        engine.export_results("BBIBOLL", output_dir="backtest_output")
+        engine.export_results(strategy_name, output_dir=output_dir)
     except Exception as e:
         print(f"导出结果时出现错误: {e}")
 
@@ -213,7 +157,7 @@ def main():
     for metric, value in key_metrics:
         print(f"{metric:<12}: {value}")
 
-    print(f"\n回测完成！结果已保存到 backtest_output/ 目录")
+    print(f"\n回测完成！结果已保存到 {output_dir} 目录")
 
 
 def run_multiple_strategies_example():

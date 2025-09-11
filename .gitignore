@@ -10,8 +10,10 @@ __pycache__/
 env/
 venv/
 
-# Jupyter Notebook
+# Jupyter Notebook / discard / experiments
 .ipynb_checkpoints
+notebooks/
+discard/
 
 # VSCode
 .vscode/

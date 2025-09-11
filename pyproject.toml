@@ -41,6 +41,8 @@ packages = [{include = "quant101", from = "src"}]
 pytest = "^8.4.1"
 pre-commit = "^4.3.0"
 ipykernel = "^6.30.1"
+black = "^25.1.0"
+isort = "^6.0.1"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -48,6 +50,13 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "--ignore=data --ignore=scripts/run_backtest.py"
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+line_length = 88
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

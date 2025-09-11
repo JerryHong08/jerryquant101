@@ -13,7 +13,12 @@ import polars as pl
 import s3fs
 from dotenv import load_dotenv
 
-from quant101.core_2.config import data_dir, splits_data, splits_error_dir
+from quant101.core_2.config import (
+    all_tickers_dir,
+    data_dir,
+    splits_data,
+    splits_error_dir,
+)
 from quant101.core_2.plotter import plot_candlestick
 
 load_dotenv()
@@ -530,9 +535,8 @@ def save_cache_metadata(cache_path, params):
 
 
 def data_loader(
-    tickers: str = None,
     asset: str = "us_stocks_sip",
-    data_type: str = "minute_aggs_v1",
+    data_type: str = "day_aggs_v1",
     start_date: str = "",
     end_date: str = "",
     use_s3: bool = False,
@@ -618,6 +622,52 @@ def data_loader(
     return lf
 
 
+def figi_alignment(lf):
+    print("Processing figi alignment...")
+    all_tickers_file = os.path.join(all_tickers_dir, f"all_tickers_*.parquet")
+    all_tickers = pl.read_parquet(all_tickers_file).lazy()
+
+    cols = lf.collect_schema().names()
+
+    lf = lf.join(
+        all_tickers.select(
+            [
+                "ticker",
+                "delisted_utc",
+                "last_updated_utc",
+                "cik",
+                "composite_figi",
+                "share_class_figi",
+            ]
+        ),
+        on="ticker",
+        how="inner",
+    )
+
+    lf_with_figi = lf.filter(pl.col("composite_figi").is_not_null())
+    lf_without_figi = lf.filter(pl.col("composite_figi").is_null())
+
+    latest_tickers = (
+        lf_with_figi.group_by(["composite_figi", "ticker"])
+        .agg(pl.col("window_start").max().alias("max_timestamp"))
+        .sort(["composite_figi", "max_timestamp"], descending=[False, True])
+        .group_by("composite_figi")
+        .first()
+        .select(["composite_figi", "ticker"])
+        .rename({"ticker": "latest_ticker"})
+    )
+
+    lf_with_figi = (
+        lf_with_figi.join(latest_tickers, on="composite_figi", how="left")
+        .with_columns(pl.col("latest_ticker").alias("ticker"))
+        .drop("latest_ticker")
+    )
+
+    aligned_lf = pl.concat([lf_with_figi, lf_without_figi], how="vertical")
+
+    return aligned_lf.select(cols)
+
+
 def stock_load_process(
     tickers: str = None,
     timeframe: str = "1d",
@@ -659,7 +709,6 @@ def stock_load_process(
     is_daily_or_above = unit in ["d", "w", "mo", "q", "y"]
 
     lf = data_loader(
-        tickers=tickers,
         asset=asset,
         data_type=data_type,
         start_date=start_date,
@@ -667,6 +716,8 @@ def stock_load_process(
         use_s3=use_s3,
         duck_db=duck_db,
     )
+
+    # lf = figi_alignment(lf)
 
     lf = lf.with_columns(
         pl.from_epoch(pl.col("window_start"), time_unit="ns")
