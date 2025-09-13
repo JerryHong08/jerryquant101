@@ -35,16 +35,16 @@ def main():
         "max_dev_pct": 1,
         "hold_days": 2,
         "start_date": "2023-02-13",
-        "selected_tickers": ["SFWL"],  # 可以改为 'random' 随机选择
+        "selected_tickers": ["DVLT"],  # 可以改为 'random' 随机选择
         # "selected_tickers": ['SILA', 'RS', 'NLSP', 'XWEL', 'RIVN', 'CHKP', 'SANA', 'BAP', 'SBSW', 'FRSH', 'CHW', 'WLY', 'RLYB', 'LUCD', 'ZBH', 'AWK', 'WLMS', 'TFC', 'WPRT', 'WBX', 'TCVA', 'LGHL', 'ABTS', 'PWR', 'FIX', 'INGR', 'MRAI', 'BMRA', 'TALK', 'CTV', 'ADPT', 'WDS', 'INAB', 'LIN', 'MXCT', 'PSNL', 'PLRX', 'AVNW', 'BGSF', 'IQST', 'PMI', 'FWONK', 'MGOL', 'WGS', 'PNC', 'WIRE', 'ULBI', 'SKIL', 'SGFY', 'DMAC', 'APRN', 'JANX', 'ABR', 'HLVX', 'EQT', 'TRUE', 'SLAM', 'EEX', 'ATTO', 'ERIE', 'INFA', 'SMPL', 'NUKK', 'ARTV', 'ALNY', 'KSPI', 'BSX', 'ACRO', 'DUK', 'CBZ', 'ENR', 'CABA', 'CMPR', 'BHVN', 'ACOR', 'CENQ', 'INLF', 'AMRZ', 'TGB', 'GORO', 'SMBC', 'NYMTI', 'WEN', 'TRGP', 'FRME', 'CAPT', 'JNCE', 'RGR', 'EVCM', 'SNWV', 'MAIA', 'INTU', 'DAIC', 'PHI', 'SSNC', 'GDST', 'SBIG', 'ASPA', 'ACOG', 'MDNA'],
         # 'selected_tickers': ['random'],  # 可以改为 'random' 随机选择
-        "random_count": 100,
+        "random_count": 7708,
         "min_turnover": 0,
     }
 
     # 2. 加载数据
     print("加载市场数据...")
-    tickers = only_common_stocks()
+    tickers = only_common_stocks(filter_date=config["start_date"])
 
     try:
         ohlcv_data = (
@@ -54,13 +54,10 @@ def main():
                 start_date=config["start_date"],
                 end_date=config["end_date"],
             )
-            .drop(["split_date", "window_start", "split_ratio"])
             .filter(pl.col("volume") != 0)
             .collect()
         )
 
-        print(f"数据大小: {ohlcv_data.estimated_size('mb'):.2f} MB")
-        print(f"数据行数: {len(ohlcv_data):,}")
         print(f"股票数量: {ohlcv_data.select('ticker').n_unique()}")
 
     except Exception as e:
@@ -96,8 +93,12 @@ def main():
 
     # 8. 绘制结果图表
     print("生成回测图表...")
+    selected_ticker = strategy_config["selected_tickers"][0]
     try:
-        if len(strategy_config.get("selected_tickers", [])) > 1:
+        if (
+            len(strategy_config.get("selected_tickers", [])) > 1
+            or selected_ticker == "random"
+        ):
             # 资金曲线图
             engine.plot_results(
                 strategy_name=strategy_name,
@@ -110,7 +111,7 @@ def main():
 
         # 个股K线图和交易信号（示例）
         visualizer = BacktestVisualizer()
-        selected_ticker = strategy_config["selected_tickers"][0]
+
         if (
             len(strategy_config.get("selected_tickers", [])) > 1
             or selected_ticker == "random"

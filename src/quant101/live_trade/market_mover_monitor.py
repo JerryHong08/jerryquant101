@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from polygon import RESTClient
 from polygon.rest.models import Agg, TickerSnapshot
 
+from quant101.core_2.config import cache_dir
 from quant101.strategies.pre_data import only_common_stocks
 
 load_dotenv()
@@ -13,9 +14,9 @@ polygon_api_key_live = os.getenv("POLYGON_API_KEY")
 
 client = RESTClient(polygon_api_key_live)
 
-selected_tickers = only_common_stocks().drop("delisted_utc")
+selected_tickers = only_common_stocks().drop("active", "composite_figi")
 
-snapshot = client.get_snapshot_all("stocks")
+snapshot = client.get_snapshot_all("stocks", include_otc=True)
 
 # print(snapshot)
 
@@ -42,7 +43,8 @@ for item in snapshot:
                         "ticker": item.ticker,
                         "prev_close": float(item.prev_day.close),
                         "close": float(item.day.close),
-                        "percent_change": percent_change,
+                        "percent_change": item.todays_change_percent,
+                        # "percent_change": percent_change,
                         "open": float(item.day.open),
                     }
                 )
@@ -64,5 +66,11 @@ result = selected_tickers.join(result, on="ticker", how="inner").sort(
 )
 
 updated_time = time.strftime("%Y%m%d%H%M", time.localtime())
-result.write_csv(f"{updated_time}_market_snapshot.csv")
+
+market_mover_dir = os.path.join(cache_dir, "market_mover")
+os.makedirs(market_mover_dir, exist_ok=True)
+market_mover_file = os.path.join(
+    cache_dir, "market_mover", f"{updated_time}_market_snapshot.csv"
+)
+result.write_csv(market_mover_file)
 print(result.head(20))

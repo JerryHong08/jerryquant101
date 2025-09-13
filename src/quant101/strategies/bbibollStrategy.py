@@ -38,7 +38,7 @@ class BBIBOLLStrategy(StrategyBase):
         if config:
             default_config.update(config)
 
-        super().__init__(name="BBIBOLL", config=default_config)
+        super().__init__(name="bbiboll", config=default_config)
 
     def calculate_indicators(self, cached: bool = False) -> pl.DataFrame:
         """
@@ -50,11 +50,11 @@ class BBIBOLLStrategy(StrategyBase):
         Returns:
             包含技术指标的DataFrame
         """
-        cache_file = "bbiboll.parquet"
 
-        if cached and os.path.exists(cache_file):
-            print(f"从缓存加载BBIBOLL指标: {cache_file}")
-            return pl.read_parquet(cache_file)
+        if cached:
+            cached_indicators = self.load_cached_indicators()
+            if cached_indicators is not None:
+                return cached_indicators
 
         print("计算BBIBOLL指标...")
 
@@ -70,27 +70,26 @@ class BBIBOLLStrategy(StrategyBase):
             (pl.col("volume") * pl.col("close")).alias("turnover")
         )
 
-        # 添加退市日期信息（如果tickers包含退市信息）
-        if self.tickers is not None and hasattr(self.tickers, "columns"):
-            if "delisted_utc" in self.tickers.columns:
-                delisted_info = self.tickers.with_columns(
-                    [
-                        pl.col("delisted_utc")
-                        .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%SZ", strict=False)
-                        .dt.date()
-                        .alias("delisted_date")
-                    ]
-                )
+        # # 添加退市日期信息（如果tickers包含退市信息）
+        # if self.tickers is not None and hasattr(self.tickers, "columns"):
+        #     if "delisted_utc" in self.tickers.columns:
+        #         delisted_info = self.tickers.with_columns(
+        #             [
+        #                 pl.col("delisted_utc")
+        #                 .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%SZ", strict=False)
+        #                 .dt.date()
+        #                 .alias("delisted_date")
+        #             ]
+        #         )
 
-                indicators = indicators.join(
-                    delisted_info.select(["ticker", "delisted_date"]),
-                    on="ticker",
-                    how="left",
-                )
+        #         indicators = indicators.join(
+        #             delisted_info.select(["ticker", "delisted_date"]),
+        #             on="ticker",
+        #             how="left",
+        #         )
 
         # 保存缓存
-        indicators.write_parquet(cache_file)
-        print(f"BBIBOLL指标已缓存到: {cache_file}")
+        self.save_indicators_cache(indicators)
 
         return indicators
 
@@ -122,12 +121,12 @@ class BBIBOLLStrategy(StrategyBase):
             & (pl.col("ticker").is_in(examined_tickers))
         )
 
-        # 添加退市股票过滤
-        if "delisted_date" in signals.columns:
-            signals = signals.filter(
-                pl.col("delisted_date").is_null()
-                | (pl.col("timestamps").dt.date() <= pl.col("delisted_date"))
-            )
+        # # 添加退市股票过滤
+        # if "delisted_date" in signals.columns:
+        #     signals = signals.filter(
+        #         pl.col("delisted_date").is_null()
+        #         | (pl.col("timestamps").dt.date() <= pl.col("delisted_date"))
+        #     )
 
         # 提取信号
         signals = signals.select(["timestamps", "ticker"]).with_columns(

@@ -41,51 +41,41 @@ def load_spx_benchmark(start, end):
         return None
 
 
-def only_common_stocks():
-    all_tickers_file = os.path.join(all_tickers_dir, f"all_tickers_*.parquet")
+def only_common_stocks(filter_date: str = "2015-01-01"):
+    all_tickers_file = os.path.join(all_tickers_dir, f"all_stocks_*.parquet")
     all_tickers = pl.read_parquet(all_tickers_file)
 
     tickers = all_tickers.filter(
         (pl.col("type").is_in(["CS", "ADRC"]))
         & (
-            (pl.col("active") == True)
+            pl.col("delisted_utc").is_null()
             | (
-                pl.col("delisted_utc").is_not_null()
-                & (
-                    pl.col("delisted_utc")
-                    .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%SZ", strict=False)
-                    .dt.date()
-                    > datetime.date(2023, 1, 1)
-                )
+                pl.col("delisted_utc")
+                .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%SZ", strict=False)
+                .dt.date()
+                > datetime.datetime.strptime(filter_date, "%Y-%m-%d").date()
             )
         )
-    ).select(pl.col(["ticker", "delisted_utc"]))
+    ).select(pl.col(["ticker", "active", "composite_figi"]))
 
     print(f"Using {all_tickers_file}, total {len(tickers)} active tickers")
 
     return tickers
 
 
-def pre_select_tickers():
-    all_tickers_file = os.path.join(all_tickers_dir, f"all_tickers_*.parquet")
-    all_tickers = pl.read_parquet(all_tickers_file)
-
-    tickers = all_tickers.filter((pl.col("type").is_in(["CS", "ADRC"])))
-
-    return tickers
-
-
 if __name__ == "__main__":
-    selected_tickers = pre_select_tickers()
+    selected_tickers = only_common_stocks()
     with pl.Config(tbl_rows=10, tbl_cols=50):
         print(selected_tickers.shape)
 
         print(
             selected_tickers.filter(
-                (~pl.col("composite_figi").is_unique())
-                & (pl.col("composite_figi").is_not_null())
+                # (~pl.col("composite_figi").is_unique())
+                # & (pl.col("composite_figi").is_not_null())
                 # & ((pl.col('composite_figi').is_null()) | (pl.col('share_class_figi').is_null()) )
-                # & (pl.col('cik') == '0001805521')
-                # & (pl.col('ticker').is_in(['FFAI', 'FFIE']))
+                # & (pl.col('composite_figi') == 'BBG000VLBCQ1')
+                # & (pl.col('ticker').is_in(['META']))
+                (pl.col("composite_figi") == "BBG00KLHTJY4")
+                # (pl.col('ticker').is_in(['DVLT']))
             ).sort("composite_figi")
         )

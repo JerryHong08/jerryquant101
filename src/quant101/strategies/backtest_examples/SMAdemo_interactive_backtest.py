@@ -168,7 +168,7 @@ def demo_interactive_backtest():
 
     # 2. 加载数据
     print("加载市场数据...")
-    tickers = only_common_stocks()
+    tickers = only_common_stocks(config["start_date"])
 
     try:
         ohlcv_data = (

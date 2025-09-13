@@ -262,7 +262,14 @@ class BacktestEngine:
 
         # 导出交易记录
         trades_path = f"{output_dir}/{strategy_name}_trades.csv"
-        results["trades"].write_csv(trades_path)
+
+        trades = (
+            pl.DataFrame(results["trades"])
+            .with_columns((pl.col("return") * 100).round(2).alias("return %"))
+            .sort("return %", descending=True)
+            .drop("return")
+        )
+        trades.write_csv(trades_path)
         print(f"交易记录已导出到: {trades_path}")
 
         # 导出每日组合表现

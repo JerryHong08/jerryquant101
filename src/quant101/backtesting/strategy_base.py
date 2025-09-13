@@ -2,10 +2,15 @@
 策略基类 - 所有策略都应该继承这个基类
 """
 
+import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 import polars as pl
+
+from quant101.core_2.config import cache_dir
+
+strategy_cache_dir = os.path.join(cache_dir, "strategies")
 
 
 class StrategyBase(ABC):
@@ -18,6 +23,22 @@ class StrategyBase(ABC):
         self.config = config or {}
         self.ohlcv_data = None
         self.tickers = None
+        # 初始化缓存文件路径
+        self.cache_file = os.path.join(strategy_cache_dir, f"{self.name}.csv")
+        # 确保缓存目录存在
+        os.makedirs(strategy_cache_dir, exist_ok=True)
+
+    def load_cached_indicators(self) -> Optional[pl.DataFrame]:
+        """加载缓存的指标数据"""
+        if os.path.exists(self.cache_file):
+            print(f"从缓存加载{self.name}指标: {self.cache_file}")
+            return pl.read_csv(self.cache_file)
+        return None
+
+    def save_indicators_cache(self, indicators: pl.DataFrame) -> None:
+        """保存指标数据到缓存"""
+        indicators.write_csv(self.cache_file)
+        print(f"{self.name}指标已缓存到: {self.cache_file}")
 
     def set_data(self, ohlcv_data: pl.DataFrame, tickers: list = None):
         """设置数据"""

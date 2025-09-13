@@ -624,10 +624,36 @@ def data_loader(
 
 def figi_alignment(lf):
     print("Processing figi alignment...")
-    all_tickers_file = os.path.join(all_tickers_dir, f"all_tickers_*.parquet")
-    all_tickers = pl.read_parquet(all_tickers_file).lazy()
+    all_tickers_file = os.path.join(all_tickers_dir, f"all_stocks_*.parquet")
+    all_tickers = (
+        pl.read_parquet(all_tickers_file)
+        .unique(subset=["composite_figi", "ticker"])
+        .lazy()
+    )
 
     cols = lf.collect_schema().names()
+
+    # 检测数据类型和时间列
+    has_window_start = "window_start" in cols
+    has_execution_date = "execution_date" in cols
+
+    # 确定用于分组的时间列
+    time_col = None
+    if has_window_start:
+        time_col = "window_start"
+        print("Detected OHLCV data with window_start column")
+    elif has_execution_date:
+        # 对于 splits 数据，创建临时时间列用于分组，保持原列不变
+        lf = lf.with_columns(
+            pl.col("execution_date")
+            .str.to_date()
+            .dt.timestamp("ns")
+            .alias("time_for_grouping")
+        )
+        time_col = "time_for_grouping"
+        print("Detected splits data with execution_date column")
+    else:
+        print("No time column detected, proceeding without time-based grouping")
 
     lf = lf.join(
         all_tickers.select(
@@ -641,21 +667,23 @@ def figi_alignment(lf):
             ]
         ),
         on="ticker",
-        how="inner",
+        how="left",
     )
 
     lf_with_figi = lf.filter(pl.col("composite_figi").is_not_null())
     lf_without_figi = lf.filter(pl.col("composite_figi").is_null())
 
-    latest_tickers = (
-        lf_with_figi.group_by(["composite_figi", "ticker"])
-        .agg(pl.col("window_start").max().alias("max_timestamp"))
-        .sort(["composite_figi", "max_timestamp"], descending=[False, True])
-        .group_by("composite_figi")
-        .first()
-        .select(["composite_figi", "ticker"])
-        .rename({"ticker": "latest_ticker"})
-    )
+    # 根据是否有时间列来处理分组逻辑
+    if time_col:
+        latest_tickers = (
+            lf_with_figi.group_by(["composite_figi", "ticker"])
+            .agg(pl.col(time_col).max().alias("max_timestamp"))
+            .sort(["composite_figi", "max_timestamp"], descending=[False, True])
+            .group_by("composite_figi")
+            .first()
+            .select(["composite_figi", "ticker"])
+            .rename({"ticker": "latest_ticker"})
+        )
 
     lf_with_figi = (
         lf_with_figi.join(latest_tickers, on="composite_figi", how="left")
@@ -665,7 +693,14 @@ def figi_alignment(lf):
 
     aligned_lf = pl.concat([lf_with_figi, lf_without_figi], how="vertical")
 
-    return aligned_lf.select(cols)
+    final_cols = [col for col in cols if col in aligned_lf.collect_schema().names()]
+    if (
+        "time_for_grouping" in aligned_lf.collect_schema().names()
+        and "time_for_grouping" not in cols
+    ):
+        final_cols = [col for col in final_cols if col != "time_for_grouping"]
+
+    return aligned_lf.select(final_cols)
 
 
 def stock_load_process(
@@ -692,6 +727,8 @@ def stock_load_process(
         try:
             cached_data = pl.scan_parquet(cache_path)
             print("Cache loaded successfully.")
+            print(f"Cache Size: {cached_data.collect().estimated_size('mb'):.2f} MB")
+            print(f"Cache rows: {len(cached_data.collect()):,}")
             return cached_data
         except Exception as e:
             print(f"Failed to load cache: {e}, proceeding with normal data loading...")
@@ -717,8 +754,6 @@ def stock_load_process(
         duck_db=duck_db,
     )
 
-    # lf = figi_alignment(lf)
-
     lf = lf.with_columns(
         pl.from_epoch(pl.col("window_start"), time_unit="ns")
         .dt.convert_time_zone("America/New_York")
@@ -733,8 +768,9 @@ def stock_load_process(
 
     print("2. data loaded.")
 
-    lf = splits_adjust(lf, splits_data, price_decimals=4)
-    # print(lf.collect().head(1))
+    splits_data_figi = figi_alignment(splits_data.lazy()).collect()
+    lf = figi_alignment(lf)
+    lf = splits_adjust(lf, splits_data_figi, price_decimals=4)
 
     print("3. splits adjusted.")
 
@@ -819,11 +855,18 @@ def stock_load_process(
         lf_full = resample_ohlcv(lf_full, timeframe)
 
     print("7. resample done.")
+
+    # lf_full = lf_full.drop(["split_date", "window_start", "split_ratio"])
+
     # Save to cache if use_cache is True
     if use_cache and not use_s3:
         try:
             print(f"Saving to cache: {cache_path}")
-            lf_full.collect().write_parquet(cache_path)
+            data = lf_full.collect()
+            data.write_parquet(cache_path)
+
+            print(f"Cache Size: {data.estimated_size('mb'):.2f} MB")
+            print(f"Cache rows: {len(data):,}")
 
             # Save metadata for debugging
             cache_params = {
@@ -849,7 +892,7 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    tickers = ["ARYE"]
+    tickers = ["ICLD"]
     # tickers = None
     timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
     asset = "us_stocks_sip"
@@ -859,7 +902,7 @@ if __name__ == "__main__":
     full_hour = False
     plot = True
     # plot = False
-    ticker_plot = "ARYE"
+    ticker_plot = "ICLD"
 
     lf_result = stock_load_process(
         tickers=tickers,

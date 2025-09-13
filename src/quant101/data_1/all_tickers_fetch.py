@@ -16,6 +16,7 @@ updated_time = time.strftime("%Y%m%d", time.localtime())
 ASSET_CONFIG = {
     "stocks": all_tickers_dir,
     "indices": all_indices_dir,
+    "otc": all_tickers_dir,
 }
 
 
@@ -43,7 +44,7 @@ def fetch_and_save(asset_type: str, out_dir: str):
     df = pl.DataFrame(all_records)
     # delete last updated all_ticker file(s)
     for f in os.listdir(out_dir):
-        if f.startswith("all_{asset_type}_") and f.endswith(".parquet"):
+        if f.startswith(f"all_{asset_type}_") and f.endswith(".parquet"):
             os.remove(os.path.join(out_dir, f))
 
     df.write_parquet(out_file, compression="snappy")
