@@ -34,7 +34,7 @@ except (ValueError, FileNotFoundError, OSError):
 all_tickers_dir = os.path.join(data_dir, "raw/us_stocks_sip/us_all_tickers")
 all_indices_dir = os.path.join(data_dir, "raw/us_indices/us_all_indices")
 
-cache_dir = os.path.join(data_dir, "processd")
+cache_dir = os.path.join(data_dir, "processed")
 
 
 sppc_dir = "/mnt/blackdisk/quant_data/kaggle_data/sppc"

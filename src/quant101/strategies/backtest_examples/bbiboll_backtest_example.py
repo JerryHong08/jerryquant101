@@ -35,16 +35,18 @@ def main():
         "max_dev_pct": 1,
         "hold_days": 2,
         "start_date": "2023-02-13",
-        "selected_tickers": ["DVLT"],  # 可以改为 'random' 随机选择
+        # "selected_tickers": ["DVLT"],  # 可以改为 'random' 随机选择
         # "selected_tickers": ['SILA', 'RS', 'NLSP', 'XWEL', 'RIVN', 'CHKP', 'SANA', 'BAP', 'SBSW', 'FRSH', 'CHW', 'WLY', 'RLYB', 'LUCD', 'ZBH', 'AWK', 'WLMS', 'TFC', 'WPRT', 'WBX', 'TCVA', 'LGHL', 'ABTS', 'PWR', 'FIX', 'INGR', 'MRAI', 'BMRA', 'TALK', 'CTV', 'ADPT', 'WDS', 'INAB', 'LIN', 'MXCT', 'PSNL', 'PLRX', 'AVNW', 'BGSF', 'IQST', 'PMI', 'FWONK', 'MGOL', 'WGS', 'PNC', 'WIRE', 'ULBI', 'SKIL', 'SGFY', 'DMAC', 'APRN', 'JANX', 'ABR', 'HLVX', 'EQT', 'TRUE', 'SLAM', 'EEX', 'ATTO', 'ERIE', 'INFA', 'SMPL', 'NUKK', 'ARTV', 'ALNY', 'KSPI', 'BSX', 'ACRO', 'DUK', 'CBZ', 'ENR', 'CABA', 'CMPR', 'BHVN', 'ACOR', 'CENQ', 'INLF', 'AMRZ', 'TGB', 'GORO', 'SMBC', 'NYMTI', 'WEN', 'TRGP', 'FRME', 'CAPT', 'JNCE', 'RGR', 'EVCM', 'SNWV', 'MAIA', 'INTU', 'DAIC', 'PHI', 'SSNC', 'GDST', 'SBIG', 'ASPA', 'ACOG', 'MDNA'],
-        # 'selected_tickers': ['random'],  # 可以改为 'random' 随机选择
-        "random_count": 7708,
+        "selected_tickers": ["random"],  # 可以改为 'random' 随机选择
+        "random_count": 7709,
         "min_turnover": 0,
     }
 
     # 2. 加载数据
     print("加载市场数据...")
     tickers = only_common_stocks(filter_date=config["start_date"])
+
+    print(tickers.head())
 
     try:
         ohlcv_data = (

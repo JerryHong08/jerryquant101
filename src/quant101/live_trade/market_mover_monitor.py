@@ -14,7 +14,7 @@ polygon_api_key_live = os.getenv("POLYGON_API_KEY")
 
 client = RESTClient(polygon_api_key_live)
 
-selected_tickers = only_common_stocks().drop("active", "composite_figi")
+selected_tickers = only_common_stocks("2025-09-10").drop("active", "composite_figi")
 
 snapshot = client.get_snapshot_all("stocks", include_otc=True)
 
@@ -73,4 +73,5 @@ market_mover_file = os.path.join(
     cache_dir, "market_mover", f"{updated_time}_market_snapshot.csv"
 )
 result.write_csv(market_mover_file)
-print(result.head(20))
+with pl.Config(tbl_rows=20, tbl_cols=50):
+    print(result.head(20))

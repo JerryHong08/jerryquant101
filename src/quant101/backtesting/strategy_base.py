@@ -32,7 +32,16 @@ class StrategyBase(ABC):
         """加载缓存的指标数据"""
         if os.path.exists(self.cache_file):
             print(f"从缓存加载{self.name}指标: {self.cache_file}")
-            return pl.read_csv(self.cache_file)
+            df = pl.read_csv(self.cache_file, try_parse_dates=True)
+            # Convert datetime columns to datetime[ns, America/New_York] format
+            for col in df.columns:
+                if df[col].dtype in [pl.Datetime, pl.Datetime("us"), pl.Datetime("ms")]:
+                    df = df.with_columns(
+                        pl.col(col)
+                        .dt.convert_time_zone("America/New_York")
+                        .dt.cast_time_unit("ns")
+                    )
+            return df
         return None
 
     def save_indicators_cache(self, indicators: pl.DataFrame) -> None:
@@ -42,6 +51,16 @@ class StrategyBase(ABC):
 
     def set_data(self, ohlcv_data: pl.DataFrame, tickers: list = None):
         """设置数据"""
+        # # 确保 timestamps 列是 datetime 类型
+        # if ohlcv_data["timestamps"].dtype != pl.Datetime:
+        #     if ohlcv_data["timestamps"].dtype == pl.String:
+        #         ohlcv_data = ohlcv_data.with_columns(
+        #             pl.col("timestamps").str.strptime(
+        #                 pl.Datetime,
+        #                 "%Y-%m-%d %H:%M:%S",
+        #                 strict=False
+        #             ).cast(pl.Datetime("ns", "America/New_York"))
+        #         )
         self.ohlcv_data = ohlcv_data
         self.tickers = tickers
 

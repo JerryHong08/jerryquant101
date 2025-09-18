@@ -65,6 +65,8 @@ class BBIBOLLStrategy(StrategyBase):
             boll_multiple=self.config["boll_multiple"],
         )
 
+        print(indicators.head())
+
         # 添加成交额
         indicators = indicators.with_columns(
             (pl.col("volume") * pl.col("close")).alias("turnover")
@@ -111,6 +113,9 @@ class BBIBOLLStrategy(StrategyBase):
         start_date = datetime.datetime.strptime(
             self.config["start_date"], "%Y-%m-%d"
         ).date()
+
+        print(f"timestamps 列的数据类型: {indicators['timestamps'].dtype}")
+        print(f"timestamps 列的前几个值: {indicators.select('timestamps').head(3)}")
 
         signals = indicators.filter(
             # 基础过滤条件
@@ -277,6 +282,7 @@ class BBIBOLLStrategy(StrategyBase):
         # 随机选择股票
         available_tickers = indicators.select("ticker").unique().to_series().to_list()
         random_count = min(self.config["random_count"], len(available_tickers))
+        print(f"可选股票数量: {len(available_tickers)}，随机选择数量: {random_count}")
 
         if selected_tickers == ["random"] or selected_tickers == "random":
             selected = random.sample(available_tickers, random_count)

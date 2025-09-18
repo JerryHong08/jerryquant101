@@ -34,6 +34,39 @@ fs = s3fs.S3FileSystem(
     client_kwargs={"region_name": "us-east-1"},
 )
 
+all_tickers_file = os.path.join(all_tickers_dir, f"all_stocks_*.parquet")
+all_tickers = (
+    pl.read_parquet(all_tickers_file)
+    # .unique(subset=["composite_figi", "ticker", "last_updated_utc"])
+    .lazy()
+)
+
+# 给 null FIGI 填充唯一 ID
+all_tickers = all_tickers.with_columns(
+    pl.when(pl.col("composite_figi").is_null())
+    .then(pl.concat_str([pl.lit("NULL_"), pl.arange(0, pl.len())]))
+    .otherwise(pl.col("composite_figi"))
+    .alias("composite_figi")
+)
+
+selected = (
+    all_tickers.sort("last_updated_utc", descending=True)
+    .group_by("composite_figi")
+    .agg(
+        [
+            pl.col("ticker").first().alias("latest_ticker"),
+            pl.col("ticker")
+            .sort_by("last_updated_utc", descending=True)
+            .alias("tickers"),
+            pl.col("last_updated_utc"),
+            pl.col("ticker").n_unique().alias("ticker_count"),
+            pl.col("delisted_utc").alias("all_delisted_utc"),  # 返回所有值（包括null）
+        ]
+    )
+)
+
+all_tickers = all_tickers.join(selected, on="composite_figi")
+
 
 def s3_data_dir_calculate(asset: str, data_type: str, start_date: str, end_date: str):
     """
@@ -505,7 +538,7 @@ def generate_cache_key(
 ):
     """Generate a unique cache key based on parameters"""
     cache_params = {
-        "tickers": sorted(tickers) if tickers else None,
+        "tickers": sorted([t for t in tickers if t is not None]) if tickers else None,
         "timeframe": timeframe,
         "asset": asset,
         "data_type": data_type,
@@ -532,6 +565,17 @@ def save_cache_metadata(cache_path, params):
     metadata_path = cache_path.replace(".parquet", "_metadata.json")
     with open(metadata_path, "w") as f:
         json.dump(params, f, indent=2, default=str)
+
+
+def tickers_alignment(tickers):
+    tickers = tickers.join(
+        all_tickers.select(
+            ["ticker", "tickers", "composite_figi", "latest_ticker", "all_delisted_utc"]
+        ).filter(pl.col("composite_figi").is_not_null()),
+        on="ticker",
+        how="left",
+    )
+    return tickers
 
 
 def data_loader(
@@ -622,85 +666,182 @@ def data_loader(
     return lf
 
 
-def figi_alignment(lf):
+def splits_figi_alignment(df):
     print("Processing figi alignment...")
-    all_tickers_file = os.path.join(all_tickers_dir, f"all_stocks_*.parquet")
-    all_tickers = (
-        pl.read_parquet(all_tickers_file)
-        .unique(subset=["composite_figi", "ticker"])
-        .lazy()
+    df = (
+        df.lazy()
+        .join(
+            all_tickers.select(["ticker", "composite_figi", "latest_ticker"]),
+            on="ticker",
+            how="left",
+        )
+        .drop("ticker")
+        .rename({"latest_ticker": "ticker"})
     )
 
-    cols = lf.collect_schema().names()
+    # print(df)
 
-    # 检测数据类型和时间列
-    has_window_start = "window_start" in cols
-    has_execution_date = "execution_date" in cols
+    aligned_lf = df
 
-    # 确定用于分组的时间列
-    time_col = None
-    if has_window_start:
-        time_col = "window_start"
-        print("Detected OHLCV data with window_start column")
-    elif has_execution_date:
-        # 对于 splits 数据，创建临时时间列用于分组，保持原列不变
-        lf = lf.with_columns(
-            pl.col("execution_date")
-            .str.to_date()
-            .dt.timestamp("ns")
-            .alias("time_for_grouping")
-        )
-        time_col = "time_for_grouping"
-        print("Detected splits data with execution_date column")
-    else:
-        print("No time column detected, proceeding without time-based grouping")
+    return aligned_lf.drop("composite_figi")
 
+
+def figi_alignment(lf):
+    """
+    增强版的 FIGI 对齐函数，处理同一 composite_figi 下多个 ticker 的重叠数据
+    """
+    # 首先添加 composite_figi 和 ticker 顺序信息
     lf = lf.join(
         all_tickers.select(
-            [
-                "ticker",
-                "delisted_utc",
-                "last_updated_utc",
-                "cik",
-                "composite_figi",
-                "share_class_figi",
-            ]
+            ["ticker", "composite_figi", "latest_ticker", "tickers", "last_updated_utc"]
         ),
         on="ticker",
         how="left",
     )
 
-    lf_with_figi = lf.filter(pl.col("composite_figi").is_not_null())
-    lf_without_figi = lf.filter(pl.col("composite_figi").is_null())
-
-    # 根据是否有时间列来处理分组逻辑
-    if time_col:
-        latest_tickers = (
-            lf_with_figi.group_by(["composite_figi", "ticker"])
-            .agg(pl.col(time_col).max().alias("max_timestamp"))
-            .sort(["composite_figi", "max_timestamp"], descending=[False, True])
-            .group_by("composite_figi")
-            .first()
-            .select(["composite_figi", "ticker"])
-            .rename({"ticker": "latest_ticker"})
+    # 找出有多个 ticker 的 composite_figi 组
+    multi_ticker_groups = (
+        lf.group_by("composite_figi")
+        .agg(
+            [
+                pl.col("ticker").n_unique().alias("ticker_count"),
+                pl.col("ticker").unique().alias("unique_tickers"),
+            ]
         )
-
-    lf_with_figi = (
-        lf_with_figi.join(latest_tickers, on="composite_figi", how="left")
-        .with_columns(pl.col("latest_ticker").alias("ticker"))
-        .drop("latest_ticker")
+        .filter(pl.col("ticker_count") > 1)
+        .select("composite_figi")
     )
 
-    aligned_lf = pl.concat([lf_with_figi, lf_without_figi], how="vertical")
+    # 分离单 ticker 和多 ticker 的数据
+    single_ticker_data = lf.join(
+        multi_ticker_groups,
+        on="composite_figi",
+        how="anti",  # 反连接，获取不在多ticker组中的数据
+    )
 
-    final_cols = [col for col in cols if col in aligned_lf.collect_schema().names()]
+    multi_ticker_data = lf.join(
+        multi_ticker_groups,
+        on="composite_figi",
+        how="semi",  # 半连接，获取在多ticker组中的数据
+    )
+
+    # 处理多 ticker 组的重叠数据
+    def process_multi_ticker_group(group_df):
+        """处理单个 composite_figi 组内的重叠数据"""
+        # 获取该组的 ticker 顺序（按 last_updated_utc 排序）
+        ticker_order = (
+            group_df.select(["ticker", "last_updated_utc"])
+            .unique()
+            .sort("last_updated_utc")
+            .select("ticker")
+            .to_series()
+            .to_list()
+        )
+
+        processed_data = []
+        last_end_date = None
+
+        for i, ticker in enumerate(ticker_order):
+            ticker_data = group_df.filter(pl.col("ticker") == ticker).sort("timestamps")
+
+            if ticker_data.height == 0:
+                continue
+
+            if last_end_date is not None:
+                # 移除与前一个 ticker 重叠的数据
+                ticker_data = ticker_data.filter(
+                    pl.col("timestamps").dt.date() > last_end_date
+                )
+
+            if ticker_data.height > 0:
+                processed_data.append(ticker_data)
+                # 更新最后日期
+                last_end_date = ticker_data.select(
+                    pl.col("timestamps").dt.date().max()
+                ).item()
+
+        # 合并所有处理后的数据
+        if processed_data:
+            combined = pl.concat(processed_data)
+            # 统一使用 latest_ticker
+            latest_ticker = group_df.select("latest_ticker").row(0)[0]
+            combined = combined.with_columns(pl.lit(latest_ticker).alias("ticker"))
+            return combined
+        else:
+            return pl.DataFrame(schema=group_df.schema)
+
+    # 对每个多 ticker 组应用处理函数
+    multi_ticker_data_collected = multi_ticker_data.collect()
+    if multi_ticker_data_collected.height > 0:
+        processed_groups = []
+
+        for figi in (
+            multi_ticker_data_collected.select("composite_figi").unique().to_series()
+        ):
+            group_data = multi_ticker_data_collected.filter(
+                pl.col("composite_figi") == figi
+            )
+            processed_group = process_multi_ticker_group(group_data)
+            if processed_group.height > 0:
+                processed_groups.append(processed_group)
+
+        if processed_groups:
+            processed_multi_ticker_data = pl.concat(processed_groups)
+        else:
+            processed_multi_ticker_data = pl.DataFrame(
+                schema=multi_ticker_data_collected.schema
+            )
+    else:
+        processed_multi_ticker_data = pl.DataFrame(schema=lf.schema)
+
+    # 处理单 ticker 数据（简单重命名）
+    single_ticker_data_collected = single_ticker_data.collect()
+    if single_ticker_data_collected.height > 0:
+        processed_single_ticker_data = (
+            single_ticker_data_collected.with_columns(
+                pl.col("latest_ticker").alias("new_ticker")
+            )
+            .drop("ticker")
+            .rename({"new_ticker": "ticker"})
+        )
+    else:
+        processed_single_ticker_data = pl.DataFrame(schema=lf.schema)
+
+    # 合并所有数据
     if (
-        "time_for_grouping" in aligned_lf.collect_schema().names()
-        and "time_for_grouping" not in cols
+        processed_multi_ticker_data.height > 0
+        and processed_single_ticker_data.height > 0
     ):
-        final_cols = [col for col in final_cols if col != "time_for_grouping"]
+        # print(processed_multi_ticker_data.head())
+        # print(processed_single_ticker_data.head())
+        # Ensure both DataFrames have the same column order
+        common_columns = [
+            col
+            for col in processed_single_ticker_data.columns
+            if col in processed_multi_ticker_data.columns
+        ]
+        processed_single_ticker_data = processed_single_ticker_data.select(
+            common_columns
+        )
+        processed_multi_ticker_data = processed_multi_ticker_data.select(common_columns)
+        final_data = pl.concat(
+            [processed_single_ticker_data, processed_multi_ticker_data]
+        )
+    elif processed_multi_ticker_data.height > 0:
+        final_data = processed_multi_ticker_data
+    elif processed_single_ticker_data.height > 0:
+        final_data = processed_single_ticker_data
+    else:
+        final_data = pl.DataFrame(schema=lf.schema)
 
-    return aligned_lf.select(final_cols)
+    # 清理列
+    columns_to_keep = [
+        col
+        for col in final_data.columns
+        if col not in ["composite_figi", "latest_ticker", "tickers", "last_updated_utc"]
+    ]
+
+    return final_data.select(columns_to_keep).sort(["ticker", "timestamps"])
 
 
 def stock_load_process(
@@ -715,6 +856,16 @@ def stock_load_process(
     use_cache: bool = True,
     duck_db: bool = False,
 ):
+    aligned_tickers = tickers_alignment(pl.DataFrame({"ticker": tickers}).lazy())
+    tickers = (
+        aligned_tickers.select("tickers")
+        .collect()
+        .to_series()
+        .explode()
+        .unique()
+        .to_list()
+    )
+
     # Generate cache key
     cache_key = generate_cache_key(
         tickers, timeframe, asset, data_type, start_date, end_date, full_hour
@@ -764,13 +915,16 @@ def stock_load_process(
         tickers = lf.select("ticker").unique().collect()["ticker"]
         print(f"All tickers count: {len(tickers)}")
     else:
+        print(f"Selected tickers count: {len(tickers)}")
         lf = lf.filter(pl.col("ticker").is_in(tickers))
 
     print("2. data loaded.")
 
-    splits_data_figi = figi_alignment(splits_data.lazy()).collect()
     lf = figi_alignment(lf)
-    lf = splits_adjust(lf, splits_data_figi, price_decimals=4)
+    splits_data_figi = splits_figi_alignment(splits_data)
+    # print(splits_data_figi.filter(pl.col("ticker").is_in(['TNFA'])).sort("ticker").head(10))
+
+    lf = splits_adjust(lf.lazy(), splits_data_figi.collect(), price_decimals=4)
 
     print("3. splits adjusted.")
 
@@ -892,17 +1046,18 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    tickers = ["ICLD"]
+    tickers = ["DVLT"]
+    # tickers = ['MYMD', 'TNFA', 'NVDA', 'FFIE', 'FFAI']
     # tickers = None
     timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
     asset = "us_stocks_sip"
     data_type = "day_aggs_v1" if timeframe == "1d" else "minute_aggs_v1"
     start_date = "2015-01-01"
-    end_date = "2025-09-05"
+    end_date = "2025-09-12"
     full_hour = False
     plot = True
     # plot = False
-    ticker_plot = "ICLD"
+    ticker_plot = tickers[0]
 
     lf_result = stock_load_process(
         tickers=tickers,
@@ -912,9 +1067,12 @@ if __name__ == "__main__":
         start_date=start_date,
         end_date=end_date,
         full_hour=full_hour,
+        use_cache=False,
     ).collect()
 
+    print(lf_result.head())
     print(lf_result.tail())
+    # print(lf_result.filter(pl.col('timestamps').cast(pl.Datetime("us")).is_between(pl.datetime(2024, 6, 3), pl.datetime(2024, 6, 11))))
 
     if plot:
         plot_candlestick(
@@ -922,3 +1080,6 @@ if __name__ == "__main__":
             ticker_plot,
             timeframe,
         )
+
+# BBG000BB07P9 second last ticker: GOLD has data before its name change, which should be dropped.
+# BBG000BF7BV7 latest ticker: BBBY has data before its name change, which should be dropped.
