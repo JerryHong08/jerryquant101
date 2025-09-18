@@ -51,16 +51,6 @@ class StrategyBase(ABC):
 
     def set_data(self, ohlcv_data: pl.DataFrame, tickers: list = None):
         """设置数据"""
-        # # 确保 timestamps 列是 datetime 类型
-        # if ohlcv_data["timestamps"].dtype != pl.Datetime:
-        #     if ohlcv_data["timestamps"].dtype == pl.String:
-        #         ohlcv_data = ohlcv_data.with_columns(
-        #             pl.col("timestamps").str.strptime(
-        #                 pl.Datetime,
-        #                 "%Y-%m-%d %H:%M:%S",
-        #                 strict=False
-        #             ).cast(pl.Datetime("ns", "America/New_York"))
-        #         )
         self.ohlcv_data = ohlcv_data
         self.tickers = tickers
 

@@ -33,11 +33,11 @@ def main():
         "boll_length": 11,
         "boll_multiple": 6,
         "max_dev_pct": 1,
-        "hold_days": 2,
+        "hold_days": 5,
         "start_date": "2023-02-13",
-        # "selected_tickers": ["DVLT"],  # 可以改为 'random' 随机选择
+        "selected_tickers": ["VSTE"],  # 可以改为 'random' 随机选择
         # "selected_tickers": ['SILA', 'RS', 'NLSP', 'XWEL', 'RIVN', 'CHKP', 'SANA', 'BAP', 'SBSW', 'FRSH', 'CHW', 'WLY', 'RLYB', 'LUCD', 'ZBH', 'AWK', 'WLMS', 'TFC', 'WPRT', 'WBX', 'TCVA', 'LGHL', 'ABTS', 'PWR', 'FIX', 'INGR', 'MRAI', 'BMRA', 'TALK', 'CTV', 'ADPT', 'WDS', 'INAB', 'LIN', 'MXCT', 'PSNL', 'PLRX', 'AVNW', 'BGSF', 'IQST', 'PMI', 'FWONK', 'MGOL', 'WGS', 'PNC', 'WIRE', 'ULBI', 'SKIL', 'SGFY', 'DMAC', 'APRN', 'JANX', 'ABR', 'HLVX', 'EQT', 'TRUE', 'SLAM', 'EEX', 'ATTO', 'ERIE', 'INFA', 'SMPL', 'NUKK', 'ARTV', 'ALNY', 'KSPI', 'BSX', 'ACRO', 'DUK', 'CBZ', 'ENR', 'CABA', 'CMPR', 'BHVN', 'ACOR', 'CENQ', 'INLF', 'AMRZ', 'TGB', 'GORO', 'SMBC', 'NYMTI', 'WEN', 'TRGP', 'FRME', 'CAPT', 'JNCE', 'RGR', 'EVCM', 'SNWV', 'MAIA', 'INTU', 'DAIC', 'PHI', 'SSNC', 'GDST', 'SBIG', 'ASPA', 'ACOG', 'MDNA'],
-        "selected_tickers": ["random"],  # 可以改为 'random' 随机选择
+        # "selected_tickers": ["random"],  # 可以改为 'random' 随机选择
         "random_count": 7709,
         "min_turnover": 0,
     }
@@ -130,6 +130,7 @@ def main():
             start_date="2022-01-01",
             end_date="2025-09-05",
             indicators=results.get("indicators"),
+            # line=False,
             save_path=f"{output_dir}/{selected_ticker}_signals.png",
         )
 

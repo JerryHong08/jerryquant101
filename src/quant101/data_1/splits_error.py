@@ -26,8 +26,10 @@ splits_original = splits_original.filter(
 )
 
 splits_errors.write_parquet(splits_error_dir)
-
 splits_errors.write_parquet(splits_error_dir_copy)
 
 with pl.Config(tbl_rows=100, tbl_cols=10, fmt_str_lengths=100):
     print(splits_errors)
+
+
+# DXF 2024-12-04 1:125 merge not included, need to add

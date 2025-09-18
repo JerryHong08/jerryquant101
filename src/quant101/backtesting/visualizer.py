@@ -306,6 +306,7 @@ class BacktestVisualizer:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         indicators: Optional[pl.DataFrame] = None,
+        line: Optional[bool] = True,
         save_path: Optional[str] = None,
     ):
         """
@@ -352,7 +353,10 @@ class BacktestVisualizer:
         )
 
         # 绘制K线图 (使用数值索引)
-        self._plot_candlesticks_line(ax1, df)
+        if line:
+            self._plot_candlesticks_line(ax1, df)
+        else:
+            self._plot_candlesticks(ax1, df)
 
         # 绘制交易信号
         ticker_trades = trades.filter(pl.col("ticker") == ticker)

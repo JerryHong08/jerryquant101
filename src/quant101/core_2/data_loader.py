@@ -1046,7 +1046,7 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    tickers = ["DVLT"]
+    tickers = ["RAIN"]
     # tickers = ['MYMD', 'TNFA', 'NVDA', 'FFIE', 'FFAI']
     # tickers = None
     timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
