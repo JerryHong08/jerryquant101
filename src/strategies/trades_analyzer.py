@@ -1,6 +1,6 @@
 import polars as pl
 
-from quant101.core_2.config import splits_data
+from core_2.config import splits_data
 
 strategy_name = "BBIBOLL"
 

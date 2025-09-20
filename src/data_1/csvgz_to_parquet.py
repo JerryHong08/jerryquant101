@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 import polars as pl
 from tqdm import tqdm
 
-from quant101.core_2.config import data_dir
+from core_2.config import data_dir
 
 # Base directories
 RAW_DIR = os.path.join(data_dir, "raw")
@@ -468,6 +468,27 @@ class CSVGZToParquetConverter:
         except Exception as e:
             return {"error": str(e)}
 
+    def convert_recent(
+        self,
+        asset_class: Optional[str] = None,
+        data_type: Optional[str] = None,
+        days: int = None,
+        compression: str = "zstd",
+        compression_level: int = 3,
+    ) -> Optional[str]:
+
+        end_date = datetime.now().date() - timedelta(days=1)
+        start_date = end_date - timedelta(days=days - 1)
+
+        return self.convert_by_asset_class(
+            asset_class,
+            data_type,
+            start_date.strftime("%Y-%m-%d"),
+            end_date.strftime("%Y-%m-%d"),
+            compression,
+            compression_level,
+        )
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -482,6 +503,7 @@ def main():
     # Asset class options (matching polygon_downloader)
     parser.add_argument("--asset-class", help="Asset class (e.g., us_stocks_sip)")
     parser.add_argument("--data-type", help="Data type (e.g., trades_v1, quotes_v1)")
+    parser.add_argument("--recent-days", type=int, help="Convert most recent N days")
     parser.add_argument("--start-date", help="Start date filter (YYYY-MM-DD)")
     parser.add_argument("--end-date", help="End date filter (YYYY-MM-DD)")
 
@@ -555,40 +577,55 @@ def main():
         print(f"Converted {len(results)} files")
 
     elif args.asset_class and args.data_type:
-        results = converter.convert_by_asset_class(
-            args.asset_class,
-            args.data_type,
-            args.start_date,
-            args.end_date,
-            compression=args.compression,
-            compression_level=args.compression_level,
-        )
-        print(f"Converted {len(results)} files")
+        if args.recent_days:
+            results = converter.convert_recent(
+                args.asset_class,
+                args.data_type,
+                args.recent_days,
+                compression=args.compression,
+                compression_level=args.compression_level,
+            )
+            print(f"\nConverted {len(results)} files")
+
+        elif args.start_date and args.end_date:
+            results = converter.convert_by_asset_class(
+                args.asset_class,
+                args.data_type,
+                args.start_date,
+                args.end_date,
+                compression=args.compression,
+                compression_level=args.compression_level,
+            )
+            print(f"Converted {len(results)} files")
 
     else:
         print("\nUsage examples:")
-        print("  Convert single file:")
+        print(" Convert recent 7 days:")
         print(
-            "    python src/quant101/data_1/csvgz_to_parquet.py --file /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/2024/03/2024-03-01.csv.gz"
+            "    python src/data_1/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days 7"
+        )
+        print("\n  Convert single file:")
+        print(
+            "    python src/data_1/csvgz_to_parquet.py --file /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/2024/03/2024-03-01.csv.gz"
         )
         print("\n  Convert directory:")
         print(
-            "    python src/quant101/data_1/csvgz_to_parquet.py --directory /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/"
+            "    python src/data_1/csvgz_to_parquet.py --directory /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/"
         )
         print("\n  Convert by asset class:")
         print(
-            "    python src/quant101/data_1/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1"
+            "    python src/data_1/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1"
         )
         print("\n  Convert date range:")
         print(
-            "    python src/quant101/data_1/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
+            "    python src/data_1/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
         )
         print("\n  Show file info:")
         print(
-            "    python src/quant101/data_1/csvgz_to_parquet.py --info /mnt/blackdisk/quant_data/polygon_data/lake/us_stocks_sip/trades_v1/2024/03/2024-03-01.parquet"
+            "    python src/data_1/csvgz_to_parquet.py --info /mnt/blackdisk/quant_data/polygon_data/lake/us_stocks_sip/trades_v1/2024/03/2024-03-01.parquet"
         )
         print("\n  List schemas:")
-        print("    python src/quant101/data_1/csvgz_to_parquet.py --list-schemas")
+        print("    python src/data_1/csvgz_to_parquet.py --list-schemas")
 
 
 if __name__ == "__main__":

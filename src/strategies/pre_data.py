@@ -3,7 +3,7 @@ import os
 
 import polars as pl
 
-from quant101.core_2.config import all_tickers_dir
+from core_2.config import all_tickers_dir
 
 
 def load_spx_benchmark(start, end):

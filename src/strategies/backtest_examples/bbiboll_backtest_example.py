@@ -6,12 +6,12 @@ import os
 
 import polars as pl
 
-from quant101.backtesting.engine import BacktestEngine
-from quant101.backtesting.visualizer import BacktestVisualizer
-from quant101.core_2.config import all_tickers_dir
-from quant101.core_2.data_loader import stock_load_process
-from quant101.strategies.bbibollStrategy import BBIBOLLStrategy
-from quant101.strategies.pre_data import load_spx_benchmark, only_common_stocks
+from backtesting.engine import BacktestEngine
+from backtesting.visualizer import BacktestVisualizer
+from core_2.config import all_tickers_dir
+from core_2.data_loader import stock_load_process
+from strategies.bbibollStrategy import BBIBOLLStrategy
+from strategies.pre_data import load_spx_benchmark, only_common_stocks
 
 
 def main():
@@ -24,8 +24,8 @@ def main():
     config = {
         "timeframe": "1d",
         "start_date": "2022-01-01",
-        "end_date": "2025-09-05",
-        "initial_capital": 100.0,
+        "end_date": "2025-09-19",
+        "initial_capital": 10000.0,
     }
 
     # 策略配置
@@ -35,18 +35,17 @@ def main():
         "max_dev_pct": 1,
         "hold_days": 5,
         "start_date": "2023-02-13",
-        "selected_tickers": ["VSTE"],  # 可以改为 'random' 随机选择
-        # "selected_tickers": ['SILA', 'RS', 'NLSP', 'XWEL', 'RIVN', 'CHKP', 'SANA', 'BAP', 'SBSW', 'FRSH', 'CHW', 'WLY', 'RLYB', 'LUCD', 'ZBH', 'AWK', 'WLMS', 'TFC', 'WPRT', 'WBX', 'TCVA', 'LGHL', 'ABTS', 'PWR', 'FIX', 'INGR', 'MRAI', 'BMRA', 'TALK', 'CTV', 'ADPT', 'WDS', 'INAB', 'LIN', 'MXCT', 'PSNL', 'PLRX', 'AVNW', 'BGSF', 'IQST', 'PMI', 'FWONK', 'MGOL', 'WGS', 'PNC', 'WIRE', 'ULBI', 'SKIL', 'SGFY', 'DMAC', 'APRN', 'JANX', 'ABR', 'HLVX', 'EQT', 'TRUE', 'SLAM', 'EEX', 'ATTO', 'ERIE', 'INFA', 'SMPL', 'NUKK', 'ARTV', 'ALNY', 'KSPI', 'BSX', 'ACRO', 'DUK', 'CBZ', 'ENR', 'CABA', 'CMPR', 'BHVN', 'ACOR', 'CENQ', 'INLF', 'AMRZ', 'TGB', 'GORO', 'SMBC', 'NYMTI', 'WEN', 'TRGP', 'FRME', 'CAPT', 'JNCE', 'RGR', 'EVCM', 'SNWV', 'MAIA', 'INTU', 'DAIC', 'PHI', 'SSNC', 'GDST', 'SBIG', 'ASPA', 'ACOG', 'MDNA'],
+        "selected_tickers": ["QUBT"],  # 可以改为 'random' 随机选择
+        # "selected_tickers": ['AACG', 'AC', 'ACAD', 'ACNT', 'ADD', 'AEHL', 'AEON', 'AHG', 'AIRI', 'AKA', 'AKU', 'ALNY', 'ALPS', 'ALTS', 'AMBR', 'AMLX', 'ARDX', 'AREN', 'ASNS', 'ATXI', 'AUGX', 'AUID', 'AUUD', 'BACC', 'BCLI', 'BFRI', 'BIIB', 'BLUW', 'BMTX', 'BNRE', 'BTOC', 'BVFL', 'CCII', 'CDTX', 'CGTL', 'CLSK', 'CMDBw', 'CMPOV', 'CMREw', 'CNL', 'CNTG', 'CPTN', 'CRD.B', 'CRSP', 'CURR', 'CYTK', 'DERM', 'DISCB', 'DLA', 'DPSI', 'DRDB', 'DRUG', 'DTCK', 'DVLT', 'DWTX', 'DYNT', 'EDN', 'EDTK', 'EDUC', 'EHLDV', 'ELDN', 'ELMD', 'ELWS', 'EQD', 'ESSC', 'EUDA', 'EVAC', 'FENG', 'FFNW', 'FLX', 'FMST', 'FNCB', 'FPAY', 'FRES', 'FTLF', 'FUNC', 'FUSN', 'GERN', 'GFED', 'GH', 'GLE', 'GMHS', 'GNS', 'GOAC', 'GPL', 'GRNQ', 'GTBP', 'GTIM', 'GURE', 'GVH', 'HBANM', 'HCTI', 'HHS', 'HIVE', 'HKIT', 'HROWL', 'HUDI', 'ICPT', 'IMDX', 'IMNM', 'INKT', 'INPXV', 'INTS', 'INVA', 'IPWR', 'ISBA', 'ITRM', 'JRSH', 'JXJT', 'KEN', 'LBGJ', 'LDTC', 'LEAP', 'LGLw', 'LIXT', 'LMNL', 'LSH', 'LSTA', 'LUMO', 'LUXA', 'LWAY', 'LXRX', 'MBINM', 'MDCX', 'MGIH', 'MHH', 'MI', 'MIXT', 'MKZR', 'MLP', 'MLTX', 'MNPR', 'MNTX', 'MTEM', 'MTR', 'MYSE', 'NDAC', 'NERV', 'NH', 'NIXX', 'NKSH', 'NMFCZ', 'NMRD', 'NPAC', 'NTBL', 'NTIC', 'NTWK', 'NVA', 'NVAX', 'NVCN', 'NVIV', 'NVOS', 'NWFL', 'NWTG', 'OBCI', 'OCA', 'OCFT', 'OCS', 'ODYS', 'OLB', 'ONCT', 'ONE', 'ONFO', 'OST', 'OXLCI', 'PC', 'PCAP', 'PCOM', 'PCSA', 'PELI', 'PMD', 'PT', 'PWOD', 'PXDT', 'QXO', 'RADX', 'RDAG', 'RDZN', 'REED', 'RGCO', 'RILYG', 'RKDA', 'ROLR', 'RYM', 'SAI', 'SCVX', 'SEAC', 'SEMw', 'SERA', 'SHIM', 'SJ', 'SMFL', 'SMID', 'SMIT', 'SNAL', 'SNSE', 'SPHA', 'SPPI', 'SPPL', 'SPRC', 'SPRY', 'SQFT', 'SRPT', 'SRXH', 'SVFC', 'SYBX', 'TAIT', 'TCRX', 'TELA', 'TLIS', 'TOPS', 'TVAC', 'UBXG', 'UFAB', 'UFG', 'USCB', 'VECT', 'VEEE', 'VERU', 'VGII', 'VHC', 'VIVK', 'VNME', 'VSTE', 'VTAK', 'VZLA', 'WAI', 'WS', 'WXM', 'XBIT', 'XXII', 'XYF', 'YYGH', 'ZIVO', 'ZKIN', 'ZVRA'],
         # "selected_tickers": ["random"],  # 可以改为 'random' 随机选择
         "random_count": 7709,
         "min_turnover": 0,
+        "plot_all": True,
     }
 
     # 2. 加载数据
     print("加载市场数据...")
     tickers = only_common_stocks(filter_date=config["start_date"])
-
-    print(tickers.head())
 
     try:
         ohlcv_data = (
@@ -95,6 +94,7 @@ def main():
 
     # 8. 绘制结果图表
     print("生成回测图表...")
+
     selected_ticker = strategy_config["selected_tickers"][0]
     try:
         if (
@@ -117,22 +117,35 @@ def main():
         if (
             len(strategy_config.get("selected_tickers", [])) > 1
             or selected_ticker == "random"
-        ):
+        ) and (strategy_config["plot_all"] == False):
             selected_ticker = (
                 results["trades"].select("ticker").unique().to_series().sample(1)[0]
             )
+            print(f"绘制 {selected_ticker} 的K线图和交易信号...")
+            visualizer.plot_candlestick_with_signals(
+                ohlcv_data=ohlcv_data,
+                trades=results["trades"],
+                ticker=selected_ticker,
+                start_date="2022-01-01",
+                end_date="2025-09-05",
+                indicators=results.get("indicators"),
+                # line=False,
+                save_path=f"{output_dir}/{selected_ticker}_signals.png",
+            )
 
-        print(f"绘制 {selected_ticker} 的K线图和交易信号...")
-        visualizer.plot_candlestick_with_signals(
-            ohlcv_data=ohlcv_data,
-            trades=results["trades"],
-            ticker=selected_ticker,
-            start_date="2022-01-01",
-            end_date="2025-09-05",
-            indicators=results.get("indicators"),
-            # line=False,
-            save_path=f"{output_dir}/{selected_ticker}_signals.png",
-        )
+        elif strategy_config["plot_all"]:
+            for selected_ticker in strategy_config.get("selected_tickers", []):
+                print(f"绘制 {selected_ticker} 的K线图和交易信号...")
+                visualizer.plot_candlestick_with_signals(
+                    ohlcv_data=ohlcv_data,
+                    trades=results["trades"],
+                    ticker=selected_ticker,
+                    start_date="2022-01-01",
+                    end_date="2025-09-05",
+                    indicators=results.get("indicators"),
+                    # line=False,
+                    save_path=f"{output_dir}/{selected_ticker}_signals.png",
+                )
 
     except Exception as e:
         print(f"绘图过程中出现错误: {e}")

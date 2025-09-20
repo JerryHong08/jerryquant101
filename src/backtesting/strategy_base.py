@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 import polars as pl
 
-from quant101.core_2.config import cache_dir
+from core_2.config import cache_dir
 
 strategy_cache_dir = os.path.join(cache_dir, "strategies")
 

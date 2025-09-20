@@ -5,7 +5,7 @@ import polars as pl
 from dotenv import load_dotenv
 from polygon import RESTClient
 
-from quant101.core_2.config import all_indices_dir, all_tickers_dir
+from core_2.config import all_indices_dir, all_tickers_dir
 
 load_dotenv()
 polygon_api_key = os.getenv("POLYGON_API_KEY")

@@ -13,13 +13,8 @@ import polars as pl
 import s3fs
 from dotenv import load_dotenv
 
-from quant101.core_2.config import (
-    all_tickers_dir,
-    data_dir,
-    splits_data,
-    splits_error_dir,
-)
-from quant101.core_2.plotter import plot_candlestick
+from core_2.config import all_tickers_dir, data_dir, splits_data
+from core_2.plotter import plot_candlestick
 
 load_dotenv()
 
@@ -686,7 +681,7 @@ def splits_figi_alignment(df):
     return aligned_lf.drop("composite_figi")
 
 
-def figi_alignment(lf):
+def ohlcv_figi_alignment(lf):
     """
     增强版的 FIGI 对齐函数，处理同一 composite_figi 下多个 ticker 的重叠数据
     """
@@ -920,7 +915,7 @@ def stock_load_process(
 
     print("2. data loaded.")
 
-    lf = figi_alignment(lf)
+    lf = ohlcv_figi_alignment(lf)
     splits_data_figi = splits_figi_alignment(splits_data)
     # print(splits_data_figi.filter(pl.col("ticker").is_in(['TNFA'])).sort("ticker").head(10))
 
@@ -1046,14 +1041,14 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    tickers = ["RAIN"]
+    tickers = ["NVDA"]
     # tickers = ['MYMD', 'TNFA', 'NVDA', 'FFIE', 'FFAI']
     # tickers = None
     timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
     asset = "us_stocks_sip"
     data_type = "day_aggs_v1" if timeframe == "1d" else "minute_aggs_v1"
     start_date = "2015-01-01"
-    end_date = "2025-09-12"
+    end_date = "2025-09-19"
     full_hour = False
     plot = True
     # plot = False

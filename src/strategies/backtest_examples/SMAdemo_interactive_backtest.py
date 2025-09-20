@@ -10,9 +10,9 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from quant101.backtesting import BacktestEngine, BacktestVisualizer, StrategyBase
-from quant101.core_2.data_loader import stock_load_process
-from quant101.strategies.pre_data import load_spx_benchmark, only_common_stocks
+from backtesting import BacktestEngine, BacktestVisualizer, StrategyBase
+from core_2.data_loader import stock_load_process
+from strategies.pre_data import load_spx_benchmark, only_common_stocks
 
 
 class SimpleMAStrategy(StrategyBase):

@@ -6,7 +6,7 @@ import polars as pl
 import s3fs
 from dotenv import load_dotenv
 
-from quant101.core_2.data_loader import data_loader
+from core_2.data_loader import data_loader
 
 load_dotenv()
 

@@ -9,8 +9,8 @@ from typing import Any, Dict, List
 
 import polars as pl
 
-from quant101.backtesting.strategy_base import StrategyBase
-from quant101.strategies.indicators.bbiboll_indicator import calculate_bbiboll
+from backtesting.strategy_base import StrategyBase
+from strategies.indicators.bbiboll_indicator import calculate_bbiboll
 
 
 class BBIBOLLStrategy(StrategyBase):
@@ -65,8 +65,6 @@ class BBIBOLLStrategy(StrategyBase):
             boll_multiple=self.config["boll_multiple"],
         )
 
-        print(indicators.head())
-
         # 添加成交额
         indicators = indicators.with_columns(
             (pl.col("volume") * pl.col("close")).alias("turnover")
@@ -113,9 +111,6 @@ class BBIBOLLStrategy(StrategyBase):
         start_date = datetime.datetime.strptime(
             self.config["start_date"], "%Y-%m-%d"
         ).date()
-
-        print(f"timestamps 列的数据类型: {indicators['timestamps'].dtype}")
-        print(f"timestamps 列的前几个值: {indicators.select('timestamps').head(3)}")
 
         signals = indicators.filter(
             # 基础过滤条件

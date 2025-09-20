@@ -5,7 +5,7 @@ import polars as pl
 from dotenv import load_dotenv
 from polygon import RESTClient
 
-from quant101.core_2.config import splits_dir
+from core_2.config import splits_dir
 
 load_dotenv()
 

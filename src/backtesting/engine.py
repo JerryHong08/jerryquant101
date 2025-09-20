@@ -170,18 +170,7 @@ class BacktestEngine:
                 save_path=save_path,
             )
 
-        # 2. 性能指标图
-        if plot_performance:
-            save_path = (
-                f"{output_dir}/{strategy_name}_performance.png" if save_plots else None
-            )
-            self.visualizer.plot_performance_metrics(
-                metrics=results["performance_metrics"],
-                strategy_name=strategy_name,
-                save_path=save_path,
-            )
-
-        # 3. 月度收益热力图
+        # 2. 月度收益热力图
         if plot_monthly:
             save_path = (
                 f"{output_dir}/{strategy_name}_monthly_returns.png"

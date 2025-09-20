@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 from polygon import RESTClient
 from polygon.rest.models import Agg, TickerSnapshot
 
-from quant101.core_2.config import cache_dir
-from quant101.strategies.pre_data import only_common_stocks
+from core_2.config import cache_dir
+from strategies.pre_data import only_common_stocks
 
 load_dotenv()
 

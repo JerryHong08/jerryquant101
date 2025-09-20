@@ -34,7 +34,7 @@ dependencies = [
 ]
 
 [tool.poetry]
-packages = [{include = "quant101", from = "src"}]
+packages = [{include = "*", from = "src"}]
 
 
 [tool.poetry.group.dev.dependencies]
