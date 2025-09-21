@@ -18,7 +18,6 @@
 
 ## To-Do
 
-* [ ] Improve **alignment**: `composite_figi` is not enough, some stocks aligned by `share_class_figi` → need refinement.
 * [ ] Add **`data_error.csv`**, similar to `splits_error.csv`.
 * [ ] Polish **X news search function**.
 * [ ] Add **trade volume filter** or other ticker filter conditions.
@@ -153,4 +152,7 @@ This directory includes **configs, loaders, and plotting tools**.
 * ✅ Added **Longbridge watchlist import** feature.
 * ✅ changed the structure from _src/quant101/*_ to _src/*_
 
+**2025-09-20**
+
+* ✅ Improved **alignment**: use both `composite_figi`&`share_class_figi` to align and make sure as much as possible.
 ---

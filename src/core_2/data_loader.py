@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 
 from core_2.config import all_tickers_dir, data_dir, splits_data
 from core_2.plotter import plot_candlestick
+from utils.tickers_name_alignment_polars import get_mapped_tickers
 
 load_dotenv()
 
@@ -29,38 +30,39 @@ fs = s3fs.S3FileSystem(
     client_kwargs={"region_name": "us-east-1"},
 )
 
-all_tickers_file = os.path.join(all_tickers_dir, f"all_stocks_*.parquet")
-all_tickers = (
-    pl.read_parquet(all_tickers_file)
-    # .unique(subset=["composite_figi", "ticker", "last_updated_utc"])
-    .lazy()
-)
+# all_tickers_file = os.path.join(all_tickers_dir, f"all_stocks_*.parquet")
+# all_tickers = (
+#     pl.read_parquet(all_tickers_file)
+#     # .unique(subset=["group_id", "ticker", "last_updated_utc"])
+#     .lazy()
+# )
 
-# 给 null FIGI 填充唯一 ID
-all_tickers = all_tickers.with_columns(
-    pl.when(pl.col("composite_figi").is_null())
-    .then(pl.concat_str([pl.lit("NULL_"), pl.arange(0, pl.len())]))
-    .otherwise(pl.col("composite_figi"))
-    .alias("composite_figi")
-)
+# # 给 null FIGI 填充唯一 ID
+# all_tickers = all_tickers.with_columns(
+#     pl.when(pl.col("group_id").is_null())
+#     .then(pl.concat_str([pl.lit("NULL_"), pl.arange(0, pl.len())]))
+#     .otherwise(pl.col("group_id"))
+#     .alias("group_id")
+# )
 
-selected = (
-    all_tickers.sort("last_updated_utc", descending=True)
-    .group_by("composite_figi")
-    .agg(
-        [
-            pl.col("ticker").first().alias("latest_ticker"),
-            pl.col("ticker")
-            .sort_by("last_updated_utc", descending=True)
-            .alias("tickers"),
-            pl.col("last_updated_utc"),
-            pl.col("ticker").n_unique().alias("ticker_count"),
-            pl.col("delisted_utc").alias("all_delisted_utc"),  # 返回所有值（包括null）
-        ]
-    )
-)
+# selected = (
+#     all_tickers.sort("last_updated_utc", descending=True)
+#     .group_by("group_id")
+#     .agg(
+#         [
+#             pl.col("ticker").first().alias("latest_ticker"),
+#             pl.col("ticker")
+#             .sort_by("last_updated_utc", descending=True)
+#             .alias("tickers"),
+#             pl.col("last_updated_utc"),
+#             pl.col("ticker").n_unique().alias("ticker_count"),
+#             pl.col("delisted_utc").alias("all_delisted_utc"),  # 返回所有值（包括null）
+#         ]
+#     )
+# )
 
-all_tickers = all_tickers.join(selected, on="composite_figi")
+# all_tickers = all_tickers.join(selected, on="group_id")
+all_tickers = get_mapped_tickers().lazy()
 
 
 def s3_data_dir_calculate(asset: str, data_type: str, start_date: str, end_date: str):
@@ -565,8 +567,8 @@ def save_cache_metadata(cache_path, params):
 def tickers_alignment(tickers):
     tickers = tickers.join(
         all_tickers.select(
-            ["ticker", "tickers", "composite_figi", "latest_ticker", "all_delisted_utc"]
-        ).filter(pl.col("composite_figi").is_not_null()),
+            ["ticker", "tickers", "group_id", "latest_ticker", "all_delisted_utc"]
+        ).filter(pl.col("group_id").is_not_null()),
         on="ticker",
         how="left",
     )
@@ -666,7 +668,7 @@ def splits_figi_alignment(df):
     df = (
         df.lazy()
         .join(
-            all_tickers.select(["ticker", "composite_figi", "latest_ticker"]),
+            all_tickers.select(["ticker", "group_id", "latest_ticker"]),
             on="ticker",
             how="left",
         )
@@ -678,25 +680,25 @@ def splits_figi_alignment(df):
 
     aligned_lf = df
 
-    return aligned_lf.drop("composite_figi")
+    return aligned_lf.drop("group_id")
 
 
 def ohlcv_figi_alignment(lf):
     """
-    增强版的 FIGI 对齐函数，处理同一 composite_figi 下多个 ticker 的重叠数据
+    增强版的 FIGI 对齐函数，处理同一 group_id 下多个 ticker 的重叠数据
     """
-    # 首先添加 composite_figi 和 ticker 顺序信息
+    # 首先添加 group_id 和 ticker 顺序信息
     lf = lf.join(
         all_tickers.select(
-            ["ticker", "composite_figi", "latest_ticker", "tickers", "last_updated_utc"]
+            ["ticker", "group_id", "latest_ticker", "tickers", "last_updated_utc"]
         ),
         on="ticker",
         how="left",
     )
 
-    # 找出有多个 ticker 的 composite_figi 组
+    # 找出有多个 ticker 的 group_id 组
     multi_ticker_groups = (
-        lf.group_by("composite_figi")
+        lf.group_by("group_id")
         .agg(
             [
                 pl.col("ticker").n_unique().alias("ticker_count"),
@@ -704,25 +706,25 @@ def ohlcv_figi_alignment(lf):
             ]
         )
         .filter(pl.col("ticker_count") > 1)
-        .select("composite_figi")
+        .select("group_id")
     )
 
     # 分离单 ticker 和多 ticker 的数据
     single_ticker_data = lf.join(
         multi_ticker_groups,
-        on="composite_figi",
+        on="group_id",
         how="anti",  # 反连接，获取不在多ticker组中的数据
     )
 
     multi_ticker_data = lf.join(
         multi_ticker_groups,
-        on="composite_figi",
+        on="group_id",
         how="semi",  # 半连接，获取在多ticker组中的数据
     )
 
     # 处理多 ticker 组的重叠数据
     def process_multi_ticker_group(group_df):
-        """处理单个 composite_figi 组内的重叠数据"""
+        """处理单个 group_id 组内的重叠数据"""
         # 获取该组的 ticker 顺序（按 last_updated_utc 排序）
         ticker_order = (
             group_df.select(["ticker", "last_updated_utc"])
@@ -770,12 +772,8 @@ def ohlcv_figi_alignment(lf):
     if multi_ticker_data_collected.height > 0:
         processed_groups = []
 
-        for figi in (
-            multi_ticker_data_collected.select("composite_figi").unique().to_series()
-        ):
-            group_data = multi_ticker_data_collected.filter(
-                pl.col("composite_figi") == figi
-            )
+        for figi in multi_ticker_data_collected.select("group_id").unique().to_series():
+            group_data = multi_ticker_data_collected.filter(pl.col("group_id") == figi)
             processed_group = process_multi_ticker_group(group_data)
             if processed_group.height > 0:
                 processed_groups.append(processed_group)
@@ -833,7 +831,7 @@ def ohlcv_figi_alignment(lf):
     columns_to_keep = [
         col
         for col in final_data.columns
-        if col not in ["composite_figi", "latest_ticker", "tickers", "last_updated_utc"]
+        if col not in ["group_id", "latest_ticker", "tickers", "last_updated_utc"]
     ]
 
     return final_data.select(columns_to_keep).sort(["ticker", "timestamps"])
@@ -1041,7 +1039,10 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    tickers = ["NVDA"]
+    tickers = ["FFAI"]
+    with pl.Config(tbl_cols=50, tbl_width_chars=1000):
+        print(all_tickers.filter(pl.col("ticker") == tickers[0]).collect())
+
     # tickers = ['MYMD', 'TNFA', 'NVDA', 'FFIE', 'FFAI']
     # tickers = None
     timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
@@ -1065,8 +1066,9 @@ if __name__ == "__main__":
         use_cache=False,
     ).collect()
 
-    print(lf_result.head())
-    print(lf_result.tail())
+    with pl.Config(tbl_cols=50):
+        print(lf_result.head())
+        print(lf_result.tail())
     # print(lf_result.filter(pl.col('timestamps').cast(pl.Datetime("us")).is_between(pl.datetime(2024, 6, 3), pl.datetime(2024, 6, 11))))
 
     if plot:
