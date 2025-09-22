@@ -7,6 +7,7 @@ from polygon.rest.models import Agg, TickerSnapshot
 
 from core_2.config import cache_dir
 from strategies.pre_data import only_common_stocks
+from utils.longbridge_utils import update_watchlist
 
 load_dotenv()
 
@@ -75,3 +76,6 @@ market_mover_file = os.path.join(
 result.write_csv(market_mover_file)
 with pl.Config(tbl_rows=20, tbl_cols=50):
     print(result.head(20))
+
+top_20 = result.select("ticker").to_series().to_list()[:20]
+update_watchlist(watchlist_name="market_mover", tickers=top_20)

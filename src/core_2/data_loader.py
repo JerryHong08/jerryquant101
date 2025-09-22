@@ -13,7 +13,7 @@ import polars as pl
 import s3fs
 from dotenv import load_dotenv
 
-from core_2.config import all_tickers_dir, data_dir, splits_data
+from core_2.config import data_dir, splits_data
 from core_2.plotter import plot_candlestick
 from utils.tickers_name_alignment_polars import get_mapped_tickers
 
@@ -30,38 +30,6 @@ fs = s3fs.S3FileSystem(
     client_kwargs={"region_name": "us-east-1"},
 )
 
-# all_tickers_file = os.path.join(all_tickers_dir, f"all_stocks_*.parquet")
-# all_tickers = (
-#     pl.read_parquet(all_tickers_file)
-#     # .unique(subset=["group_id", "ticker", "last_updated_utc"])
-#     .lazy()
-# )
-
-# # 给 null FIGI 填充唯一 ID
-# all_tickers = all_tickers.with_columns(
-#     pl.when(pl.col("group_id").is_null())
-#     .then(pl.concat_str([pl.lit("NULL_"), pl.arange(0, pl.len())]))
-#     .otherwise(pl.col("group_id"))
-#     .alias("group_id")
-# )
-
-# selected = (
-#     all_tickers.sort("last_updated_utc", descending=True)
-#     .group_by("group_id")
-#     .agg(
-#         [
-#             pl.col("ticker").first().alias("latest_ticker"),
-#             pl.col("ticker")
-#             .sort_by("last_updated_utc", descending=True)
-#             .alias("tickers"),
-#             pl.col("last_updated_utc"),
-#             pl.col("ticker").n_unique().alias("ticker_count"),
-#             pl.col("delisted_utc").alias("all_delisted_utc"),  # 返回所有值（包括null）
-#         ]
-#     )
-# )
-
-# all_tickers = all_tickers.join(selected, on="group_id")
 all_tickers = get_mapped_tickers().lazy()
 
 

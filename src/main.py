@@ -20,7 +20,7 @@ ohlcv_data = (
         timeframe=config["timeframe"],
         start_date=config["start_date"],
         end_date=config["end_date"],
-        use_cache=False,
+        # use_cache=False,
     )
     # .collect()
 )
@@ -82,8 +82,7 @@ with pl.Config(tbl_rows=20, tbl_cols=50):
     print(duration.filter(pl.col("ticker") == "BURU").collect())
 
 duration = (
-    duration.group_by("ticker")
-    .agg(
+    duration.group_by("ticker").agg(
         [
             pl.col("duration_days").max().alias("max_duration_days"),
             pl.col("start_date")
@@ -97,9 +96,10 @@ duration = (
             pl.col("avg_turnover").first(),
         ]
     )
-    .sort(
-        ["avg_turnover", "max_duration_days", "ticker"], descending=[True, True, False]
-    )
+    # .sort(
+    #     ["avg_turnover", "max_duration_days", "ticker"], descending=[True, True, False]
+    # )
+    .sort(["max_duration_days", "ticker"], descending=[True, False])
 )
 
 result = (
@@ -108,8 +108,10 @@ result = (
 ).collect()
 
 with pl.Config(tbl_rows=20, tbl_cols=50):
-    result.write_csv("low_volume_tickers.csv")
+    # result.write_csv("low_volume_tickers.csv")
     print(result.to_series().to_list())
     print(result.select("ticker").unique().height)
 
-# update_watchlist("quant101_watchlist", tickers=result.to_series().to_list()[:603])
+update_watchlist(
+    wachlist_name="quant101_watchlist", tickers=result.to_series().to_list()[:40]
+)

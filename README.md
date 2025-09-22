@@ -153,7 +153,7 @@ This directory includes **configs, loaders, and plotting tools**.
 **2025-09-21**
 * ✅ Improved **alignment**: use both `composite_figi`&`share_class_figi` to align and make sure as much as possible.
 
-**2025-09-21**
+**2025-09-22**
 * ✅ `config.py` reconstructed, add data with error correction fuction.
 * ✅ add one `stocks_error.csv`.
 ---

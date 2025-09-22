@@ -2,7 +2,7 @@ import os
 
 import polars as pl
 
-from core_2.config import all_tickers_dir, get_asset_overview_data
+from core_2.config import get_asset_overview_data
 
 
 def get_mapped_tickers():
@@ -91,7 +91,7 @@ def get_mapped_tickers():
                 )
             ).filter(
                 pl.col("group_id")
-                == df.filter(pl.col("ticker") == "META").select("group_id").item()
+                == df.filter(pl.col("ticker") == "SRTAW").select("group_id").item()
             )
         )
 
@@ -107,7 +107,6 @@ def get_mapped_tickers():
                 .sort_by("last_updated_utc")
                 .last()
                 .alias("lasted_name"),
-                pl.col("last_updated_utc").sort().alias("all_last_updated_utc"),
                 pl.col("delisted_utc").sort().alias("all_delisted_utc"),
             ]
         )
@@ -116,7 +115,6 @@ def get_mapped_tickers():
         .rename(
             {
                 "all_tickers_names": "tickers",
-                "all_last_updated_utc": "last_updated_utc",
                 "lasted_name": "latest_ticker",
             }
         )
@@ -126,14 +124,12 @@ def get_mapped_tickers():
 
 
 if __name__ == "__main__":
-    get_mapped_tickers()
+    result = get_mapped_tickers()
 
-# result = result.with_columns(
-#     pl.col("tickers").list.join(", "),
-#     pl.col("last_updated_utc").list.join(", "),
-#     pl.col("all_delisted_utc").list.join(", "),
-# ).sort('group_id')
+print(result.sort(pl.col("tickers").list.len(), descending=True).head(20))
+result = result.with_columns(
+    pl.col("tickers").list.join(", "),
+    pl.col("all_delisted_utc").list.join(", "),
+).sort("group_id")
 
-# result.write_csv("tickers_name_alignment.csv")
-
-# print(result.head())
+result.write_csv("tickers_name_alignment.csv")
