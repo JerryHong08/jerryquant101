@@ -35,8 +35,81 @@ def main():
         "max_dev_pct": 1,
         "hold_days": 5,
         "start_date": "2023-02-13",
-        "selected_tickers": ["LCID"],  # 可以改为 'random' 随机选择
-        # "selected_tickers": ['AACG', 'AC', 'ACAD', 'ACNT', 'ADD', 'AEHL', 'AEON', 'AHG', 'AIRI', 'AKA', 'AKU', 'ALNY', 'ALPS', 'ALTS', 'AMBR', 'AMLX', 'ARDX', 'AREN', 'ASNS', 'ATXI', 'AUGX', 'AUID', 'AUUD', 'BACC', 'BCLI', 'BFRI', 'BIIB', 'BLUW', 'BMTX', 'BNRE', 'BTOC', 'BVFL', 'CCII', 'CDTX', 'CGTL', 'CLSK', 'CMDBw', 'CMPOV', 'CMREw', 'CNL', 'CNTG', 'CPTN', 'CRD.B', 'CRSP', 'CURR', 'CYTK', 'DERM', 'DISCB', 'DLA', 'DPSI', 'DRDB', 'DRUG', 'DTCK', 'DVLT', 'DWTX', 'DYNT', 'EDN', 'EDTK', 'EDUC', 'EHLDV', 'ELDN', 'ELMD', 'ELWS', 'EQD', 'ESSC', 'EUDA', 'EVAC', 'FENG', 'FFNW', 'FLX', 'FMST', 'FNCB', 'FPAY', 'FRES', 'FTLF', 'FUNC', 'FUSN', 'GERN', 'GFED', 'GH', 'GLE', 'GMHS', 'GNS', 'GOAC', 'GPL', 'GRNQ', 'GTBP', 'GTIM', 'GURE', 'GVH', 'HBANM', 'HCTI', 'HHS', 'HIVE', 'HKIT', 'HROWL', 'HUDI', 'ICPT', 'IMDX', 'IMNM', 'INKT', 'INPXV', 'INTS', 'INVA', 'IPWR', 'ISBA', 'ITRM', 'JRSH', 'JXJT', 'KEN', 'LBGJ', 'LDTC', 'LEAP', 'LGLw', 'LIXT', 'LMNL', 'LSH', 'LSTA', 'LUMO', 'LUXA', 'LWAY', 'LXRX', 'MBINM', 'MDCX', 'MGIH', 'MHH', 'MI', 'MIXT', 'MKZR', 'MLP', 'MLTX', 'MNPR', 'MNTX', 'MTEM', 'MTR', 'MYSE', 'NDAC', 'NERV', 'NH', 'NIXX', 'NKSH', 'NMFCZ', 'NMRD', 'NPAC', 'NTBL', 'NTIC', 'NTWK', 'NVA', 'NVAX', 'NVCN', 'NVIV', 'NVOS', 'NWFL', 'NWTG', 'OBCI', 'OCA', 'OCFT', 'OCS', 'ODYS', 'OLB', 'ONCT', 'ONE', 'ONFO', 'OST', 'OXLCI', 'PC', 'PCAP', 'PCOM', 'PCSA', 'PELI', 'PMD', 'PT', 'PWOD', 'PXDT', 'QXO', 'RADX', 'RDAG', 'RDZN', 'REED', 'RGCO', 'RILYG', 'RKDA', 'ROLR', 'RYM', 'SAI', 'SCVX', 'SEAC', 'SEMw', 'SERA', 'SHIM', 'SJ', 'SMFL', 'SMID', 'SMIT', 'SNAL', 'SNSE', 'SPHA', 'SPPI', 'SPPL', 'SPRC', 'SPRY', 'SQFT', 'SRPT', 'SRXH', 'SVFC', 'SYBX', 'TAIT', 'TCRX', 'TELA', 'TLIS', 'TOPS', 'TVAC', 'UBXG', 'UFAB', 'UFG', 'USCB', 'VECT', 'VEEE', 'VERU', 'VGII', 'VHC', 'VIVK', 'VNME', 'VSTE', 'VTAK', 'VZLA', 'WAI', 'WS', 'WXM', 'XBIT', 'XXII', 'XYF', 'YYGH', 'ZIVO', 'ZKIN', 'ZVRA'],
+        # "selected_tickers": ["FIEE"],  # 可以改为 'random' 随机选择
+        "selected_tickers": [
+            "IMPPP",
+            "FEDU",
+            "ITCL",
+            "DYNT",
+            "HFBL",
+            "PTNR",
+            "HMG",
+            "CPAC",
+            "CULL",
+            "OFED",
+            "CNFRZ",
+            "SIF",
+            "HNNAZ",
+            "NTZ",
+            "BBGI",
+            "TAIT",
+            "GTIM",
+            "CNNB",
+            "VIAO",
+            "MSVB",
+            "ZIVO",
+            "OMCC",
+            "OFSSH",
+            "GNTA",
+            "WVVI",
+            "SHLT",
+            "FRMEP",
+            "IDW",
+            "IOR",
+            "CLPS",
+            "ELSE",
+            "SFUN",
+            "VERY",
+            "IHT",
+            "QLI",
+            "SVVC",
+            "CYAND",
+            "GRAM",
+            "FATBB",
+            "ATIF",
+            "AKO.A",
+            "GTN.A",
+            "GLBZ",
+            "WLYB",
+            "SANG",
+            "FWP",
+            "NTIP",
+            "AIH",
+            "LSXMB",
+            "GYRO",
+            "JCTC",
+            "DGICB",
+            "BEDU",
+            "KELYB",
+            "DSWL",
+            "LBTYB",
+            "AWX",
+            "UNAM",
+            "EQS",
+            "IDBA",
+            "AAME",
+            "APWC",
+            "KFFB",
+            "MSN",
+            "BTAQU",
+            "WVFC",
+            "UTSI",
+            "HVT.A",
+            "FTAIV",
+            "BBIGV",
+            "LGLw",
+            "INPXV",
+        ],
         # "selected_tickers": ["random"],  # 可以改为 'random' 随机选择
         "random_count": 7709,
         "min_turnover": 0,
@@ -67,7 +140,9 @@ def main():
 
     # 3. 加载基准数据
     print("加载基准数据...")
-    benchmark_data = load_spx_benchmark(config["start_date"], config["end_date"])
+    benchmark_data = load_spx_benchmark(
+        strategy_config["start_date"], config["end_date"]
+    )
 
     # 4. 创建回测引擎
     engine = BacktestEngine(initial_capital=config["initial_capital"])
@@ -85,7 +160,7 @@ def main():
     results = engine.run_backtest(
         strategy=strategy,
         benchmark_data=benchmark_data,
-        use_cached_indicators=True,  # 使用缓存以加快速度
+        use_cached_indicators=True,
         save_results=True,
     )
 
@@ -101,7 +176,6 @@ def main():
             len(strategy_config.get("selected_tickers", [])) > 1
             or selected_ticker == "random"
         ):
-            # 资金曲线图
             engine.plot_results(
                 strategy_name=strategy_name,
                 plot_equity=True,
@@ -111,7 +185,6 @@ def main():
                 output_dir=output_dir,
             )
 
-        # 个股K线图和交易信号（示例）
         visualizer = BacktestVisualizer()
 
         if (
@@ -143,7 +216,7 @@ def main():
                     start_date="2022-01-01",
                     end_date="2025-09-05",
                     indicators=results.get("indicators"),
-                    # line=False,
+                    line=False,
                     save_path=f"{output_dir}/{selected_ticker}_signals.png",
                 )
 

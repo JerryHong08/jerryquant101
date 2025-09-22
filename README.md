@@ -143,16 +143,17 @@ This directory includes **configs, loaders, and plotting tools**.
 # Change Log
 
 **2025-09-19**
-
 * ✅ Changed `splits_error` handling → now supports flexible CSV editing (add/remove error types).
 
 **2025-09-20**
-
 * ✅ `csvgz_to_parquet.py` now supports **recent-days convert**.
 * ✅ Added **Longbridge watchlist import** feature.
 * ✅ changed the structure from _src/quant101/*_ to _src/*_
 
-**2025-09-20**
-
+**2025-09-21**
 * ✅ Improved **alignment**: use both `composite_figi`&`share_class_figi` to align and make sure as much as possible.
+
+**2025-09-21**
+* ✅ `config.py` reconstructed, add data with error correction fuction.
+* ✅ add one `stocks_error.csv`.
 ---

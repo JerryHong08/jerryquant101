@@ -689,9 +689,7 @@ def ohlcv_figi_alignment(lf):
     """
     # 首先添加 group_id 和 ticker 顺序信息
     lf = lf.join(
-        all_tickers.select(
-            ["ticker", "group_id", "latest_ticker", "tickers", "last_updated_utc"]
-        ),
+        all_tickers.select(["ticker", "group_id", "latest_ticker", "tickers"]),
         on="ticker",
         how="left",
     )
@@ -725,15 +723,12 @@ def ohlcv_figi_alignment(lf):
     # 处理多 ticker 组的重叠数据
     def process_multi_ticker_group(group_df):
         """处理单个 group_id 组内的重叠数据"""
-        # 获取该组的 ticker 顺序（按 last_updated_utc 排序）
-        ticker_order = (
-            group_df.select(["ticker", "last_updated_utc"])
-            .unique()
-            .sort("last_updated_utc")
-            .select("ticker")
-            .to_series()
-            .to_list()
-        )
+
+        # 直接从预排序的 tickers 列表中获取顺序
+        first_row = group_df.row(0)
+        ticker_order = first_row[group_df.columns.index("tickers")]  # 获取 tickers 列表
+
+        # print(f"Ticker 顺序: {ticker_order}")  # 调试信息
 
         processed_data = []
         last_end_date = None
@@ -831,7 +826,7 @@ def ohlcv_figi_alignment(lf):
     columns_to_keep = [
         col
         for col in final_data.columns
-        if col not in ["group_id", "latest_ticker", "tickers", "last_updated_utc"]
+        if col not in ["group_id", "latest_ticker", "tickers"]
     ]
 
     return final_data.select(columns_to_keep).sort(["ticker", "timestamps"])
@@ -1039,12 +1034,12 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    tickers = ["FFAI"]
+    tickers = ["META"]
+    # tickers = ['LCID','TNFA', 'MYMD', 'NVDA', 'FFIE', 'FFAI']
+    # tickers = None
     with pl.Config(tbl_cols=50, tbl_width_chars=1000):
         print(all_tickers.filter(pl.col("ticker") == tickers[0]).collect())
 
-    # tickers = ['MYMD', 'TNFA', 'NVDA', 'FFIE', 'FFAI']
-    # tickers = None
     timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
     asset = "us_stocks_sip"
     data_type = "day_aggs_v1" if timeframe == "1d" else "minute_aggs_v1"
@@ -1067,8 +1062,8 @@ if __name__ == "__main__":
     ).collect()
 
     with pl.Config(tbl_cols=50):
-        print(lf_result.head())
-        print(lf_result.tail())
+        print(lf_result.filter(pl.col("ticker") == ticker_plot).head())
+        print(lf_result.filter(pl.col("ticker") == ticker_plot).tail())
     # print(lf_result.filter(pl.col('timestamps').cast(pl.Datetime("us")).is_between(pl.datetime(2024, 6, 3), pl.datetime(2024, 6, 11))))
 
     if plot:
@@ -1077,6 +1072,3 @@ if __name__ == "__main__":
             ticker_plot,
             timeframe,
         )
-
-# BBG000BB07P9 second last ticker: GOLD has data before its name change, which should be dropped.
-# BBG000BF7BV7 latest ticker: BBBY has data before its name change, which should be dropped.

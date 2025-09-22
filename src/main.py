@@ -20,6 +20,7 @@ ohlcv_data = (
         timeframe=config["timeframe"],
         start_date=config["start_date"],
         end_date=config["end_date"],
+        use_cache=False,
     )
     # .collect()
 )
@@ -61,6 +62,20 @@ duration = (
             + 1
         ).alias("duration_days")
     )
+    .join(
+        ohlcv_data.filter(pl.col("volume") != low_volume_threshold)
+        .with_columns(
+            (pl.col("volume") * pl.col("close"))
+            .mean()
+            .over("ticker")
+            .alias("avg_turnover")
+            .cast(pl.Int128)
+        )
+        .select(["ticker", "avg_turnover"])
+        .unique(),
+        on="ticker",
+        how="left",
+    )
 )
 
 with pl.Config(tbl_rows=20, tbl_cols=50):
@@ -79,9 +94,12 @@ duration = (
             .filter(pl.col("duration_days") == pl.col("duration_days").max())
             .first()
             .alias("max_duration_end_date"),
+            pl.col("avg_turnover").first(),
         ]
     )
-    .sort(["max_duration_days", "ticker"], descending=[True, False])
+    .sort(
+        ["avg_turnover", "max_duration_days", "ticker"], descending=[True, True, False]
+    )
 )
 
 result = (
@@ -92,7 +110,6 @@ result = (
 with pl.Config(tbl_rows=20, tbl_cols=50):
     result.write_csv("low_volume_tickers.csv")
     print(result.to_series().to_list())
-
     print(result.select("ticker").unique().height)
 
-update_watchlist("quant101_watchlist", tickers=result.to_series().to_list()[:603])
+# update_watchlist("quant101_watchlist", tickers=result.to_series().to_list()[:603])
