@@ -20,7 +20,7 @@ discard/
 
 # Data files
 data
-*.csv
+/*.csv
 *.db
 *.sqlite
 *.parquet

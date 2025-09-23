@@ -657,7 +657,16 @@ def ohlcv_figi_alignment(lf):
     """
     # 首先添加 group_id 和 ticker 顺序信息
     lf = lf.join(
-        all_tickers.select(["ticker", "group_id", "latest_ticker", "tickers"]),
+        all_tickers.select(
+            [
+                "ticker",
+                "group_id",
+                "latest_ticker",
+                "tickers",
+                "all_last_updated_utc",
+                "all_delisted_utc",
+            ]
+        ),
         on="ticker",
         how="left",
     )
@@ -695,6 +704,8 @@ def ohlcv_figi_alignment(lf):
         # 直接从预排序的 tickers 列表中获取顺序
         first_row = group_df.row(0)
         ticker_order = first_row[group_df.columns.index("tickers")]  # 获取 tickers 列表
+        last_updated_list = group_df.select("all_last_updated_utc").row(0)[0]
+        delisted_list = group_df.select("all_delisted_utc").row(0)[0]
 
         # print(f"Ticker 顺序: {ticker_order}")  # 调试信息
 
@@ -707,10 +718,26 @@ def ohlcv_figi_alignment(lf):
             if ticker_data.height == 0:
                 continue
 
+            # 取 cutoff
+            lu = last_updated_list[i]
+            de = delisted_list[i]
+
+            cutoff_candidates = [d for d in (lu, de) if d is not None]
+            cutoff = min(cutoff_candidates) if cutoff_candidates else None
+            cutoff = (
+                datetime.fromisoformat(cutoff.replace("Z", "+00:00")).date()
+                if cutoff is not None
+                else None
+            )
             if last_end_date is not None:
                 # 移除与前一个 ticker 重叠的数据
                 ticker_data = ticker_data.filter(
                     pl.col("timestamps").dt.date() > last_end_date
+                )
+
+            if cutoff is not None:
+                ticker_data = ticker_data.filter(
+                    pl.col("timestamps").dt.date() <= cutoff
                 )
 
             if ticker_data.height > 0:
@@ -735,8 +762,12 @@ def ohlcv_figi_alignment(lf):
     if multi_ticker_data_collected.height > 0:
         processed_groups = []
 
-        for figi in multi_ticker_data_collected.select("group_id").unique().to_series():
-            group_data = multi_ticker_data_collected.filter(pl.col("group_id") == figi)
+        for group_id in (
+            multi_ticker_data_collected.select("group_id").unique().to_series()
+        ):
+            group_data = multi_ticker_data_collected.filter(
+                pl.col("group_id") == group_id
+            )
             processed_group = process_multi_ticker_group(group_data)
             if processed_group.height > 0:
                 processed_groups.append(processed_group)
@@ -748,7 +779,7 @@ def ohlcv_figi_alignment(lf):
                 schema=multi_ticker_data_collected.schema
             )
     else:
-        processed_multi_ticker_data = pl.DataFrame(schema=lf.schema)
+        processed_multi_ticker_data = pl.DataFrame(schema=lf.collect_schema())
 
     # 处理单 ticker 数据（简单重命名）
     single_ticker_data_collected = single_ticker_data.collect()
@@ -794,7 +825,14 @@ def ohlcv_figi_alignment(lf):
     columns_to_keep = [
         col
         for col in final_data.columns
-        if col not in ["group_id", "latest_ticker", "tickers"]
+        if col
+        not in [
+            "group_id",
+            "latest_ticker",
+            "tickers",
+            "all_last_updated_utc",
+            "all_delisted_utc",
+        ]
     ]
 
     return final_data.select(columns_to_keep).sort(["ticker", "timestamps"])
@@ -813,6 +851,17 @@ def stock_load_process(
     duck_db: bool = False,
 ):
     aligned_tickers = tickers_alignment(pl.DataFrame({"ticker": tickers}).lazy())
+
+    skipped = (
+        pl.read_csv("low_volume_tickers.csv")
+        .filter(pl.col("max_duration_days") > 50)
+        .select(pl.col("ticker").unique())
+    ).lazy()
+    print(
+        f"there are {len(skipped.collect())} tickers to skip due to specious low volume."
+    )
+    aligned_tickers = aligned_tickers.join(skipped, on="ticker", how="anti")
+
     tickers = (
         aligned_tickers.select("tickers")
         .collect()
@@ -870,13 +919,15 @@ def stock_load_process(
     if tickers == None:
         tickers = lf.select("ticker").unique().collect()["ticker"]
         print(f"All tickers count: {len(tickers)}")
+    elif len(tickers) == 0:
+        raise ValueError("Tickers list is empty after alignment.")
     else:
         print(f"Selected tickers count: {len(tickers)}")
         lf = lf.filter(pl.col("ticker").is_in(tickers))
 
     print("2. data loaded.")
 
-    lf = ohlcv_figi_alignment(lf)
+    lf = ohlcv_figi_alignment(lf).lazy()
     splits_data_figi = splits_figi_alignment(splits_data)
     # print(splits_data_figi.filter(pl.col("ticker").is_in(['TNFA'])).sort("ticker").head(10))
 
@@ -1002,7 +1053,7 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    tickers = ["META"]
+    tickers = ["HMG"]
     # tickers = ['LCID','TNFA', 'MYMD', 'NVDA', 'FFIE', 'FFAI']
     # tickers = None
     with pl.Config(tbl_cols=50, tbl_width_chars=1000):
@@ -1011,7 +1062,7 @@ if __name__ == "__main__":
     timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
     asset = "us_stocks_sip"
     data_type = "day_aggs_v1" if timeframe == "1d" else "minute_aggs_v1"
-    start_date = "2015-01-01"
+    start_date = "2022-01-01"
     end_date = "2025-09-19"
     full_hour = False
     plot = True
@@ -1029,10 +1080,11 @@ if __name__ == "__main__":
         use_cache=False,
     ).collect()
 
+    # print(lf_result.filter(pl.col('timestamps').cast(pl.Datetime("us")).is_between(pl.datetime(2024, 6, 3), pl.datetime(2024, 6, 11))))
+
     with pl.Config(tbl_cols=50):
         print(lf_result.filter(pl.col("ticker") == ticker_plot).head())
         print(lf_result.filter(pl.col("ticker") == ticker_plot).tail())
-    # print(lf_result.filter(pl.col('timestamps').cast(pl.Datetime("us")).is_between(pl.datetime(2024, 6, 3), pl.datetime(2024, 6, 11))))
 
     if plot:
         plot_candlestick(

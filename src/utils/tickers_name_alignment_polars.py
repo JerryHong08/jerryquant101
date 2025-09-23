@@ -9,7 +9,7 @@ def get_mapped_tickers():
     # ======================
     # 1. Load the data
     # ======================
-    df = get_asset_overview_data(asset="stocks")
+    df = get_asset_overview_data(asset="stocks").lazy()
 
     # ======================
     # 2. fill null FIGI
@@ -22,8 +22,8 @@ def get_mapped_tickers():
             .alias("composite_figi"),
             pl.when(pl.col("share_class_figi").is_null())
             .then(pl.concat_str([pl.lit("NULL_"), pl.arange(0, pl.len())]))
-            .otherwise(pl.col("share_class_figi"))
             .alias("share_class_figi"),
+            pl.col("type").fill_null("UNKNOWN_TYPE"),
         )
         .group_by([pl.all().exclude("last_updated_utc")])
         .agg(pl.col("last_updated_utc").max())
@@ -31,69 +31,57 @@ def get_mapped_tickers():
     )
 
     # ======================
-    # 3. create bipartite graph edges (ticker <-> figi)
+    # 3. create bipartite graph edges (ticker <-> figi + type 限制)
     # ======================
     edges = (
-        df.select(["ticker", "composite_figi", "share_class_figi"])
-        .unpivot(index="ticker", value_name="figi")
-        .select(["ticker", "figi"])
+        df.select(["ticker", "type", "composite_figi", "share_class_figi"])
+        .unpivot(index=["ticker", "type"], value_name="figi")
+        .filter(~pl.col("figi").str.starts_with("NULL_"))  # 关键
+        .select(["ticker", "type", "figi"])
         .unique()
     )
 
     # ======================
-    # 4. Find connected components and create mapping {ticker -> group_id} 迭代传播
+    # 4. Find connected components and create mapping {ticker -> group_id}
     # ======================
-    groups = df.select(["ticker"]).with_columns(
-        pl.col("ticker").hash().alias("group_id")
+    groups = df.select(["ticker", "type"]).with_columns(
+        (pl.col("ticker") + "_" + pl.col("type")).hash().alias("group_id")
     )
 
     changed = True
     while changed:
         # ticker -> figi
-        t2f = edges.join(groups, on="ticker", how="left")
-        # figi -> min(group_id)
-        f2g = t2f.group_by("figi").agg(pl.col("group_id").min().alias("group_id"))
-        # 回传 figi -> ticker
-        new_groups = edges.join(f2g, on="figi", how="left").select(
-            ["ticker", "group_id"]
+        t2f = edges.join(groups, on=["ticker", "type"], how="left")
+
+        # figi -> min(group_id) （按 type 分开，不同 type 不混）
+        f2g = t2f.group_by(["figi", "type"]).agg(
+            pl.col("group_id").min().alias("group_id")
         )
 
-        # 取最小 group_id
-        new_groups = new_groups.group_by("ticker").agg(pl.col("group_id").min())
+        # 回传 figi -> ticker
+        new_groups = (
+            edges.join(f2g, on=["figi", "type"], how="left")
+            .select(["ticker", "type", "group_id"])
+            .group_by(["ticker", "type"])
+            .agg(pl.col("group_id").min())
+        )
 
         # 合并
-        updated = groups.join(new_groups, on="ticker", how="left", suffix="_new")
+        updated = groups.join(
+            new_groups, on=["ticker", "type"], how="left", suffix="_new"
+        )
         updated = updated.with_columns(
             pl.min_horizontal("group_id", "group_id_new").alias("group_id")
-        ).select(["ticker", "group_id"])
+        ).select(["ticker", "type", "group_id"])
 
-        changed = not updated.equals(groups)
-        groups = updated
+        updated_df = updated.collect()
+        changed = not updated_df.equals(groups.collect())
+        groups = updated_df.lazy()
 
     # ======================
     # 5. join back to original dataframe
     # ======================
-    df = df.join(groups, on="ticker", how="left")
-
-    with pl.Config(tbl_cols=50, tbl_width_chars=1000):
-        print(
-            df.select(
-                pl.all().exclude(
-                    [
-                        "cik",
-                        "currency_name",
-                        "currency_name",
-                        "base_currency_name",
-                        "base_currency_symbol",
-                        "currency_symbol",
-                        "locale",
-                    ]
-                )
-            ).filter(
-                pl.col("group_id")
-                == df.filter(pl.col("ticker") == "SRTAW").select("group_id").item()
-            )
-        )
+    df = df.join(groups, on=["ticker", "type"], how="left")
 
     # ======================
     # 6. groupby aggregation
@@ -103,11 +91,15 @@ def get_mapped_tickers():
         .agg(
             [
                 pl.col("ticker").sort_by("last_updated_utc").alias("all_tickers_names"),
+                pl.col("type").sort_by("last_updated_utc").alias("all_types"),
                 pl.col("ticker")
                 .sort_by("last_updated_utc")
                 .last()
-                .alias("lasted_name"),
-                pl.col("delisted_utc").sort().alias("all_delisted_utc"),
+                .alias("latest_ticker"),
+                pl.col("delisted_utc")
+                .sort_by("last_updated_utc")
+                .alias("all_delisted_utc"),
+                pl.col("last_updated_utc").sort().alias("all_last_updated_utc"),
             ]
         )
         .with_columns(pl.col("all_tickers_names").alias("ticker"))
@@ -115,10 +107,9 @@ def get_mapped_tickers():
         .rename(
             {
                 "all_tickers_names": "tickers",
-                "lasted_name": "latest_ticker",
             }
         )
-    )
+    ).collect()
 
     return result
 
@@ -126,10 +117,16 @@ def get_mapped_tickers():
 if __name__ == "__main__":
     result = get_mapped_tickers()
 
-print(result.sort(pl.col("tickers").list.len(), descending=True).head(20))
-result = result.with_columns(
-    pl.col("tickers").list.join(", "),
-    pl.col("all_delisted_utc").list.join(", "),
-).sort("group_id")
+    # print(result.with_columns(
+    #       pl.col('tickers').list.len()
+    #     ).sort('tickers', descending=True)
+    # )
 
-result.write_csv("tickers_name_alignment.csv")
+    result = result.with_columns(
+        pl.col("tickers").list.join(", "),
+        pl.col("all_types").list.join(", "),
+        pl.col("all_delisted_utc").list.join(", "),
+        pl.col("all_last_updated_utc").list.join(", "),
+    ).sort("group_id")
+
+    result.write_csv("tickers_name_alignment_polars.csv")

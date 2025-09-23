@@ -34,7 +34,6 @@ def delete_tickers_in_all(ctx, tickers_to_delete):
 
 
 def update_watchlist(watchlist_name, tickers):
-    print(len(watchlist_name))
     if len(watchlist_name) > 20:
         raise ValueError("Watchlist name should be 10 characters or less.")
 

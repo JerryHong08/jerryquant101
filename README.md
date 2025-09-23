@@ -14,8 +14,6 @@
 
 ## On-Going
 
-* [ ] `low_volume_tickers` verifying...
-
 ## To-Do
 
 * [ ] Add **`data_error.csv`**, similar to `splits_error.csv`.
@@ -91,7 +89,7 @@ Other options:`--file`, `--directory`, `--asset-class`, `--date-range`, `--info`
 ### 3. Splits Adjustment
 
     splits&merge data are from Polygon.io, and there will be some discrepancy, and you can customize by editing `splits_error.csv`.
-I have left mine in[`src/data_1/data_discrepancy_fixed/splits_error.csv`](data_1/data_discrepancy_fixed/splits_error.csv), which comes from my experience, you can use it as a reference.
+I have left mine in[`src/data_1/data_discrepancy_fixed/splits_error.csv`](src/data_1/data_discrepancy_fixed/splits_error.csv), which comes from my experience, you can use it as a reference.
 
 * Example:
 
@@ -156,4 +154,10 @@ This directory includes **configs, loaders, and plotting tools**.
 **2025-09-22**
 * ✅ `config.py` reconstructed, add data with error correction fuction.
 * ✅ add one `stocks_error.csv`.
+
+**2025-09-24**
+* 🥹 `low_volume_tickers` the specious low volume tickers have too much to examined and each case seems to be different, which would cost too much time for me to do it.
+And the most important part about low_volume_tickers is that it can show the correctness of your data load process. As you can find some notes in the [`src/data_1/data_discrepancy_fixed/low_volume_tickers_copy.csv`](src/data_1/data_discrepancy_fixed/low_volume_tickers_copy.csv).
+For example, most of the long-term like over years 0 volume is because of relisted on the market or there is a new ticker has the same name, which complicates the situation now for it's hard to distinguish. So, as for now, 2025-09-24, I have decided to leave this tickers(max_duration_days > 50) as skipped tickers. I know it's unwise, but it saves me time for now.
+
 ---
