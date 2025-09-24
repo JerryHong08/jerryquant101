@@ -347,15 +347,15 @@ class BacktestVisualizer:
 
         # 买入信号
         buy_signals_plotted = False
-        if "buy_date" in trades_pd.columns and "buy_open" in trades_pd.columns:
+        if "buy_date" in trades_pd.columns and "buy_price" in trades_pd.columns:
             for _, trade in trades_pd.iterrows():
-                if pd.notna(trade["buy_date"]) and pd.notna(trade["buy_open"]):
+                if pd.notna(trade["buy_date"]) and pd.notna(trade["buy_price"]):
                     buy_date_str = str(trade["buy_date"])
                     for date_key, index in date_to_index.items():
                         if buy_date_str in date_key:
                             ax.scatter(
                                 index,
-                                trade["buy_open"],
+                                trade["buy_price"],
                                 color="green",
                                 marker="^",
                                 s=100,
@@ -500,13 +500,13 @@ class BacktestVisualizer:
         if not trades_pd.empty:
             for _, trade in trades_pd.iterrows():
                 # 买入信息
-                if pd.notna(trade.get("buy_date")) and pd.notna(trade.get("buy_open")):
+                if pd.notna(trade.get("buy_date")) and pd.notna(trade.get("buy_price")):
                     buy_date_str = str(trade["buy_date"])
                     for i in range(len(df)):
                         if buy_date_str in str(df.iloc[i]["timestamps"]):
                             trade_info_map[i] = {
                                 "type": "BUY",
-                                "price": trade["buy_open"],
+                                "price": trade["buy_price"],
                                 "date": trade["buy_date"],
                             }
                             break

@@ -854,7 +854,9 @@ def stock_load_process(
 
     skipped = (
         pl.read_csv("low_volume_tickers.csv")
-        .filter(pl.col("max_duration_days") > 50)
+        .filter(
+            (pl.col("max_duration_days") > 50) | (pl.col("avg_turnover") < 60000),
+        )
         .select(pl.col("ticker").unique())
     ).lazy()
     print(
