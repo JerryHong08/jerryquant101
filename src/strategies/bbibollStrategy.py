@@ -32,7 +32,7 @@ class BBIBOLLStrategy(StrategyBase):
             "start_date": "2023-02-13",
             "selected_tickers": ["random"],  # 可以设置为 'random' 随机选择
             "random_count": 10,  # 随机选择的股票数量
-            "min_turnover": 0,  # 最小成交额筛选
+            # "min_turnover": 0,  # 最小成交额筛选
         }
 
         if config:
@@ -58,7 +58,7 @@ class BBIBOLLStrategy(StrategyBase):
 
         print("计算BBIBOLL指标...")
 
-        # 计算指标
+        # compute bbiboll
         indicators = calculate_bbiboll(
             self.ohlcv_data,
             boll_length=self.config["boll_length"],
@@ -69,24 +69,6 @@ class BBIBOLLStrategy(StrategyBase):
         indicators = indicators.with_columns(
             (pl.col("volume") * pl.col("close")).alias("turnover")
         )
-
-        # # 添加退市日期信息（如果tickers包含退市信息）
-        # if self.tickers is not None and hasattr(self.tickers, "columns"):
-        #     if "delisted_utc" in self.tickers.columns:
-        #         delisted_info = self.tickers.with_columns(
-        #             [
-        #                 pl.col("delisted_utc")
-        #                 .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%SZ", strict=False)
-        #                 .dt.date()
-        #                 .alias("delisted_date")
-        #             ]
-        #         )
-
-        #         indicators = indicators.join(
-        #             delisted_info.select(["ticker", "delisted_date"]),
-        #             on="ticker",
-        #             how="left",
-        #         )
 
         # 保存缓存
         self.save_indicators_cache(indicators)
@@ -101,7 +83,7 @@ class BBIBOLLStrategy(StrategyBase):
             indicators: 技术指标DataFrame
 
         Returns:
-            交易信号DataFrame
+            交易信号DataFrame，包含买入(1)和卖出(-1)信号
         """
         # 选择要交易的股票
         examined_tickers = self._select_tickers(indicators)
@@ -112,36 +94,122 @@ class BBIBOLLStrategy(StrategyBase):
             self.config["start_date"], "%Y-%m-%d"
         ).date()
 
-        signals = indicators.filter(
-            # 基础过滤条件
-            pl.col("bbi").is_not_null()
-            & (pl.col("dev_pct") <= self.config["max_dev_pct"])
+        # 基础数据过滤
+        filtered_indicators = indicators.filter(
+            (pl.col("ticker").is_in(examined_tickers))
+            & (pl.col("bbi").is_not_null())
             & (pl.col("timestamps").dt.date() >= start_date)
-            & (pl.col("turnover") >= self.config["min_turnover"])
-            & (pl.col("ticker").is_in(examined_tickers))
+        ).sort(["ticker", "timestamps"])
+
+        if filtered_indicators.is_empty():
+            print("没有满足基础条件的数据")
+            return pl.DataFrame()
+
+        # 条件一：偏离度 <= max_dev_pct
+        condition_one = pl.col("dev_pct") <= self.config["max_dev_pct"]
+
+        # 为每行数据添加是否满足买入条件的标记
+        data_with_condition = filtered_indicators.with_columns(
+            pl.when(condition_one)
+            .then(pl.lit(True))
+            .otherwise(pl.lit(False))
+            .alias("meets_buy_condition")
         )
 
-        # # 添加退市股票过滤
-        # if "delisted_date" in signals.columns:
-        #     signals = signals.filter(
-        #         pl.col("delisted_date").is_null()
-        #         | (pl.col("timestamps").dt.date() <= pl.col("delisted_date"))
-        #     )
+        # 初始化信号列表
+        all_signals = []
 
-        # 提取信号
-        signals = signals.select(["timestamps", "ticker"]).with_columns(
-            pl.lit(1).alias("signal")
+        # 按股票分组处理
+        for ticker in examined_tickers:
+            ticker_data = data_with_condition.filter(pl.col("ticker") == ticker).sort(
+                "timestamps"
+            )
+
+            if ticker_data.is_empty():
+                continue
+
+            ticker_signals = []
+            is_holding = False
+            buy_price = None
+            buy_date = None
+
+            # 遍历每个交易日
+            for row in ticker_data.iter_rows(named=True):
+                current_date = row["timestamps"]
+                current_close = row["close"]
+                current_open = row["open"]
+                meets_condition = row["meets_buy_condition"]
+                current_dev_pct = row["dev_pct"]
+
+                if not is_holding and meets_condition:
+                    # 产生买入信号
+                    ticker_signals.append(
+                        {"ticker": ticker, "timestamps": current_date, "signal": 1}
+                    )
+                    is_holding = True
+                    buy_price = current_close
+                    buy_date = current_date
+
+                elif is_holding and buy_price is not None:
+                    # 计算收益率（基于买入日收盘价）
+                    daily_return = (current_open / buy_price) - 1
+
+                    # 卖出条件判断
+                    loss_threshold = -0.20  # 亏损20%
+                    profit_threshold = 0.20  # 盈利20%
+
+                    sell_condition = (
+                        # 条件1: 亏损超过20% 且不再满足买入条件
+                        (
+                            daily_return < loss_threshold
+                            and current_dev_pct > self.config["max_dev_pct"]
+                        )
+                        or
+                        # 条件2: 盈利超过20%
+                        (daily_return > profit_threshold)
+                    )
+
+                    if sell_condition:
+                        # 产生卖出信号
+                        ticker_signals.append(
+                            {"ticker": ticker, "timestamps": current_date, "signal": -1}
+                        )
+                        is_holding = False
+                        buy_price = None
+                        buy_date = None
+
+            all_signals.extend(ticker_signals)
+
+        if not all_signals:
+            print("没有生成任何交易信号")
+            return pl.DataFrame()
+
+        # 转换为DataFrame
+        signals_df = (
+            pl.DataFrame(all_signals)
+            .with_columns(
+                pl.col("timestamps").dt.cast_time_unit("ns")  # 统一转换为微秒精度
+            )
+            .sort(["ticker", "timestamps"])
+            .rename({"timestamps": "signal_date"})
         )
 
-        print(f"生成信号数量: {len(signals)}")
-        return signals
+        # 统计信号数量
+        buy_count = signals_df.filter(pl.col("signal") == 1).height
+        sell_count = signals_df.filter(pl.col("signal") == -1).height
+
+        print(f"生成买入信号数量: {buy_count}")
+        print(f"生成卖出信号数量: {sell_count}")
+        print(f"总信号数量: {len(signals_df)}")
+
+        return signals_df
 
     def trade_rules(self, signals: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
         """
         根据信号执行交易规则
 
         Args:
-            signals: 交易信号DataFrame
+            signals: 交易信号DataFrame，包含买入(1)和卖出(-1)信号
 
         Returns:
             tuple: (trades_df, portfolio_daily_df)
@@ -150,94 +218,60 @@ class BBIBOLLStrategy(StrategyBase):
             print("没有生成任何交易信号")
             return pl.DataFrame(), pl.DataFrame()
 
-        # 信号分组和去重
-        signals = signals.sort(["ticker", "timestamps"])
-        signals = signals.with_columns(
-            (pl.col("timestamps").diff().dt.total_days().fill_null(999) > 1)
-            .cum_sum()
-            .over("ticker")
-            .alias("block_id")
-        )
+        with pl.Config(tbl_rows=20, tbl_cols=50):
+            print(signals.head(20))
 
-        # 每个信号块只取最后一个信号
-        last_signals = signals.group_by(["ticker", "block_id"]).agg(
-            pl.col("timestamps").max().alias("signal_date")
-        )
-
-        # 准备价格数据，添加行号
+        # 准备价格数据
         prices = self.ohlcv_data.select(["ticker", "timestamps", "open", "close"]).sort(
             ["ticker", "timestamps"]
         )
 
-        prices = prices.with_columns(
-            pl.arange(0, pl.len()).over("ticker").alias("row_id")
+        # 分离买入和卖出信号
+        buy_signals = (
+            signals.filter(pl.col("signal") == 1)
+            .select(["ticker", "signal_date"])
+            .rename({"signal_date": "buy_signal_date"})
+        )
+        sell_signals = (
+            signals.filter(pl.col("signal") == -1)
+            .select(["ticker", "signal_date"])
+            .rename({"signal_date": "sell_signal_date"})
         )
 
-        # 将信号日期映射到价格数据
-        last_signals = last_signals.join(
-            prices.rename({"timestamps": "signal_date"}),
-            on=["ticker", "signal_date"],
-            how="left",
+        # 为每个买入信号匹配对应的卖出信号
+        # 使用 join_asof 来匹配每个买入信号后的第一个卖出信号
+        trades = buy_signals.join_asof(
+            sell_signals.sort(["ticker", "sell_signal_date"]),
+            left_on="buy_signal_date",
+            right_on="sell_signal_date",
+            by="ticker",
+            strategy="forward",
         )
 
-        # 计算买卖行号
-        hold_days = self.config["hold_days"]
-        last_signals = last_signals.with_columns(
-            [
-                (pl.col("row_id") + 1).alias("buy_row_id"),
-                (pl.col("row_id") + 1 + hold_days).alias("sell_row_id"),
-            ]
-        )
-
-        # 获取买入价格
-        buys = last_signals.join(
-            prices.select(["ticker", "row_id", "timestamps", "open"]).rename(
-                {"row_id": "buy_row_id", "timestamps": "buy_date", "open": "buy_open"}
+        # 获取买入价格（买入信号日的次日开盘价）
+        trades = trades.join(
+            prices.select(["ticker", "timestamps", "open"]).rename(
+                {"timestamps": "buy_signal_date", "open": "buy_open"}
             ),
-            on=["ticker", "buy_row_id"],
+            on=["ticker", "buy_signal_date"],
             how="left",
         )
 
-        # 获取卖出价格
-        sells = last_signals.join(
-            prices.select(["ticker", "row_id", "timestamps", "open"]).rename(
-                {
-                    "row_id": "sell_row_id",
-                    "timestamps": "sell_date",
-                    "open": "sell_open",
-                }
+        # 获取卖出价格（卖出信号日的次日开盘价）
+        trades = trades.join(
+            prices.select(["ticker", "timestamps", "open"]).rename(
+                {"timestamps": "sell_signal_date", "open": "sell_open"}
             ),
-            on=["ticker", "sell_row_id"],
+            on=["ticker", "sell_signal_date"],
             how="left",
         )
 
-        # 合并买卖数据
-        trades = buys.join(
-            sells.select(
-                ["ticker", "block_id", "sell_row_id", "sell_date", "sell_open"]
-            ),
-            on=["ticker", "block_id", "sell_row_id"],
-            how="left",
-        ).select(
-            [
-                "ticker",
-                "block_id",
-                "buy_row_id",
-                "buy_date",
-                "buy_open",
-                "sell_row_id",
-                "sell_date",
-                "sell_open",
-            ]
-        )
-
-        # 过滤有效交易
+        # 过滤有效交易（必须有买入和卖出价格）
         trades = trades.filter(
-            pl.col("buy_row_id").is_not_null()
-            & pl.col("sell_row_id").is_not_null()
-            & (pl.col("buy_row_id") < pl.col("sell_row_id"))
-            & pl.col("buy_open").is_not_null()
+            pl.col("buy_open").is_not_null()
             & pl.col("sell_open").is_not_null()
+            & pl.col("sell_signal_date").is_not_null()
+            & (pl.col("buy_signal_date") < pl.col("sell_signal_date"))
         )
 
         # 计算交易收益
@@ -245,21 +279,16 @@ class BBIBOLLStrategy(StrategyBase):
             ((pl.col("sell_open") / pl.col("buy_open")) - 1).alias("return")
         )
 
+        # 重命名列以保持一致性
+        trades = trades.rename(
+            {"buy_signal_date": "buy_date", "sell_signal_date": "sell_date"}
+        )
+
         # 展开每笔交易到每个持仓日
         portfolio_daily = self._calculate_daily_portfolio(trades, prices)
 
         trades_output = trades.select(
-            [
-                "ticker",
-                "block_id",
-                "buy_row_id",
-                "buy_date",
-                "buy_open",
-                "sell_row_id",
-                "sell_date",
-                "sell_open",
-                "return",
-            ]
+            ["ticker", "buy_date", "buy_open", "sell_date", "sell_open", "return"]
         ).sort(["buy_date", "ticker"])
 
         print(f"生成交易记录数量: {len(trades_output)}")
@@ -276,7 +305,10 @@ class BBIBOLLStrategy(StrategyBase):
 
         # 随机选择股票
         available_tickers = indicators.select("ticker").unique().to_series().to_list()
-        random_count = min(self.config["random_count"], len(available_tickers))
+        if self.config["random_count"] == None:
+            random_count = len(available_tickers)
+        else:
+            random_count = min(self.config["random_count"], len(available_tickers))
         print(f"可选股票数量: {len(available_tickers)}，随机选择数量: {random_count}")
 
         if selected_tickers == ["random"] or selected_tickers == "random":
@@ -293,43 +325,52 @@ class BBIBOLLStrategy(StrategyBase):
         if trades.is_empty():
             return pl.DataFrame()
 
-        # 准备价格数据（用于计算每日收益）
-        prices_short = prices.select(["ticker", "row_id", "timestamps", "open"]).rename(
-            {"row_id": "day_row_id", "timestamps": "date", "open": "open_day"}
-        )
+        # 为每笔交易展开到持仓期间的每一天
+        expanded_trades = []
 
-        # 展开每笔交易到持仓日
-        expanded = trades.join(prices_short, on="ticker", how="left").filter(
-            (pl.col("day_row_id") >= pl.col("buy_row_id"))
-            & (pl.col("day_row_id") < pl.col("sell_row_id"))
-        )
+        for row in trades.iter_rows(named=True):
+            ticker = row["ticker"]
+            buy_date = row["buy_date"]
+            sell_date = row["sell_date"]
+            buy_price = row["buy_open"]
 
-        # 获取下一日开盘价
-        expanded = expanded.with_columns(
-            (pl.col("day_row_id") + 1).alias("next_row_id")
-        )
+            # 获取该股票在持仓期间的价格数据
+            ticker_prices = prices.filter(
+                (pl.col("ticker") == ticker)
+                & (pl.col("timestamps") >= buy_date)
+                & (pl.col("timestamps") < sell_date)
+            ).sort("timestamps")
 
-        prices_next = prices.select(["ticker", "row_id", "open"]).rename(
-            {"row_id": "next_row_id", "open": "open_next"}
-        )
+            # 计算每日收益率
+            if not ticker_prices.is_empty():
+                ticker_prices_with_return = ticker_prices.with_columns(
+                    [
+                        pl.lit(ticker).alias("trade_ticker"),
+                        pl.lit(buy_date).alias("trade_buy_date"),
+                        pl.lit(buy_price).alias("trade_buy_price"),
+                        ((pl.col("close") / buy_price) - 1).alias("position_return"),
+                    ]
+                )
 
-        expanded = expanded.join(prices_next, on=["ticker", "next_row_id"], how="left")
+                expanded_trades.append(ticker_prices_with_return)
 
-        # 计算每日收益
-        expanded = expanded.with_columns(
-            ((pl.col("open_next") / pl.col("open_day")) - 1).alias("daily_return")
-        ).filter(pl.col("daily_return").is_not_null())
+        if not expanded_trades:
+            return pl.DataFrame()
+
+        # 合并所有展开的交易
+        all_positions = pl.concat(expanded_trades)
 
         # 按日期聚合组合收益（等权平均）
         portfolio_daily = (
-            expanded.group_by("date")
+            all_positions.group_by("timestamps")
             .agg(
                 [
-                    pl.col("daily_return").mean().alias("portfolio_return"),
+                    pl.col("position_return").mean().alias("portfolio_return"),
                     pl.count().alias("n_positions"),
                 ]
             )
-            .sort("date")
+            .sort("timestamps")
+            .rename({"timestamps": "date"})
         )
 
         # 计算累计权益曲线
