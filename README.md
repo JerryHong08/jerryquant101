@@ -12,11 +12,10 @@
 
 # Roadmap
 
-## On-Going
-
 ## To-Do
-
-* [ ] Add **`data_error.csv`**, similar to `splits_error.csv`.
+* [ ] Stock dividends process
+* [ ] More universal indicator calculator
+* [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
 * [ ] Polish **X news search function**.
 * [ ] Add **trade volume filter** or other ticker filter conditions.
 
@@ -160,4 +159,7 @@ This directory includes **configs, loaders, and plotting tools**.
 And the most important part about low_volume_tickers is that it can show the correctness of your data load process. As you can find some notes in the [`src/data_1/data_discrepancy_fixed/low_volume_tickers_copy.csv`](src/data_1/data_discrepancy_fixed/low_volume_tickers_copy.csv).
 For example, most of the long-term like over years 0 volume is because of relisted on the market or there is a new ticker has the same name, which complicates the situation now for it's hard to distinguish. So, as for now, 2025-09-24, I have decided to leave this tickers(max_duration_days > 50) as skipped tickers. I know it's unwise, but it saves me time for now.
 
+**2025-09-24**
+* ✅ add strategies indicators, registry version.
+* ✅ BBIBOLL Strategy signal and trade rule established.
 ---

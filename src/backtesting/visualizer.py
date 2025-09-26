@@ -12,15 +12,10 @@ import pandas as pd
 import polars as pl
 import seaborn as sns
 
-# 设置中文字体和样式
-plt.rcParams["font.sans-serif"] = ["SimHei", "DejaVu Sans", "Arial Unicode MS"]
-plt.rcParams["axes.unicode_minus"] = False
-sns.set_style("whitegrid")
-
 
 class BacktestVisualizer:
     """
-    回测结果可视化器
+    backtest visualizer
     """
 
     def __init__(self, figsize: tuple = (12, 8)):
@@ -220,7 +215,7 @@ class BacktestVisualizer:
         save_path: Optional[str] = None,
     ):
         """
-        绘制K线图和交易信号 (带交互功能)
+        plot k line, trade signals and indicators
 
         Args:
             ohlcv_data: OHLCV数据
@@ -271,22 +266,22 @@ class BacktestVisualizer:
         # 绘制交易信号
         ticker_trades = trades.filter(pl.col("ticker") == ticker)
         if not ticker_trades.is_empty():
-            self._plot_trade_signals_compact(ax1, ticker_trades, df)
+            self._plot_trade_signals(ax1, ticker_trades, df)
 
         # 绘制技术指标
         if indicators is not None:
             ticker_indicators = indicators.filter(pl.col("ticker") == ticker)
             if not ticker_indicators.is_empty():
                 print("plot indicators...")
-                self._plot_indicators_compact(ax1, ticker_indicators, df)
+                self._plot_indicators(ax1, ticker_indicators, df)
 
         # 绘制成交量
         ax2.bar(range(len(df)), df["volume"], color="gray", alpha=0.3)
         ax2.set_ylabel("Volume", fontsize=10)
         ax2.set_xlabel("Date", fontsize=12)
 
-        # 设置x轴标签 (只显示部分日期避免拥挤)
-        step = max(1, len(df) // 10)  # 最多显示10个日期标签
+        # set up X-axis, only display a few date labels to avoid clutter
+        step = max(1, len(df) // 10)
         tick_positions = range(0, len(df), step)
         tick_labels = [date_labels[i][:10] for i in tick_positions]
 
@@ -302,7 +297,7 @@ class BacktestVisualizer:
         ax1.legend()
         ax1.grid(True, alpha=0.3)
 
-        # 添加交互功能
+        # mouse hover interaction
         self._add_interactive_features(fig, ax1, ax2, df, ticker_trades)
 
         plt.tight_layout()
@@ -338,7 +333,7 @@ class BacktestVisualizer:
             bottom = min(row["close"], row["open"])
             ax.bar(i, height, bottom=bottom, color=color, alpha=0.8, width=0.8)
 
-    def _plot_trade_signals_compact(self, ax, trades: pl.DataFrame, df):
+    def _plot_trade_signals(self, ax, trades: pl.DataFrame, df):
         """绘制交易信号 (紧凑版本)"""
         trades_pd = trades.to_pandas()
 
@@ -385,8 +380,92 @@ class BacktestVisualizer:
                             sell_signals_plotted = True
                             break
 
-    def _plot_indicators_compact(self, ax, indicators: pl.DataFrame, df):
-        """绘制技术指标 (紧凑版本) - 修复长度不匹配问题"""
+    def _add_interactive_features(self, fig, ax1, ax2, df, trades):
+        """添加交互功能：鼠标悬停显示OHLCV和交易信息"""
+        # 创建交易信息映射
+        trades_pd = trades.to_pandas() if not trades.is_empty() else pd.DataFrame()
+        trade_info_map = {}
+
+        if not trades_pd.empty:
+            for _, trade in trades_pd.iterrows():
+                # 买入信息
+                if pd.notna(trade.get("buy_date")) and pd.notna(trade.get("buy_price")):
+                    buy_date_str = str(trade["buy_date"])
+                    for i in range(len(df)):
+                        if buy_date_str in str(df.iloc[i]["timestamps"]):
+                            trade_info_map[i] = {
+                                "type": "BUY",
+                                "price": trade["buy_price"],
+                                "date": trade["buy_date"],
+                            }
+                            break
+
+                # 卖出信息
+                if pd.notna(trade.get("sell_date")) and pd.notna(
+                    trade.get("sell_open")
+                ):
+                    sell_date_str = str(trade["sell_date"])
+                    for i in range(len(df)):
+                        if sell_date_str in str(df.iloc[i]["timestamps"]):
+                            trade_info_map[i] = {
+                                "type": "SELL",
+                                "price": trade["sell_open"],
+                                "date": trade["sell_date"],
+                            }
+                            break
+
+        # 创建信息显示框
+        info_text = ax1.text(
+            0.02,
+            0.98,
+            "",
+            transform=ax1.transAxes,
+            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
+            verticalalignment="top",
+            fontsize=10,
+        )
+
+        def on_mouse_move(event):
+            if event.inaxes == ax1:
+                # 获取鼠标位置对应的数据索引
+                x_pos = event.xdata
+                if x_pos is not None:
+                    index = int(round(x_pos))
+                    if 0 <= index < len(df):
+                        row = df.iloc[index]
+                        date_str = str(row["timestamps"])
+
+                        # 基础OHLCV信息
+                        info_lines = [
+                            f"Date: {date_str[:10]}",
+                            f"Open: {row['open']:.2f}",
+                            f"High: {row['high']:.2f}",
+                            f"Low: {row['low']:.2f}",
+                            f"Close: {row['close']:.2f}",
+                            f"Volume: {row['volume']:,.0f}",
+                        ]
+
+                        # 如果有交易信息，添加交易详情
+                        if index in trade_info_map:
+                            trade_info = trade_info_map[index]
+                            info_lines.append("")
+                            info_lines.append(f"*** {trade_info['type']} Signal ***")
+                            info_lines.append(f"Price: {trade_info['price']:.2f}")
+
+                        info_text.set_text("\n".join(info_lines))
+                    else:
+                        info_text.set_text("")
+                else:
+                    info_text.set_text("")
+            else:
+                info_text.set_text("")
+
+            fig.canvas.draw_idle()
+
+        # 连接鼠标移动事件
+        fig.canvas.mpl_connect("motion_notify_event", on_mouse_move)
+
+    def _plot_indicators(self, ax, indicators: pl.DataFrame, df):
         try:
             indicators_pd = indicators.to_pandas()
 
@@ -490,88 +569,3 @@ class BacktestVisualizer:
             import traceback
 
             traceback.print_exc()
-
-    def _add_interactive_features(self, fig, ax1, ax2, df, trades):
-        """添加交互功能：鼠标悬停显示OHLCV和交易信息"""
-        # 创建交易信息映射
-        trades_pd = trades.to_pandas() if not trades.is_empty() else pd.DataFrame()
-        trade_info_map = {}
-
-        if not trades_pd.empty:
-            for _, trade in trades_pd.iterrows():
-                # 买入信息
-                if pd.notna(trade.get("buy_date")) and pd.notna(trade.get("buy_price")):
-                    buy_date_str = str(trade["buy_date"])
-                    for i in range(len(df)):
-                        if buy_date_str in str(df.iloc[i]["timestamps"]):
-                            trade_info_map[i] = {
-                                "type": "BUY",
-                                "price": trade["buy_price"],
-                                "date": trade["buy_date"],
-                            }
-                            break
-
-                # 卖出信息
-                if pd.notna(trade.get("sell_date")) and pd.notna(
-                    trade.get("sell_open")
-                ):
-                    sell_date_str = str(trade["sell_date"])
-                    for i in range(len(df)):
-                        if sell_date_str in str(df.iloc[i]["timestamps"]):
-                            trade_info_map[i] = {
-                                "type": "SELL",
-                                "price": trade["sell_open"],
-                                "date": trade["sell_date"],
-                            }
-                            break
-
-        # 创建信息显示框
-        info_text = ax1.text(
-            0.02,
-            0.98,
-            "",
-            transform=ax1.transAxes,
-            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
-            verticalalignment="top",
-            fontsize=10,
-        )
-
-        def on_mouse_move(event):
-            if event.inaxes == ax1:
-                # 获取鼠标位置对应的数据索引
-                x_pos = event.xdata
-                if x_pos is not None:
-                    index = int(round(x_pos))
-                    if 0 <= index < len(df):
-                        row = df.iloc[index]
-                        date_str = str(row["timestamps"])
-
-                        # 基础OHLCV信息
-                        info_lines = [
-                            f"Date: {date_str[:10]}",
-                            f"Open: {row['open']:.2f}",
-                            f"High: {row['high']:.2f}",
-                            f"Low: {row['low']:.2f}",
-                            f"Close: {row['close']:.2f}",
-                            f"Volume: {row['volume']:,.0f}",
-                        ]
-
-                        # 如果有交易信息，添加交易详情
-                        if index in trade_info_map:
-                            trade_info = trade_info_map[index]
-                            info_lines.append("")
-                            info_lines.append(f"*** {trade_info['type']} Signal ***")
-                            info_lines.append(f"Price: {trade_info['price']:.2f}")
-
-                        info_text.set_text("\n".join(info_lines))
-                    else:
-                        info_text.set_text("")
-                else:
-                    info_text.set_text("")
-            else:
-                info_text.set_text("")
-
-            fig.canvas.draw_idle()
-
-        # 连接鼠标移动事件
-        fig.canvas.mpl_connect("motion_notify_event", on_mouse_move)

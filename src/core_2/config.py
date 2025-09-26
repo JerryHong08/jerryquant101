@@ -100,11 +100,7 @@ splits_data = get_asset_overview_data(asset="splits")
 
 if __name__ == "__main__":
     with pl.Config(tbl_rows=50, tbl_cols=20):
-        asset = "indices"
+        asset = "splits"
         all_asset = get_asset_overview_data(asset)
         print(all_asset.head())
-        # print(
-        #     all_asset.filter(
-        #         pl.col("ticker").is_in(['FB'])
-        #     )
-        # )
+        print(all_asset.filter(pl.col("ticker").is_in(["XTIA"])))

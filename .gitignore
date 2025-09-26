@@ -31,7 +31,8 @@ backtest_output/
 
 # Secrets
 .env
-src/strategies/
+src/strategies/*
+!src/strategies/indicators/
 
 # AI
 claude/

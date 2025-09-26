@@ -45,7 +45,7 @@ class BacktestEngine:
         self,
         strategy: StrategyBase,
         benchmark_data: Optional[pl.DataFrame] = None,
-        use_cached_indicators: bool = False,
+        use_cached_indicators: bool = True,
         save_results: bool = True,
     ) -> Dict[str, Any]:
         """
@@ -234,7 +234,9 @@ class BacktestEngine:
         """获取所有策略的回测结果"""
         return self.results
 
-    def export_results(self, strategy_name: str, output_dir: str = "backtest_results"):
+    def export_results(
+        self, strategy_config, strategy_name: str, output_dir: str = "backtest_results"
+    ):
         """
         导出回测结果到文件
 
@@ -257,13 +259,18 @@ class BacktestEngine:
             .with_columns((pl.col("return") * 100).round(2).alias("return %"))
             .sort("return %", descending=True)
             .drop("return")
+        ).with_columns(
+            pl.col("buy_date").dt.date().alias("buy_date"),
+            pl.col("sell_date").dt.date().alias("sell_date"),
         )
         trades.write_csv(trades_path)
         print(f"交易记录已导出到: {trades_path}")
 
         # 导出每日组合表现
         portfolio_path = f"{output_dir}/{strategy_name}_portfolio_daily.csv"
-        results["portfolio_daily"].write_csv(portfolio_path)
+        results["portfolio_daily"].with_columns(
+            pl.col("date").dt.date().alias("date"),
+        ).write_csv(portfolio_path)
         print(f"每日组合表现已导出到: {portfolio_path}")
 
         # 导出性能指标
@@ -274,6 +281,15 @@ class BacktestEngine:
             for key, value in results["performance_metrics"].items():
                 f.write(f"{key}: {value}\n")
         print(f"性能指标已导出到: {metrics_path}")
+
+        # export strategy_config
+        strategy_config_path = f"{output_dir}/{strategy_name}_config.txt"
+        with open(strategy_config_path, "w", encoding="utf-8") as f:
+            f.write(f"{strategy_name} strategy config\n")
+            f.write("=" * 50 + "\n\n")
+            for key, value in strategy_config.items():
+                f.write(f"{key}: {value}\n")
+        print(f"Strategy config exported: {strategy_config_path}")
 
     def _print_strategy_comparison(self, all_results: Dict[str, Dict[str, Any]]):
         """打印策略比较表格"""

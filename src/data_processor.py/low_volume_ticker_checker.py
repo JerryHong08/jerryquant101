@@ -3,13 +3,13 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
+from backtesting.backtest_pre_data import only_common_stocks
 from core_2.data_loader import stock_load_process
-from strategies.pre_data import only_common_stocks
 from utils.longbridge_utils import update_watchlist
 
 config = {
     "timeframe": "1d",
-    "start_date": "2022-01-01",
+    "start_date": "2015-01-01",
     "end_date": "2025-09-05",
 }
 
@@ -106,23 +106,25 @@ duration = (
 result = (duration).collect()
 
 notes = pl.read_csv(
-    "low_volume_tickers.csv"
+    "low_volume_tickers.csv", truncate_ragged_lines=True
 )  # load previous tickers information with notes on it.
 result = result.join(
-    notes.select(["ticker", "notes", "source"]), on="ticker", how="left"
+    notes.select(["ticker", "notes", "source", "cut_off_date", "counts"]),
+    on="ticker",
+    how="left",
 )
 result.sort("max_duration_days", descending=True).write_csv("low_volume_tickers.csv")
 
 # Convert to pandas and plot histogram
-df = (
-    result.filter(pl.col("max_duration_days") > 50)
-    .with_columns(pl.col("avg_turnover").cast(pl.Int64))
-    .to_pandas()
-)
-plt.figure(figsize=(10, 6))
-plt.hist(df["max_duration_days"], bins=20, edgecolor="black", alpha=0.7)
-plt.xlabel("Max Duration Days")
-plt.ylabel("Frequency")
-plt.title("Distribution of Max Duration Days")
-plt.grid(True, alpha=0.3)
-plt.show()
+# df = (
+#     result.filter(pl.col("max_duration_days") > 50)
+#     .with_columns(pl.col("avg_turnover").cast(pl.Int64))
+#     .to_pandas()
+# )
+# plt.figure(figsize=(10, 6))
+# plt.hist(df["max_duration_days"], bins=20, edgecolor="black", alpha=0.7)
+# plt.xlabel("Max Duration Days")
+# plt.ylabel("Frequency")
+# plt.title("Distribution of Max Duration Days")
+# plt.grid(True, alpha=0.3)
+# plt.show()

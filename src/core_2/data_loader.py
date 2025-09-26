@@ -426,6 +426,7 @@ def splits_adjust(lf, splits, price_decimals: int = 4):
     if not tickers:
         return lf
 
+    # filter out the data that need to be adjusted
     splits_filtered = splits.filter(
         (pl.col("ticker").is_in(tickers))
         & (
@@ -456,8 +457,14 @@ def splits_adjust(lf, splits, price_decimals: int = 4):
                 .over("ticker")
                 .alias("cumulative_split_ratio")
             )
+            .group_by(["ticker", "split_date"])
+            .agg(  # this for some tickers like ["SESN", "CARM"] tickers changed name and reversed splits twice in a day.
+                pl.col("cumulative_split_ratio").last().alias("cumulative_split_ratio"),
+            )
             .sort(["ticker", "split_date"])
         )
+
+        print(splits_with_factor.head())
 
         # 由于 Polars join_asof 需要对齐日期类型，可以先添加辅助列
         lf = (
@@ -643,8 +650,6 @@ def splits_figi_alignment(df):
         .drop("ticker")
         .rename({"latest_ticker": "ticker"})
     )
-
-    # print(df)
 
     aligned_lf = df
 
@@ -853,12 +858,15 @@ def stock_load_process(
     aligned_tickers = tickers_alignment(pl.DataFrame({"ticker": tickers}).lazy())
 
     skipped = (
-        pl.read_csv("low_volume_tickers.csv")
+        pl.read_csv("low_volume_tickers.csv", truncate_ragged_lines=True)
         .filter(
             (pl.col("max_duration_days") > 50) | (pl.col("avg_turnover") < 60000),
         )
         .select(pl.col("ticker").unique())
-    ).lazy()
+    )
+
+    skipped = tickers_alignment(skipped.lazy())
+
     print(
         f"there are {len(skipped.collect())} tickers to skip due to specious low volume."
     )
@@ -1055,7 +1063,7 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    tickers = ["HMG"]
+    tickers = ["EQC"]
     # tickers = ['LCID','TNFA', 'MYMD', 'NVDA', 'FFIE', 'FFAI']
     # tickers = None
     with pl.Config(tbl_cols=50, tbl_width_chars=1000):
@@ -1064,7 +1072,7 @@ if __name__ == "__main__":
     timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
     asset = "us_stocks_sip"
     data_type = "day_aggs_v1" if timeframe == "1d" else "minute_aggs_v1"
-    start_date = "2022-01-01"
+    start_date = "2015-01-01"
     end_date = "2025-09-19"
     full_hour = False
     plot = True
@@ -1085,8 +1093,13 @@ if __name__ == "__main__":
     # print(lf_result.filter(pl.col('timestamps').cast(pl.Datetime("us")).is_between(pl.datetime(2024, 6, 3), pl.datetime(2024, 6, 11))))
 
     with pl.Config(tbl_cols=50):
-        print(lf_result.filter(pl.col("ticker") == ticker_plot).head())
-        print(lf_result.filter(pl.col("ticker") == ticker_plot).tail())
+        print(
+            lf_result.filter(
+                (pl.col("ticker") == ticker_plot)
+                # & (pl.col("timestamps").dt.date().is_between(pl.date(2023, 3, 6), pl.date(2023, 3, 11)))
+            )
+        )
+        # print(lf_result.filter(pl.col("ticker") == ticker_plot).tail())
 
     if plot:
         plot_candlestick(
@@ -1094,3 +1107,6 @@ if __name__ == "__main__":
             ticker_plot,
             timeframe,
         )
+
+    # from strategies.indicators.obv_indicator import calculate_obv
+    # print(calculate_obv(lf_result).sort('timestamps').tail())
