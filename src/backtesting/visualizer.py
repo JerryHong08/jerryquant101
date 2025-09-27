@@ -18,8 +18,34 @@ class BacktestVisualizer:
     backtest visualizer
     """
 
-    def __init__(self, figsize: tuple = (12, 8)):
+    def __init__(self, figsize: tuple = (12, 8), maximize_window: bool = True):
         self.figsize = figsize
+        self.maximize_window = maximize_window
+
+    def _setup_window(self):
+        """设置窗口显示"""
+        if not self.maximize_window:
+            return
+
+        # 设置窗口显示模式
+        try:
+            manager = plt.get_current_fig_manager()
+            if hasattr(manager, "full_screen_toggle"):
+                # 全屏模式（无边框）
+                manager.full_screen_toggle()
+                print("窗口已设置为全屏模式")
+            elif hasattr(manager, "window"):
+                if hasattr(manager.window, "state"):
+                    # 最大化模式（有边框）
+                    manager.window.state("zoomed")
+                    print("窗口已设置为最大化")
+                elif hasattr(manager.window, "wm_state"):
+                    manager.window.wm_state("zoomed")
+                    print("窗口已设置为最大化")
+            else:
+                print("当前后端不支持窗口控制")
+        except Exception as e:
+            print(f"设置窗口状态失败: {e}")
 
     def _normalize_date_string(self, date_obj):
         """标准化日期字符串格式"""
@@ -133,7 +159,7 @@ class BacktestVisualizer:
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
             print(f"资金曲线图已保存到: {save_path}")
-
+        self._setup_window()
         plt.show()
 
     def plot_monthly_returns(
@@ -197,6 +223,7 @@ class BacktestVisualizer:
                 plt.savefig(save_path, dpi=300, bbox_inches="tight")
                 print(f"月度收益热力图已保存到: {save_path}")
 
+            self._setup_window()
             plt.show()
 
         except Exception as e:
@@ -231,12 +258,12 @@ class BacktestVisualizer:
 
         if start_date:
             ticker_data = ticker_data.filter(
-                pl.col("timestamps") >= pl.lit(start_date).str.to_date()
+                pl.col("timestamps").dt.date() >= pl.lit(start_date).str.to_date()
             )
 
         if end_date:
             ticker_data = ticker_data.filter(
-                pl.col("timestamps") <= pl.lit(end_date).str.to_date()
+                pl.col("timestamps").dt.date() <= pl.lit(end_date).str.to_date()
             )
 
         if ticker_data.is_empty():
@@ -306,6 +333,7 @@ class BacktestVisualizer:
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
             print(f"K线图已保存到: {save_path}")
 
+        self._setup_window()
         plt.show()
 
     def _plot_candlesticks_line(self, ax, df):
@@ -334,13 +362,13 @@ class BacktestVisualizer:
             ax.bar(i, height, bottom=bottom, color=color, alpha=0.8, width=0.8)
 
     def _plot_trade_signals(self, ax, trades: pl.DataFrame, df):
-        """绘制交易信号 (紧凑版本)"""
+        """plot trade signal"""
         trades_pd = trades.to_pandas()
 
         # 为买卖信号创建位置映射
         date_to_index = {str(df.iloc[i]["timestamps"]): i for i in range(len(df))}
 
-        # 买入信号
+        # buy signal
         buy_signals_plotted = False
         if "buy_date" in trades_pd.columns and "buy_price" in trades_pd.columns:
             for _, trade in trades_pd.iterrows():
@@ -351,7 +379,7 @@ class BacktestVisualizer:
                             ax.scatter(
                                 index,
                                 trade["buy_price"],
-                                color="green",
+                                color="blue",
                                 marker="^",
                                 s=100,
                                 label="Buy" if not buy_signals_plotted else "",
@@ -360,7 +388,7 @@ class BacktestVisualizer:
                             buy_signals_plotted = True
                             break
 
-        # 卖出信号
+        # sell signal
         sell_signals_plotted = False
         if "sell_date" in trades_pd.columns and "sell_open" in trades_pd.columns:
             for _, trade in trades_pd.iterrows():
@@ -371,7 +399,7 @@ class BacktestVisualizer:
                             ax.scatter(
                                 index,
                                 trade["sell_open"],
-                                color="red",
+                                color="yellow",
                                 marker="v",
                                 s=100,
                                 label="Sell" if not sell_signals_plotted else "",

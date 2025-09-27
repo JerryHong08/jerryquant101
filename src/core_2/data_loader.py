@@ -144,6 +144,15 @@ def data_dir_calculate(
 
 
 def generate_full_timestamp(start_date, end_date, timeframe, full_hour: bool = False):
+    """
+    Args:
+        start_date: Start date in format 'YYYY-MM-DD'
+        end_date: Start date in format 'YYYY-MM-DD'
+        timeframe: '1m', '5m', '15m', '30m', '1h', '1d'
+        full_hour: For intraday data, whether to generate full hours (4:00-20:00) or only regular trading hours (9:30-16:00)
+    Return:
+        Schema([('timestamps', Datetime(time_unit='us', time_zone='America/New_York'))])
+    """
 
     # 纽约证券交易所 (美国)
     xnys = xcals.get_calendar("XNYS")
@@ -1030,34 +1039,34 @@ def stock_load_process(
     # lf_full = lf_full.drop(["split_date", "window_start", "split_ratio"])
 
     # Save to cache if use_cache is True
-    if use_cache and not use_s3:
-        try:
-            print(f"Saving to cache: {cache_path}")
-            data = lf_full.collect()
-            data.write_parquet(cache_path)
+    # if use_cache and not use_s3:
+    try:
+        print(f"Saving to cache: {cache_path}")
+        data = lf_full.collect()
+        data.write_parquet(cache_path)
 
-            print(f"Cache Size: {data.estimated_size('mb'):.2f} MB")
-            print(f"Cache rows: {len(data):,}")
+        print(f"Cache Size: {data.estimated_size('mb'):.2f} MB")
+        print(f"Cache rows: {len(data):,}")
 
-            # Save metadata for debugging
-            cache_params = {
-                "tickers": tickers,
-                "timeframe": timeframe,
-                "asset": asset,
-                "data_type": data_type,
-                "start_date": start_date,
-                "end_date": end_date,
-                "full_hour": full_hour,
-                "cache_key": cache_key,
-                "created_at": datetime.now().isoformat(),
-            }
-            save_cache_metadata(cache_path, cache_params)
-            print("Cache saved successfully.")
+        # Save metadata for debugging
+        cache_params = {
+            "tickers": tickers,
+            "timeframe": timeframe,
+            "asset": asset,
+            "data_type": data_type,
+            "start_date": start_date,
+            "end_date": end_date,
+            "full_hour": full_hour,
+            "cache_key": cache_key,
+            "created_at": datetime.now().isoformat(),
+        }
+        save_cache_metadata(cache_path, cache_params)
+        print("Cache saved successfully.")
 
-            # Return lazy frame of cached data
-            return pl.scan_parquet(cache_path)
-        except Exception as e:
-            print(f"Failed to save cache: {e}, returning processed data...")
+        # Return lazy frame of cached data
+        return pl.scan_parquet(cache_path)
+    except Exception as e:
+        print(f"Failed to save cache: {e}, returning processed data...")
 
     return lf_full
 

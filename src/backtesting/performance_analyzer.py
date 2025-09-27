@@ -8,6 +8,8 @@ from typing import Any, Dict, Optional
 import numpy as np
 import polars as pl
 
+from backtesting.backtest_pre_data import load_irx_data
+
 
 class PerformanceAnalyzer:
     """
@@ -74,11 +76,32 @@ class PerformanceAnalyzer:
         trade_stats = self._calculate_trade_stats(trades)
 
         # 风险指标
-        returns = portfolio_daily["portfolio_return"].drop_nulls()
-        risk_metrics = self._calculate_risk_metrics(returns, benchmark_data)
+        daily_irx = load_irx_data(
+            start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
+        )
 
-        # 费用计算 (假设每笔交易费用为资金的0.1%)
-        total_fees = len(trades) * end_value * 0.001
+        if daily_irx is not None:
+            print(
+                f"IRX date range: {daily_irx['date'].min()} to {daily_irx['date'].max()}"
+            )
+
+            portfolio_with_irx = portfolio_daily.join(
+                daily_irx.select(["date", "irx_rate"]), on="date", how="left"
+            )
+
+            returns = portfolio_with_irx["portfolio_return"]
+            irx_aligned = portfolio_with_irx["irx_rate"]
+
+            print(f"Valid data points after alignment: {len(portfolio_with_irx)}")
+        else:
+            returns = portfolio_daily["portfolio_return"].drop_nulls()
+            irx_aligned = None
+
+        # irx_aligned = None
+        risk_metrics = self._calculate_risk_metrics(returns, irx_aligned)
+
+        # trade fees culculate (assume 0.7% per trade)
+        total_fees = len(trades) * end_value * 0.007
 
         # 暴露度 (假设满仓)
         max_gross_exposure = 100.0
@@ -205,7 +228,7 @@ class PerformanceAnalyzer:
         }
 
     def _calculate_risk_metrics(
-        self, returns: pl.Series, benchmark_data: Optional[pl.DataFrame] = None
+        self, returns: pl.Series, irx_daily_rate: Optional[pl.DataFrame] = None
     ) -> Dict[str, float]:
         """计算风险指标"""
         if returns.is_empty():
@@ -218,13 +241,26 @@ class PerformanceAnalyzer:
 
         returns_array = returns.to_numpy()
 
-        # 年化收益率和波动率
+        if irx_daily_rate is not None:
+            print("Calculating risk metrics with IRX data...")
+            irx_daily_array = irx_daily_rate.to_numpy()
+            # Ensure both arrays have the same length by taking the minimum
+            print(len(returns_array), len(irx_daily_array))
+            min_length = min(len(returns_array), len(irx_daily_array))
+
+            returns_array = returns_array[:min_length]
+            irx_daily_array = irx_daily_array[:min_length]
+            execess_return = returns_array - irx_daily_array
+        else:
+            print("Not found IRX data")
+            execess_return = returns_array
+
+        annual_vol = np.std(execess_return) * np.sqrt(252)
+
+        # Sharpe比率
+        sharpe_ratio = execess_return.mean() * 252 / annual_vol if annual_vol > 0 else 0
+
         annual_return = np.mean(returns_array) * 252
-        annual_vol = np.std(returns_array) * np.sqrt(252)
-
-        # Sharpe比率 (假设无风险利率为0)
-        sharpe_ratio = annual_return / annual_vol if annual_vol > 0 else 0
-
         # Sortino比率 (下行波动率)
         negative_returns = returns_array[returns_array < 0]
         downside_vol = (

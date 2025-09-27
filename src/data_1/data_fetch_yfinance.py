@@ -1,8 +1,12 @@
 import polars as pl
 import yfinance as yf
 
-ticker = ["^SPX"]
-data = yf.download(ticker, start="2015-01-01", end="2025-09-05", interval="1d")
+# ^IRX
+# ^SPX
+ticker = ["^IRX"]
+start = "2015-01-01"
+end = "2025-09-30"
+data = yf.download(ticker, start=start, end=end, interval="1d")
 data = data.reset_index()
 data.columns = ["Date", "Close", "High", "Low", "Open", "Volume"]
 data = data[["Date", "Open", "High", "Low", "Close"]]
@@ -19,11 +23,13 @@ df = df.with_columns(
 )
 
 df.write_parquet(
-    "I:SPXday20150101_20250905.parquet", compression="zstd", compression_level=3
+    f"I:{ticker[0].replace('^', '')}day.parquet",
+    compression="zstd",
+    compression_level=3,
 )
 
 print(
     df.with_columns(
         pl.from_epoch(pl.col("timestamp"), time_unit="ms").alias("datetime")
-    ).head()
+    ).tail()
 )

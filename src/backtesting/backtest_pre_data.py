@@ -6,6 +6,40 @@ import polars as pl
 from core_2.config import all_tickers_dir
 
 
+def load_irx_data(start, end):
+    try:
+        irx = pl.read_parquet("I:IRXday.parquet")
+        irx = irx.with_columns(
+            pl.from_epoch(pl.col("timestamp"), time_unit="ms")
+            .dt.replace_time_zone("America/New_York")
+            .dt.replace(hour=0, minute=0, second=0)
+            .cast(pl.Datetime("ns", "America/New_York"))
+            .alias("date")
+        )
+
+        irx = irx.filter(
+            (
+                pl.col("date").dt.date()
+                >= datetime.datetime.strptime(start, "%Y-%m-%d").date()
+            )
+            & (
+                pl.col("date").dt.date()
+                <= datetime.datetime.strptime(end, "%Y-%m-%d").date()
+            )
+        ).sort("date")
+
+        irx = (
+            irx.with_columns(
+                (pl.col("close") / 25200).alias("irx_rate"),
+            )
+        ).select(["date", "irx_rate"])
+
+        return irx
+    except Exception as e:
+        print(f"加载IRX数据失败: {e}")
+        return None
+
+
 def load_spx_benchmark(start, end):
     """加载SPX基准数据"""
     try:
