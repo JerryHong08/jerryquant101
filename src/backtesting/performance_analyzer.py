@@ -8,8 +8,6 @@ from typing import Any, Dict, Optional
 import numpy as np
 import polars as pl
 
-from backtesting.backtest_pre_data import load_irx_data
-
 
 class PerformanceAnalyzer:
     """
@@ -75,29 +73,8 @@ class PerformanceAnalyzer:
         # 交易统计
         trade_stats = self._calculate_trade_stats(trades)
 
-        # 风险指标
-        daily_irx = load_irx_data(
-            start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
-        )
-
-        if daily_irx is not None:
-            print(
-                f"IRX date range: {daily_irx['date'].min()} to {daily_irx['date'].max()}"
-            )
-
-            portfolio_with_irx = portfolio_daily.join(
-                daily_irx.select(["date", "irx_rate"]), on="date", how="left"
-            )
-
-            returns = portfolio_with_irx["portfolio_return"]
-            irx_aligned = portfolio_with_irx["irx_rate"]
-
-            print(f"Valid data points after alignment: {len(portfolio_with_irx)}")
-        else:
-            returns = portfolio_daily["portfolio_return"].drop_nulls()
-            irx_aligned = None
-
-        # irx_aligned = None
+        returns = portfolio_daily["portfolio_return"].drop_nulls()
+        irx_aligned = None
         risk_metrics = self._calculate_risk_metrics(returns, irx_aligned)
 
         # trade fees culculate (assume 0.7% per trade)
@@ -245,7 +222,6 @@ class PerformanceAnalyzer:
             print("Calculating risk metrics with IRX data...")
             irx_daily_array = irx_daily_rate.to_numpy()
             # Ensure both arrays have the same length by taking the minimum
-            print(len(returns_array), len(irx_daily_array))
             min_length = min(len(returns_array), len(irx_daily_array))
 
             returns_array = returns_array[:min_length]

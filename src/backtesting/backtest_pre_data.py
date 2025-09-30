@@ -43,7 +43,7 @@ def load_irx_data(start, end):
 def load_spx_benchmark(start, end):
     """加载SPX基准数据"""
     try:
-        spx = pl.read_parquet("I:SPXday20150101_20250905.parquet")
+        spx = pl.read_parquet("I:SPXday.parquet")
         spx = spx.with_columns(
             pl.from_epoch(pl.col("timestamp"), time_unit="ms")
             .dt.convert_time_zone("America/New_York")

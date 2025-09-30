@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 
 import polars as pl
 
+from backtesting.backtest_pre_data import load_irx_data
 from core_2.config import cache_dir
 
 strategy_cache_dir = os.path.join(cache_dir, "strategies")
@@ -119,6 +120,30 @@ class StrategyBase(ABC):
         # 3. 执行交易
         print(f"执行 {self.name} 策略交易...")
         trades, portfolio_daily = self.trade_rules(signals)
+
+        start_date = portfolio_daily["date"].min()
+        end_date = portfolio_daily["date"].max()
+        # 4. adjust portfolio returns with risk-free rate
+        if "add_risk_free_rate" in self.config:
+            daily_irx = load_irx_data(
+                start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
+            )
+
+            if daily_irx is not None:
+                print(
+                    f"IRX date range: {daily_irx['date'].min()} to {daily_irx['date'].max()}"
+                )
+                portfolio_daily = portfolio_daily.join(
+                    daily_irx.select(["date", "irx_rate"]), on="date", how="left"
+                )
+
+                portfolio_daily = portfolio_daily.with_columns(
+                    (pl.col("portfolio_return") - pl.col("irx_rate")).alias(
+                        "portfolio_return"
+                    )
+                )
+
+            print(portfolio_daily["portfolio_return"].head())
 
         return {
             "strategy_name": self.name,

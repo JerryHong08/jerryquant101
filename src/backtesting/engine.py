@@ -6,7 +6,9 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
 import polars as pl
+import quantstats as qs
 
 from .performance_analyzer import PerformanceAnalyzer
 from .strategy_base import StrategyBase
@@ -23,6 +25,10 @@ class BacktestEngine:
         self.performance_analyzer = PerformanceAnalyzer(initial_capital)
         self.visualizer = BacktestVisualizer()
         self.results = {}
+        # 忽略matplotlib字体警告
+        import logging
+
+        logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 
     def add_strategy(
         self,
@@ -250,6 +256,27 @@ class BacktestEngine:
 
         results = self.results[strategy_name]
         os.makedirs(output_dir, exist_ok=True)
+
+        # export quantstats report
+        portfolio_daily = results["portfolio_daily"]
+        if not portfolio_daily.is_empty():
+            benchmark = results.get("benchmark_data")
+            benchmark = benchmark.with_columns(
+                (pl.col("close") / pl.col("close").shift(1) - 1).alias("daily_return")
+            )
+            benchmark = benchmark.with_columns(
+                pl.col("date").cast(pl.Date).alias("date")
+            )
+            benchmark = pd.Series(benchmark["daily_return"], index=benchmark["date"])
+            portfolio_daily = portfolio_daily.with_columns(
+                pl.col("date").cast(pl.Date).alias("date")
+            )
+
+            qs_returns = pd.Series(
+                portfolio_daily["portfolio_return"], index=portfolio_daily["date"]
+            )
+            html_path = f"{output_dir}/{strategy_name}_report.html"
+            qs.reports.html(qs_returns, benchmark=benchmark, output=html_path)
 
         # 导出交易记录
         trades_path = f"{output_dir}/{strategy_name}_trades.csv"

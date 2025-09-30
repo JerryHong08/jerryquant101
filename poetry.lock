@@ -4217,6 +4217,29 @@ files = [
 cffi = {version = "*", markers = "implementation_name == \"pypy\""}
 
 [[package]]
+name = "quantstats"
+version = "0.0.77"
+description = "Portfolio analytics for quants"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "quantstats-0.0.77-py2.py3-none-any.whl", hash = "sha256:d0cb5b6378010e5124ec482f1945d8b852fbaabe7c3f7f51d77082e5604b0050"},
+    {file = "quantstats-0.0.77.tar.gz", hash = "sha256:55213fce012b5455a25cf328424c33a395b20cc362408e5e5a9b1f0e5e03e33d"},
+]
+
+[package.dependencies]
+matplotlib = ">=3.3.0"
+numpy = ">=1.21.0"
+packaging = ">=20.0"
+pandas = ">=1.5.0,<3.0.0"
+python-dateutil = ">=2.8.0"
+scipy = ">=1.7.0"
+seaborn = ">=0.11.0"
+tabulate = ">=0.8.9"
+yfinance = ">=0.2.65"
+
+[[package]]
 name = "requests"
 version = "2.32.4"
 description = "Python HTTP for Humans."
@@ -4712,6 +4735,21 @@ files = [
 build = "*"
 numpy = "*"
 pip = "*"
+
+[[package]]
+name = "tabulate"
+version = "0.9.0"
+description = "Pretty-print tabular data"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "tabulate-0.9.0-py3-none-any.whl", hash = "sha256:024ca478df22e9340661486f85298cff5f6dcdba14f3813e8830015b9ed1948f"},
+    {file = "tabulate-0.9.0.tar.gz", hash = "sha256:0095b12bf5966de529c0feb1fa08671671b3368eec77d7ef7ab114be2c068b3c"},
+]
+
+[package.extras]
+widechars = ["wcwidth"]
 
 [[package]]
 name = "tensorboard"
@@ -5537,4 +5575,4 @@ repair = ["scipy (>=1.6.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "cd2170a74520005ecb360d129e055c5b7c5caad673549816d5f642ae160f07cb"
+content-hash = "c10d5384e2fc4c30739993d4af81f524fc33ffabbdd17965f6e4838d63586513"

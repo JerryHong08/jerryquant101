@@ -3,11 +3,12 @@ import yfinance as yf
 
 # ^IRX
 # ^SPX
-ticker = ["^IRX"]
+ticker = ["^SPX"]
 start = "2015-01-01"
-end = "2025-09-30"
+end = "2025-09-28"
 data = yf.download(ticker, start=start, end=end, interval="1d")
 data = data.reset_index()
+print(data.tail())
 data.columns = ["Date", "Close", "High", "Low", "Open", "Volume"]
 data = data[["Date", "Open", "High", "Low", "Close"]]
 df = pl.from_pandas(data)
