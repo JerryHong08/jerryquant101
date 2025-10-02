@@ -1,18 +1,19 @@
-
----
 # Table of Contents
 
 * [Roadmap](#roadmap)
 * [Document & Guide (Detailed)](#document--guide-detailed)
-    * [data_1](#data_1)
-    * [core_2](#core_2)
-    * [live_trade](#live_trade)
+  * [data_1](#data_1)
+  * [core_2](#core_2)
+  * [live_trade](#live_trade)
 * [Change Log](#change-log)
+
 ---
 
-# Roadmap
+## Roadmap
 
-## To-Do
+* [ ] live trade monitor
+* [ ] universal indicator plot
+* [ ] Polars ETL + numba backtest engine(long-term)
 * [ ] Stock dividends process
 * [ ] More universal indicator calculator
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
@@ -21,7 +22,7 @@
 
 ---
 
-# Document & Guide (Detailed)
+## Document & Guide (Detailed)
 
 ## `data_1`
 
@@ -31,13 +32,13 @@ This directory handles **data download & save**.
 
     Use prefixes to download specific files by **date range** or **recent days**.
 
-```bash
-# Download recent 7 days
-python src/data_1/polygon_downloader.py \
-    --asset-class us_stocks_sip \
-    --data-type minute_aggs_v1 \
-    --recent-days 7
-```
+    ```bash
+    # Download recent 7 days
+    python src/data_1/polygon_downloader.py \
+        --asset-class us_stocks_sip \
+        --data-type minute_aggs_v1 \
+        --recent-days 7
+    ```
 
 ### ⚡ First Time Setup
 
@@ -45,18 +46,16 @@ python src/data_1/polygon_downloader.py \
    `core_2/config.py`
 2. Suggested file structure:
 
-```
-├── lake/          # parquet files
-│   ├── us_options_opra/trades_v1
-│   └── us_stocks_sip/{day_aggs_v1, minute_aggs_v1}
-├── processed/     # cache
-│   └── us_stocks_sip/day_aggs_v1
-└── raw/           # original csv.gz files
-    ├── global_crypto/minute_aggs_v1
-    ├── us_indices/{day_aggs_v1, minute_aggs_v1, us_all_indices}
-    ├── us_options_opra/{day_aggs_v1, minute_aggs_v1, quotes_v1, trades_v1}
-    └── us_stocks_sip/{day_aggs_v1, minute_aggs_v1, splits, us_all_tickers}
-```
+        ├── lake/          # parquet files
+        │   ├── us_options_opra/trades_v1
+        │   └── us_stocks_sip/{day_aggs_v1, minute_aggs_v1}
+        ├── processed/     # cache
+        │   └── us_stocks_sip/day_aggs_v1
+        └── raw/           # original csv.gz files
+            ├── global_crypto/minute_aggs_v1
+            ├── us_indices/{day_aggs_v1, minute_aggs_v1, us_all_indices}
+            ├── us_options_opra/{day_aggs_v1, minute_aggs_v1, quotes_v1, trades_v1}
+            └── us_stocks_sip/{day_aggs_v1, minute_aggs_v1, splits, us_all_tickers}
 
 ### 💾 File Size Reference (per year)
 
@@ -71,15 +70,13 @@ python src/data_1/polygon_downloader.py \
 
 ### 2. CSVGZ → Parquet Conversion
 
-    For faster access using Polars.
+For faster access using Polars.
 
-```bash
-# Convert recent 7 days
-python src/data_1/csvgz_to_parquet.py \
-    --asset-class us_stocks_sip \
-    --data-type day_aggs_v1 \
-    --recent-days 7
-```
+    # Convert recent 7 days
+    python src/data_1/csvgz_to_parquet.py \
+        --asset-class us_stocks_sip \
+        --data-type day_aggs_v1 \
+        --recent-days 7
 
 Other options:`--file`, `--directory`, `--asset-class`, `--date-range`, `--info`, `--list-schemas`.
 
@@ -87,7 +84,8 @@ Other options:`--file`, `--directory`, `--asset-class`, `--date-range`, `--info`
 
 ### 3. Splits Adjustment
 
-    splits&merge data are from Polygon.io, and there will be some discrepancy, and you can customize by editing `splits_error.csv`.
+splits&merge data are from Polygon.io, and there will be some discrepancy, and you can customize by editing `splits_error.csv`.
+
 I have left mine in[`src/data_1/data_discrepancy_fixed/splits_error.csv`](src/data_1/data_discrepancy_fixed/splits_error.csv), which comes from my experience, you can use it as a reference.
 
 * Example:
@@ -122,9 +120,7 @@ This directory includes **configs, loaders, and plotting tools**.
     * Good appearance
     * have basic chart elements
 
-<p align="center">
-  <img src="./figures/NVDA1d_Chart.png" width="1000">
-</p>
+![NVDA 1-day price chart showing technical analysis indicators and trading signals](./figures/NVDA1d_Chart.png)
 
 ## `live_trade`
 
@@ -137,30 +133,46 @@ This directory includes **configs, loaders, and plotting tools**.
     prototype for pre-market momentum trading.
 ---
 
-# Change Log
+## Change Log
 
-**2025-09-19**
+2025-09-19
+
 * ✅ Changed `splits_error` handling → now supports flexible CSV editing (add/remove error types).
 
-**2025-09-20**
+2025-09-20
+
 * ✅ `csvgz_to_parquet.py` now supports **recent-days convert**.
+
 * ✅ Added **Longbridge watchlist import** feature.
+
 * ✅ changed the structure from _src/quant101/*_ to _src/*_
 
-**2025-09-21**
+2025-09-21
+
 * ✅ Improved **alignment**: use both `composite_figi`&`share_class_figi` to align and make sure as much as possible.
 
-**2025-09-22**
+2025-09-22
+
 * ✅ `config.py` reconstructed, add data with error correction fuction.
+
 * ✅ add one `stocks_error.csv`.
 
-**2025-09-24**
+2025-09-24
+
 * 🥹 `low_volume_tickers` the specious low volume tickers have too much to examined and each case seems to be different, which would cost too much time for me to do it.
 And the most important part about low_volume_tickers is that it can show the correctness of your data load process. As you can find some notes in the [`src/data_1/data_discrepancy_fixed/low_volume_tickers_copy.csv`](src/data_1/data_discrepancy_fixed/low_volume_tickers_copy.csv).
 For example, most of the long-term like over years 0 volume is because of relisted on the market or there is a new ticker has the same name, which complicates the situation now for it's hard to distinguish. So, as for now, 2025-09-24, I have decided to leave this tickers(max_duration_days > 50) as skipped tickers. I know it's unwise, but it saves me time for now.
 
-**2025-09-27**
+2025-09-27
+
 * ✅ add strategies indicators, registry version.
+
 * ✅ BBIBOLL Strategy signal and trade rule established.
+
 * ✅ add risk-free rate to fix sharpe ratio calculate.
+
+2025-09-30
+
+* ✅ add quantstats
+
 ---

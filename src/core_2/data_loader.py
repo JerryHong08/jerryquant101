@@ -1072,7 +1072,7 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    tickers = ["EQC"]
+    tickers = ["VIA"]
     # tickers = ['LCID','TNFA', 'MYMD', 'NVDA', 'FFIE', 'FFAI']
     # tickers = None
     with pl.Config(tbl_cols=50, tbl_width_chars=1000):
