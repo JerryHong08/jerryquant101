@@ -6,17 +6,14 @@ from strategies.indicators.registry import get_indicator
 
 visualizer = BacktestVisualizer()
 
-ticker = "AA"
-start_date = "2024-10-01"
-end_date = "2025-10-03"
+ticker = "TSLA"
+start_date = "2023-01-01"
+end_date = "2023-12-31"
 ohlcv_data = stock_load_process(ticker, start_date, end_date).collect()
 print(ohlcv_data.head())
 
 func = get_indicator("bbiboll")
 indicators = func(ohlcv_data)
-
-with pl.Config(tbl_rows=50, tbl_cols=50):
-    print(indicators.filter(pl.col("dev_pct") == 1))
 
 visualizer.plot_candlestick_with_signals(
     ohlcv_data,

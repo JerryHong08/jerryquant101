@@ -74,8 +74,8 @@ class PerformanceAnalyzer:
         trade_stats = self._calculate_trade_stats(trades)
 
         returns = portfolio_daily["portfolio_return"].drop_nulls()
-        irx_aligned = None
-        risk_metrics = self._calculate_risk_metrics(returns, irx_aligned)
+
+        risk_metrics = self._calculate_risk_metrics(returns)
 
         # trade fees culculate (assume 0.7% per trade)
         total_fees = len(trades) * end_value * 0.007
@@ -204,9 +204,7 @@ class PerformanceAnalyzer:
             "Expectancy": expectancy,
         }
 
-    def _calculate_risk_metrics(
-        self, returns: pl.Series, irx_daily_rate: Optional[pl.DataFrame] = None
-    ) -> Dict[str, float]:
+    def _calculate_risk_metrics(self, returns: pl.Series) -> Dict[str, float]:
         """计算风险指标"""
         if returns.is_empty():
             return {
@@ -218,23 +216,10 @@ class PerformanceAnalyzer:
 
         returns_array = returns.to_numpy()
 
-        if irx_daily_rate is not None:
-            print("Calculating risk metrics with IRX data...")
-            irx_daily_array = irx_daily_rate.to_numpy()
-            # Ensure both arrays have the same length by taking the minimum
-            min_length = min(len(returns_array), len(irx_daily_array))
-
-            returns_array = returns_array[:min_length]
-            irx_daily_array = irx_daily_array[:min_length]
-            execess_return = returns_array - irx_daily_array
-        else:
-            print("Not found IRX data")
-            execess_return = returns_array
-
-        annual_vol = np.std(execess_return) * np.sqrt(252)
+        annual_vol = np.std(returns_array) * np.sqrt(252)
 
         # Sharpe比率
-        sharpe_ratio = execess_return.mean() * 252 / annual_vol if annual_vol > 0 else 0
+        sharpe_ratio = returns_array.mean() * 252 / annual_vol if annual_vol > 0 else 0
 
         annual_return = np.mean(returns_array) * 252
         # Sortino比率 (下行波动率)

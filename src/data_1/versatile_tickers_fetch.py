@@ -20,7 +20,7 @@ class VersatileFetcher:
     def fetch_spx_aggs(self):
         ticker = "I:SPX"
         start_ = "2015-01-01"
-        end_ = "2025-09-05"
+        end_ = "2025-10-05"
         timespan = "day"
         aggs = []
         for a in self.client.list_aggs(
@@ -41,7 +41,7 @@ class VersatileFetcher:
             compression="zstd",
             compression_level=3,
         )
-        print(aggs.describe())
+        print(aggs.tail())
 
 
 Downloader = VersatileFetcher()

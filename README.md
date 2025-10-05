@@ -11,14 +11,18 @@
 
 ## Roadmap
 
-* [ ] live trade monitor
+* features to be add:
+* [ ] live trade monitor need to add more features such as live compare chart, basic fundamental metrics like floatshares
 * [ ] universal indicator plot
-* [ ] Polars ETL + numba backtest engine(long-term)
-* [ ] Stock dividends process
-* [ ] More universal indicator calculator
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
 * [ ] Polish **X news search function**.
 * [ ] Add **trade volume filter** or other ticker filter conditions.
+* [ ] Polars ETL + numba backtest engine(long-term)
+
+* bugs to be fixed:
+* [ ] backtest open positions need to be fixed.
+* [ ] Stock dividends
+* [ ] low_volume_tickers.csv, see more detail below in the changelog.
 
 ---
 
@@ -159,7 +163,7 @@ This directory includes **configs, loaders, and plotting tools**.
 
 2025-09-24
 
-* 🥹 `low_volume_tickers` the specious low volume tickers have too much to examined and each case seems to be different, which would cost too much time for me to do it.
+* 🥹 `low_volume_tickers.csv` the specious low volume tickers have too much to examined and each case seems to be different, which would cost too much time for me to do it.
 And the most important part about low_volume_tickers is that it can show the correctness of your data load process. As you can find some notes in the [`src/data_1/data_discrepancy_fixed/low_volume_tickers_copy.csv`](src/data_1/data_discrepancy_fixed/low_volume_tickers_copy.csv).
 For example, most of the long-term like over years 0 volume is because of relisted on the market or there is a new ticker has the same name, which complicates the situation now for it's hard to distinguish. So, as for now, 2025-09-24, I have decided to leave this tickers(max_duration_days > 50) as skipped tickers. I know it's unwise, but it saves me time for now.
 
@@ -174,5 +178,14 @@ For example, most of the long-term like over years 0 volume is because of relist
 2025-09-30
 
 * ✅ add quantstats
+
+2025-10-02
+
+* ✅ add redis for market mover monitor collector and analyzer.
+
+2025-10-04
+
+* ✅ add market mover replayer.
+* ✅ More universal indicator calculator.
 
 ---

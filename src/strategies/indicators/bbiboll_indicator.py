@@ -30,25 +30,21 @@ def calculate_bbiboll(
             longterm_dev_pct_rank: dev rank over entire history
     """
 
-    close_prices = df.select("close").to_numpy().flatten()
+    close_prices = df.select("close").cast(pl.Float64).to_numpy().flatten()
 
-    # calculate moving averages for bbi
     ma3 = talib.SMA(close_prices, timeperiod=3)
     ma6 = talib.SMA(close_prices, timeperiod=6)
     ma12 = talib.SMA(close_prices, timeperiod=12)
     ma24 = talib.SMA(close_prices, timeperiod=24)
 
-    # BBI = (MA3 + MA6 + MA12 + MA24) / 4
     bbi = (ma3 + ma6 + ma12 + ma24) / 4
 
     # DEV (BBI std * multipler)
     dev = talib.STDDEV(bbi, timeperiod=boll_length) * boll_multiple
 
-    # upr and dwm
     upr = bbi + dev
     dwn = bbi - dev
 
-    # add to dataframe
     result = df.with_columns(
         [
             pl.Series("bbi", bbi),

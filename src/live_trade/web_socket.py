@@ -14,7 +14,7 @@ client = WebSocketClient(
 )
 
 # aggregates (per second)
-client.subscribe("A.TSLA")  # single ticker
+client.subscribe("A.CIGL")  # single ticker
 # client.subscribe("A.*") # all tickers
 # client.subscribe("A.AAPL") # single ticker
 # client.subscribe("A.AAPL", "AM.MSFT") # multiple tickers

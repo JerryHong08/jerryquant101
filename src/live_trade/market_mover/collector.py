@@ -1,0 +1,76 @@
+import json
+import os
+import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import polars as pl
+import redis
+from dotenv import load_dotenv
+from polygon import RESTClient
+from polygon.rest.models import Agg, TickerSnapshot
+
+from core_2.config import cache_dir
+
+load_dotenv()
+r = redis.Redis(host="localhost", port=6379, db=0)
+
+client = RESTClient(os.getenv("POLYGON_API_KEY"))
+
+while True:
+    snapshot = client.get_snapshot_all("stocks", include_otc=False)
+
+    # crunch some numbers
+    data_list = []
+    for item in snapshot:
+        # verify this is an TickerSnapshot
+        if isinstance(item, TickerSnapshot):
+            # verify this is an Agg
+            if isinstance(item.day, Agg):
+                # verify this is a float
+                if (
+                    isinstance(item.day.open, (float, int))
+                    and isinstance(item.day.close, (float, int))
+                    and float(item.prev_day.close) != 0
+                ):
+                    percent_change = (
+                        (float(item.day.close) - float(item.prev_day.close))
+                        / float(item.prev_day.close)
+                        * 100
+                    )
+                    data_list.append(
+                        {
+                            "ticker": item.ticker,
+                            "percent_change": item.todays_change_percent,
+                            "accumulated_volume": float(item.min.accumulated_volume),
+                            "current_price": float(item.min.close),
+                            "prev_close": float(item.prev_day.close),
+                            "timestamp": item.min.timestamp,
+                            "prev_volume": item.prev_day.volume,
+                        }
+                    )
+
+    df = pl.DataFrame(data_list)
+
+    # save into cache
+    updated_time = datetime.now(ZoneInfo("America/New_York")).strftime(
+        "%Y%m%d%H%M%S"
+    )  # 20250930170603
+    year = updated_time[:4]
+    month = updated_time[4:6]
+    date = updated_time[6:8]
+
+    market_mover_dir = os.path.join(cache_dir, "market_mover", year, month, date)
+    os.makedirs(market_mover_dir, exist_ok=True)
+    market_mover_file = os.path.join(
+        market_mover_dir, f"{updated_time}_market_snapshot.csv"
+    )
+
+    df.write_csv(market_mover_file)
+
+    # turn into JSON publish to Redis
+    payload = df.write_json()
+    r.publish("market_snapshot", payload)
+    print(f"Published {len(df)} rows at {datetime.now(ZoneInfo('America/New_York'))}")
+
+    time.sleep(5)

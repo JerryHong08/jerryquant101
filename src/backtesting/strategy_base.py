@@ -16,7 +16,7 @@ strategy_cache_dir = os.path.join(cache_dir, "strategies")
 
 class StrategyBase(ABC):
     """
-    策略基类，定义策略接口
+    StrategyBase
     """
 
     def __init__(self, name: str, config: Dict[str, Any] = None):
@@ -24,15 +24,15 @@ class StrategyBase(ABC):
         self.config = config or {}
         self.ohlcv_data = None
         self.tickers = None
-        # 初始化缓存文件路径
+
         self.cache_file = os.path.join(strategy_cache_dir, f"{self.name}.csv")
-        # 确保缓存目录存在
+
         os.makedirs(strategy_cache_dir, exist_ok=True)
 
     def load_cached_indicators(self) -> Optional[pl.DataFrame]:
-        """加载缓存的指标数据"""
+        """load cached indicators"""
         if os.path.exists(self.cache_file):
-            print(f"从缓存加载{self.name}指标: {self.cache_file}")
+            print(f"loading {self.name} cached indicators: {self.cache_file}")
             df = pl.read_csv(self.cache_file, try_parse_dates=True)
             # Convert datetime columns to datetime[ns, America/New_York] format
             for col in df.columns:
@@ -46,25 +46,25 @@ class StrategyBase(ABC):
         return None
 
     def save_indicators_cache(self, indicators: pl.DataFrame) -> None:
-        """保存指标数据到缓存"""
+        """save indicators to cache"""
         indicators.write_csv(self.cache_file)
-        print(f"{self.name}指标已缓存到: {self.cache_file}")
+        print(f"{self.name} cache saved into: {self.cache_file}")
 
     def set_data(self, ohlcv_data: pl.DataFrame, tickers: list = None):
-        """设置数据"""
+        """set ohlcv data for backtest"""
         self.ohlcv_data = ohlcv_data
         self.tickers = tickers
 
     @abstractmethod
     def calculate_indicators(self, cached: bool = False) -> pl.DataFrame:
         """
-        计算策略所需的技术指标
+        calculate technical indicators
 
         Args:
-            cached: 是否使用缓存的指标数据
+            cached: if use cached indicators
 
         Returns:
-            包含技术指标的DataFrame
+            return ohlcv with indicators DataFrame
         """
         pass
 
@@ -74,10 +74,10 @@ class StrategyBase(ABC):
         根据指标生成交易信号
 
         Args:
-            indicators: 技术指标DataFrame
+            indicators: ohlcv with indicators DataFrame
 
         Returns:
-            交易信号DataFrame，包含columns: [ticker, timestamps, signal]
+            signal DataFrame with columns: [ticker, timestamps, signal]
         """
         pass
 
@@ -96,30 +96,133 @@ class StrategyBase(ABC):
         """
         pass
 
-    def run_backtest(self, use_cached_indicators: bool = False) -> Dict[str, Any]:
+    def vectorbt_trade(self, signals: pl.DataFrame) -> None:
         """
-        运行完整的回测流程
+        use vectorbt backtest
 
         Args:
-            use_cached_indicators: 是否使用缓存的指标
+            signals: pl.DataFrame
+        """
+        import numpy as np
+        import pandas as pd
+        import vectorbt as vbt
+
+        self.ohlcv_data = self.ohlcv_data.filter(
+            pl.col("ticker").is_in(signals["ticker"].unique())
+        )
+
+        price = (
+            self.ohlcv_data.sort(["ticker", "timestamps"])
+            .pivot(
+                index="timestamps",
+                columns="ticker",
+                values="close",
+                aggregate_function="first",
+            )
+            .to_pandas()
+        )
+
+        # Reset index to make timestamps a regular column, then set it back as index
+        # This ensures proper column structure
+        price = price.reset_index().set_index("timestamps")
+
+        # 创建买卖信号的 DataFrame
+        buy_signals = (
+            signals.filter(pl.col("signal") == 1)
+            .select(["ticker", "signal_date"])
+            .to_pandas()
+        )
+        sell_signals = (
+            signals.filter(pl.col("signal") == -1)
+            .select(["ticker", "signal_date"])
+            .to_pandas()
+        )
+
+        # 创建布尔型信号矩阵 - 确保只包含股票列
+        stock_columns = price.columns.tolist()  # 获取股票列名
+
+        entries = pd.DataFrame(
+            data=np.full((len(price.index), len(stock_columns)), False),
+            index=price.index,
+            columns=stock_columns,
+            dtype=bool,
+        )
+
+        exits = pd.DataFrame(
+            data=np.full((len(price.index), len(stock_columns)), False),
+            index=price.index,
+            columns=stock_columns,
+            dtype=bool,
+        )
+
+        for _, row in buy_signals.iterrows():
+            ticker = row["ticker"]
+            signal_date = row["signal_date"]
+            if ticker in entries.columns and signal_date in entries.index:
+                entries.loc[signal_date, ticker] = True
+
+        for _, row in sell_signals.iterrows():
+            ticker = row["ticker"]
+            signal_date = row["signal_date"]
+            if ticker in exits.columns and signal_date in exits.index:
+                exits.loc[signal_date, ticker] = True
+
+        # Verify data types are correct
+        assert (
+            entries.dtypes.nunique() == 1 and entries.dtypes.iloc[0] == bool
+        ), "Entries must be all boolean"
+        assert (
+            exits.dtypes.nunique() == 1 and exits.dtypes.iloc[0] == bool
+        ), "Exits must be all boolean"
+
+        portfolio = vbt.Portfolio.from_signals(
+            close=price,
+            entries=entries,
+            exits=exits,
+            init_cash=self.config.get("initial_capital", 100000),
+            fees=self.config.get("fees", 0.001),
+            slippage=self.config.get("slippage", 0.001),
+            freq=self.config.get("timeframe", "1d"),
+            call_seq="auto",
+        )
+
+        last_row = portfolio.value().iloc[-1]
+        top_5_columns = last_row.nlargest(5)
+        print("last rows max 5 columns:")
+        print(top_5_columns)
+
+        self.trades_vbt = portfolio.trades.records_readable
+        self.portfolio_daily_vbt = (
+            portfolio.total_return().to_frame(name="total_return").reset_index()
+        )
+        print(self.portfolio_daily_vbt.tail())
+        print(f"vectorbt backtest done, total {len(self.trades_vbt)} trades.")
+
+    def run_backtest(self, use_cached_indicators: bool = False) -> Dict[str, Any]:
+        """
+        run backtest
+
+        Args:
+            use_cached_indicators: bool
 
         Returns:
-            回测结果字典
+            backtest results dict
         """
         if self.ohlcv_data is None:
-            raise ValueError("必须先设置数据，请调用 set_data() 方法")
+            raise ValueError("no ohlcv data, please set_data() first.")
 
-        # 1. 计算指标
-        print(f"计算 {self.name} 策略指标...")
+        # 1. calculate indicators
+        print(f"calculating {self.name} indicators...")
         indicators = self.calculate_indicators(cached=use_cached_indicators)
 
-        # 2. 生成信号
-        print(f"生成 {self.name} 策略信号...")
+        # 2. generate signals
+        print(f"generate {self.name} signals...")
         signals = self.generate_signals(indicators)
 
-        # 3. 执行交易
-        print(f"执行 {self.name} 策略交易...")
-        trades, portfolio_daily = self.trade_rules(signals)
+        # 3. simulate trades
+        print(f"simulating {self.name} trades...")
+        trades, portfolio_daily, open_positions = self.trade_rules(signals)
+        # self.vectorbt_trade(signals)
 
         start_date = portfolio_daily["date"].min()
         end_date = portfolio_daily["date"].max()
@@ -142,8 +245,9 @@ class StrategyBase(ABC):
                         "portfolio_return"
                     )
                 )
-
-            print(portfolio_daily["portfolio_return"].head())
+                print("Portfolio returns adjusted with risk-free rate (IRX).")
+            else:
+                print("No IRX data available for the given date range.")
 
         return {
             "strategy_name": self.name,
@@ -152,6 +256,7 @@ class StrategyBase(ABC):
             "signals": signals,
             "trades": trades,
             "portfolio_daily": portfolio_daily,
+            "open_positions": open_positions,
         }
 
     def get_strategy_info(self) -> Dict[str, Any]:

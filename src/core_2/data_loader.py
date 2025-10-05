@@ -854,32 +854,34 @@ def ohlcv_figi_alignment(lf):
 
 def stock_load_process(
     tickers: str = None,
+    start_date: str = "",
+    end_date: str = "",
     timeframe: str = "1d",
     asset: str = "us_stocks_sip",
     data_type: str = "day_aggs_v1",
-    start_date: str = "",
-    end_date: str = "",
     full_hour: bool = False,
     use_s3: bool = False,
     use_cache: bool = True,
     duck_db: bool = False,
+    skip_low_volume: bool = True,
 ):
     aligned_tickers = tickers_alignment(pl.DataFrame({"ticker": tickers}).lazy())
 
-    skipped = (
-        pl.read_csv("low_volume_tickers.csv", truncate_ragged_lines=True)
-        .filter(
-            (pl.col("max_duration_days") > 50) | (pl.col("avg_turnover") < 60000),
+    if skip_low_volume:
+        skipped = (
+            pl.read_csv("low_volume_tickers.csv", truncate_ragged_lines=True)
+            .filter(
+                (pl.col("max_duration_days") > 50) | (pl.col("avg_turnover") < 60000),
+            )
+            .select(pl.col("ticker").unique())
         )
-        .select(pl.col("ticker").unique())
-    )
 
-    skipped = tickers_alignment(skipped.lazy())
+        skipped = tickers_alignment(skipped.lazy())
 
-    print(
-        f"there are {len(skipped.collect())} tickers to skip due to specious low volume."
-    )
-    aligned_tickers = aligned_tickers.join(skipped, on="ticker", how="anti")
+        print(
+            f"there are {len(skipped.collect())} tickers to skip due to specious low volume."
+        )
+        aligned_tickers = aligned_tickers.join(skipped, on="ticker", how="anti")
 
     tickers = (
         aligned_tickers.select("tickers")
@@ -1072,7 +1074,10 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    tickers = ["VIA"]
+    from backtesting.backtest_pre_data import only_common_stocks
+
+    # tickers = only_common_stocks(filter_date='2024-10-01').to_series().to_list()
+    tickers = ["BULL"]
     # tickers = ['LCID','TNFA', 'MYMD', 'NVDA', 'FFIE', 'FFAI']
     # tickers = None
     with pl.Config(tbl_cols=50, tbl_width_chars=1000):
@@ -1081,8 +1086,8 @@ if __name__ == "__main__":
     timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
     asset = "us_stocks_sip"
     data_type = "day_aggs_v1" if timeframe == "1d" else "minute_aggs_v1"
-    start_date = "2015-01-01"
-    end_date = "2025-09-19"
+    start_date = "2024-10-01"
+    end_date = "2025-10-03"
     full_hour = False
     plot = True
     # plot = False
@@ -1109,6 +1114,18 @@ if __name__ == "__main__":
             )
         )
         # print(lf_result.filter(pl.col("ticker") == ticker_plot).tail())
+        from strategies.indicators.registry import get_indicator
+
+        func = get_indicator("bbiboll")
+        indicators = func(lf_result)
+
+        print(
+            indicators.filter(
+                pl.col("timestamps")
+                .dt.date()
+                .is_between(pl.date(2025, 4, 6), pl.date(2025, 4, 11))
+            )
+        )
 
     if plot:
         plot_candlestick(
@@ -1116,6 +1133,3 @@ if __name__ == "__main__":
             ticker_plot,
             timeframe,
         )
-
-    # from strategies.indicators.obv_indicator import calculate_obv
-    # print(calculate_obv(lf_result).sort('timestamps').tail())

@@ -276,10 +276,23 @@ class BacktestEngine:
                 portfolio_daily["portfolio_return"], index=portfolio_daily["date"]
             )
             html_path = f"{output_dir}/{strategy_name}_report.html"
-            qs.reports.html(qs_returns, benchmark=benchmark, output=html_path)
+            qs.reports.html(
+                qs_returns, benchmark=benchmark, output=html_path, benchmark_title="SPY"
+            )
 
-        # 导出交易记录
+        # export trades and open positions
         trades_path = f"{output_dir}/{strategy_name}_trades.csv"
+        open_positions_path = f"{output_dir}/{strategy_name}_open_positions.csv"
+
+        open_positions = (
+            pl.DataFrame(results.get("open_positions", []))
+            .with_columns(
+                pl.col("buy_date").dt.date().alias("buy_date"),
+            )
+            .sort("buy_date")
+        )
+        open_positions.write_csv(open_positions_path)
+        print(f"open positions exported: {open_positions_path}")
 
         trades = (
             pl.DataFrame(results["trades"])
@@ -291,23 +304,23 @@ class BacktestEngine:
             pl.col("sell_date").dt.date().alias("sell_date"),
         )
         trades.write_csv(trades_path)
-        print(f"交易记录已导出到: {trades_path}")
+        print(f"trades exported: {trades_path}")
 
         # 导出每日组合表现
         portfolio_path = f"{output_dir}/{strategy_name}_portfolio_daily.csv"
         results["portfolio_daily"].with_columns(
             pl.col("date").dt.date().alias("date"),
         ).write_csv(portfolio_path)
-        print(f"每日组合表现已导出到: {portfolio_path}")
+        print(f"daily portfolio performance exported: {portfolio_path}")
 
         # 导出性能指标
         metrics_path = f"{output_dir}/{strategy_name}_metrics.txt"
         with open(metrics_path, "w", encoding="utf-8") as f:
-            f.write(f"{strategy_name} 回测性能指标\n")
+            f.write(f"{strategy_name} backtest performance metrics\n")
             f.write("=" * 50 + "\n\n")
             for key, value in results["performance_metrics"].items():
                 f.write(f"{key}: {value}\n")
-        print(f"性能指标已导出到: {metrics_path}")
+        print(f"backtest performance metrics exported: {metrics_path}")
 
         # export strategy_config
         strategy_config_path = f"{output_dir}/{strategy_name}_config.txt"

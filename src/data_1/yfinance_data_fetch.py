@@ -3,9 +3,9 @@ import yfinance as yf
 
 # ^IRX
 # ^SPX
-ticker = ["^SPX"]
+ticker = ["^IRX"]
 start = "2015-01-01"
-end = "2025-09-28"
+end = "2025-10-05"
 data = yf.download(ticker, start=start, end=end, interval="1d")
 data = data.reset_index()
 print(data.tail())

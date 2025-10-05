@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -7,12 +9,14 @@ from backtesting.backtest_pre_data import only_common_stocks
 from core_2.data_loader import stock_load_process
 from utils.longbridge_utils import update_watchlist
 
+updated_time = datetime.now().strftime("%Y-%m-%d")
 config = {
     "timeframe": "1d",
     "start_date": "2015-01-01",
-    "end_date": "2025-09-26",
+    "end_date": updated_time,
 }
 
+print(config)
 tickers = only_common_stocks(filter_date=config["start_date"])
 
 ohlcv_data = (
@@ -22,6 +26,7 @@ ohlcv_data = (
         start_date=config["start_date"],
         end_date=config["end_date"],
         # use_cache=False,
+        skip_low_volume=False,
     )
     # .collect()
 )
@@ -79,8 +84,8 @@ duration = (
     )
 )
 
-with pl.Config(tbl_rows=20, tbl_cols=50):
-    print(duration.filter(pl.col("ticker") == "BURU").collect())
+# with pl.Config(tbl_rows=20, tbl_cols=50):
+#     print(duration.filter(pl.col("ticker") == "BURU").collect())
 
 duration = (
     duration.group_by("ticker")

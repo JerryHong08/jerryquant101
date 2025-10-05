@@ -233,8 +233,9 @@ class BacktestVisualizer:
     def plot_candlestick_with_signals(
         self,
         ohlcv_data: pl.DataFrame,
-        trades: pl.DataFrame,
         ticker: str,
+        trades: pl.DataFrame,
+        open_positions: Optional[pl.DataFrame] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         indicators: Optional[pl.DataFrame] = None,
@@ -245,13 +246,13 @@ class BacktestVisualizer:
         plot k line, trade signals and indicators
 
         Args:
-            ohlcv_data: OHLCV数据
-            trades: 交易记录
-            ticker: 股票代码
-            start_date: 开始日期
-            end_date: 结束日期
-            indicators: 技术指标数据
-            save_path: 保存路径
+            ohlcv_data:
+            trades: Optional
+            ticker:
+            start_date:
+            end_date:
+            indicators:
+            save_path:
         """
         # 过滤数据
         ticker_data = ohlcv_data.filter(pl.col("ticker") == ticker)
@@ -279,23 +280,34 @@ class BacktestVisualizer:
             d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d) for d in dates
         ]
 
-        # 创建子图
+        # ------------------------------------------------------
+        # create subplots
         fig, (ax1, ax2) = plt.subplots(
             2, 1, figsize=(15, 10), height_ratios=[3, 1], sharex=True
         )
 
-        # 绘制K线图 (使用数值索引)
+        # plot k-line
         if line:
             self._plot_candlesticks_line(ax1, df)
         else:
             self._plot_candlesticks(ax1, df)
 
-        # 绘制交易信号
-        ticker_trades = trades.filter(pl.col("ticker") == ticker)
-        if not ticker_trades.is_empty():
-            self._plot_trade_signals(ax1, ticker_trades, df)
+        # plot trade signals
+        if trades is not None and not trades.is_empty():
+            ticker_trades = trades.filter(pl.col("ticker") == ticker)
+            if not ticker_trades.is_empty():
+                self._plot_trade_signals(ax1, ticker_trades, df)
+        else:
+            ticker_trades = pl.DataFrame()
 
-        # 绘制技术指标
+        if open_positions is not None and not open_positions.is_empty():
+            ticker_positions = open_positions.filter(pl.col("ticker") == ticker)
+            if not ticker_positions.is_empty():
+                self._plot_trade_signals(ax1, ticker_positions, df, open_position=True)
+        else:
+            ticker_positions = pl.DataFrame()
+
+        # plot indicators
         if indicators is not None:
             ticker_indicators = indicators.filter(pl.col("ticker") == ticker)
             if not ticker_indicators.is_empty():
@@ -324,8 +336,19 @@ class BacktestVisualizer:
         ax1.legend()
         ax1.grid(True, alpha=0.3)
 
+        print(f"open_positions: {open_positions}")
+        print(f"ticker_trades: {ticker_trades}")
+
+        missing_cols = [
+            col for col in ticker_trades.columns if col not in open_positions.columns
+        ]
+        open_positions_aligned = open_positions.with_columns(
+            [pl.lit(None).alias(col) for col in missing_cols]
+        ).select(ticker_trades.columns)
+
+        tick_all_trades = pl.concat([ticker_trades, open_positions_aligned])
         # mouse hover interaction
-        self._add_interactive_features(fig, ax1, ax2, df, ticker_trades)
+        self._add_interactive_features(fig, ax1, ax2, df, tick_all_trades)
 
         plt.tight_layout()
 
@@ -333,7 +356,8 @@ class BacktestVisualizer:
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
             print(f"K线图已保存到: {save_path}")
 
-        self._setup_window()
+            self._setup_window()
+
         plt.show()
 
     def _plot_candlesticks_line(self, ax, df):
@@ -361,7 +385,9 @@ class BacktestVisualizer:
             bottom = min(row["close"], row["open"])
             ax.bar(i, height, bottom=bottom, color=color, alpha=0.8, width=0.8)
 
-    def _plot_trade_signals(self, ax, trades: pl.DataFrame, df):
+    def _plot_trade_signals(
+        self, ax, trades: pl.DataFrame, df, open_position: bool = False
+    ):
         """plot trade signal"""
         trades_pd = trades.to_pandas()
 
@@ -379,7 +405,7 @@ class BacktestVisualizer:
                             ax.scatter(
                                 index,
                                 trade["buy_price"],
-                                color="blue",
+                                color="blue" if not open_position else "purple",
                                 marker="^",
                                 s=100,
                                 label="Buy" if not buy_signals_plotted else "",
@@ -411,7 +437,10 @@ class BacktestVisualizer:
     def _add_interactive_features(self, fig, ax1, ax2, df, trades):
         """添加交互功能：鼠标悬停显示OHLCV和交易信息"""
         # 创建交易信息映射
+        print(trades)
         trades_pd = trades.to_pandas() if not trades.is_empty() else pd.DataFrame()
+        print(trades_pd)
+
         trade_info_map = {}
 
         if not trades_pd.empty:
@@ -498,10 +527,11 @@ class BacktestVisualizer:
             indicators_pd = indicators.to_pandas()
 
             # 创建标准化的日期映射
-            df_dates = [
-                self._normalize_date_string(df.iloc[i]["timestamps"])
-                for i in range(len(df))
-            ]
+            # df_dates = [
+            #     self._normalize_date_string(df.iloc[i]["timestamps"])
+            #     for i in range(len(df))
+            # ]
+            df_dates = [df.iloc[i]["timestamps"] for i in range(len(df))]
 
             # 为指标数据创建索引映射
             valid_indices = []
@@ -510,7 +540,8 @@ class BacktestVisualizer:
             valid_dwn = []
 
             for _, row in indicators_pd.iterrows():
-                indicator_date = self._normalize_date_string(row["timestamps"])
+                # indicator_date = self._normalize_date_string(row["timestamps"])
+                indicator_date = row["timestamps"]
                 if indicator_date and indicator_date in df_dates:
                     index = df_dates.index(indicator_date)
                     valid_indices.append(index)
