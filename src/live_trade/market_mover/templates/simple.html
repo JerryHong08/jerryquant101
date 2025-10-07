@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Mover - Simple Test</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .chart-container { width: 100%; height: 600px; margin: 20px 0; }
+        .info-panel { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Market Mover - Time Chart Test</h1>
+    
+    <div id="status" class="status disconnected">Connecting...</div>
+    
+    <div class="info-panel">
+        <h3>Data Status:</h3>
+        <div id="data-status">Waiting for data...</div>
+    </div>
+    
+    <div class="chart-container">
+        <canvas id="main-chart"></canvas>
+    </div>
+
+    <script>
+        const socket = io();
+        const statusDiv = document.getElementById('status');
+        const dataStatusDiv = document.getElementById('data-status');
+        
+        let chart = null;
+        
+        // Initialize chart with time axis
+        const ctx = document.getElementById('main-chart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Market Movers - Real-time'
+                    },
+                    legend: {
+                        display: true,
+                        position: 'right',
+                        labels: {
+                            boxWidth: 12,
+                            font: {
+                                size: 10
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'minute',
+                            displayFormats: {
+                                minute: 'HH:mm'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Time (EST)'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Percent Change (%)'
+                        }
+                    }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                }
+            }
+        });
+        
+        socket.on('connect', () => {
+            statusDiv.textContent = 'Connected to server';
+            statusDiv.className = 'status connected';
+            console.log('Connected to server');
+        });
+        
+        socket.on('disconnect', () => {
+            statusDiv.textContent = 'Disconnected from server';
+            statusDiv.className = 'status disconnected';
+            console.log('Disconnected from server');
+        });
+        
+        socket.on('chart_update', (data) => {
+            console.log('Received data:', data);
+            
+            if (!data.datasets || data.datasets.length === 0) {
+                dataStatusDiv.textContent = 'No datasets received';
+                return;
+            }
+            
+            // Show first and last timestamps for debugging
+            let timeInfo = '';
+            if (data.datasets && data.datasets.length > 0) {
+                const firstDataset = data.datasets[0];
+                if (firstDataset.data && firstDataset.data.length > 0) {
+                    const firstTime = new Date(firstDataset.data[0].x).toLocaleString();
+                    const lastTime = new Date(firstDataset.data[firstDataset.data.length - 1].x).toLocaleString();
+                    timeInfo = `<br><strong>Time Range:</strong> ${firstTime} to ${lastTime}`;
+                }
+            }
+            
+            dataStatusDiv.innerHTML = `
+                <strong>Datasets:</strong> ${data.datasets.length}<br>
+                <strong>Timestamps:</strong> ${data.timestamps ? data.timestamps.length : 0}<br>
+                <strong>Highlights:</strong> ${data.highlights ? data.highlights.length : 0}${timeInfo}
+            `;
+            
+            // Take top 10 stocks only for clarity
+            const topDatasets = data.datasets
+                .filter(d => d.data && d.data.length > 0)
+                .sort((a, b) => a.rank - b.rank)
+                .slice(0, 10)
+                .map(dataset => {
+                    // Ensure data points have proper time format
+                    const processedData = dataset.data.map(point => {
+                        if (point && point.x && point.y !== null) {
+                            return {
+                                x: new Date(point.x),
+                                y: parseFloat(point.y)
+                            };
+                        }
+                        return null;
+                    }).filter(point => point !== null);
+                    
+                    return {
+                        label: `${dataset.label} (#${dataset.rank})`,
+                        data: processedData,
+                        borderColor: dataset.borderColor || `hsl(${dataset.rank * 25}, 70%, 50%)`,
+                        backgroundColor: dataset.backgroundColor || `hsla(${dataset.rank * 25}, 70%, 50%, 0.1)`,
+                        borderWidth: dataset.highlight ? 3 : 1,
+                        pointRadius: 2,
+                        tension: 0.1,
+                        fill: false
+                    };
+                });
+            
+            console.log('Processing', topDatasets.length, 'datasets');
+            console.log('Sample data points:', topDatasets[0]?.data.slice(0, 3));
+            
+            chart.data.datasets = topDatasets;
+            chart.update('none');
+        });
+        
+        socket.on('error', (data) => {
+            console.error('Server error:', data);
+            dataStatusDiv.textContent = 'Error: ' + data.message;
+        });
+    </script>
+</body>
+</html>

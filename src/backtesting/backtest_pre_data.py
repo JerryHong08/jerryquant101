@@ -92,7 +92,7 @@ def only_common_stocks(filter_date: str = "2015-01-01"):
         )
     ).select(pl.col(["ticker", "active", "composite_figi"]))
 
-    print(f"Using {all_tickers_file}, total {len(tickers)} active tickers")
+    # print(f"Using {all_tickers_file}, total {len(tickers)} active tickers")
 
     return tickers
 

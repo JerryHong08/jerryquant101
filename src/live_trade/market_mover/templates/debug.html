@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Mover Debug - Simple Test</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Market Mover Debug</h1>
+    
+    <div id="status">Connecting...</div>
+    
+    <div id="data-info" style="margin: 20px 0; padding: 10px; background: #f0f0f0;">
+        <h3>Data Info:</h3>
+        <div id="datasets-count">Datasets: 0</div>
+        <div id="timestamps-count">Timestamps: 0</div>
+        <div id="highlights-count">Highlights: 0</div>
+    </div>
+    
+    <canvas id="debug-chart" width="800" height="400"></canvas>
+    
+    <div id="raw-data" style="margin-top: 20px; padding: 10px; background: #f9f9f9; max-height: 300px; overflow-y: auto;">
+        <h3>Raw Data:</h3>
+        <pre id="raw-data-content">No data received yet...</pre>
+    </div>
+
+    <script>
+        const socket = io();
+        const statusDiv = document.getElementById('status');
+        const datasetsCount = document.getElementById('datasets-count');
+        const timestampsCount = document.getElementById('timestamps-count');
+        const highlightsCount = document.getElementById('highlights-count');
+        const rawDataContent = document.getElementById('raw-data-content');
+        
+        let chart = null;
+        
+        // Initialize simple chart
+        const ctx = document.getElementById('debug-chart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Debug Chart - Market Movers'
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: 'Data Point Index'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Percent Change (%)'
+                        }
+                    }
+                }
+            }
+        });
+        
+        socket.on('connect', () => {
+            statusDiv.textContent = 'Connected';
+            statusDiv.style.color = 'green';
+            console.log('Connected to server');
+        });
+        
+        socket.on('disconnect', () => {
+            statusDiv.textContent = 'Disconnected';
+            statusDiv.style.color = 'red';
+            console.log('Disconnected from server');
+        });
+        
+        socket.on('chart_update', (data) => {
+            console.log('Received chart update:', data);
+            
+            // Update info
+            const datasetsLength = data.datasets ? data.datasets.length : 0;
+            const timestampsLength = data.timestamps ? data.timestamps.length : 0;
+            const highlightsLength = data.highlights ? data.highlights.length : 0;
+            
+            datasetsCount.textContent = `Datasets: ${datasetsLength}`;
+            timestampsCount.textContent = `Timestamps: ${timestampsLength}`;
+            highlightsCount.textContent = `Highlights: ${highlightsLength}`;
+            
+            // Show raw data (first 1000 chars)
+            const rawDataStr = JSON.stringify(data, null, 2);
+            rawDataContent.textContent = rawDataStr.substring(0, 1000) + (rawDataStr.length > 1000 ? '...' : '');
+            
+            // Update chart with simple data
+            if (data.datasets && data.datasets.length > 0) {
+                const chartDatasets = data.datasets.slice(0, 5).map((dataset, index) => {
+                    // Convert data to simple x,y points
+                    const simpleData = dataset.data.map((point, idx) => ({
+                        x: idx,
+                        y: point ? point.y : 0
+                    }));
+                    
+                    return {
+                        label: dataset.label,
+                        data: simpleData,
+                        borderColor: `hsl(${index * 72}, 70%, 50%)`,
+                        backgroundColor: `hsla(${index * 72}, 70%, 50%, 0.1)`,
+                        borderWidth: 2,
+                        pointRadius: 3
+                    };
+                });
+                
+                chart.data.datasets = chartDatasets;
+                chart.update('none');
+                
+                console.log('Chart updated with', chartDatasets.length, 'datasets');
+            } else {
+                console.log('No datasets to display');
+            }
+        });
+        
+        socket.on('error', (data) => {
+            console.error('Server error:', data);
+            statusDiv.textContent = 'Error: ' + data.message;
+            statusDiv.style.color = 'red';
+        });
+    </script>
+</body>
+</html>

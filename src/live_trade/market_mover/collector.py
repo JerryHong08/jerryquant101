@@ -23,11 +23,8 @@ while True:
     # crunch some numbers
     data_list = []
     for item in snapshot:
-        # verify this is an TickerSnapshot
         if isinstance(item, TickerSnapshot):
-            # verify this is an Agg
             if isinstance(item.day, Agg):
-                # verify this is a float
                 if (
                     isinstance(item.day.open, (float, int))
                     and isinstance(item.day.close, (float, int))
@@ -45,12 +42,14 @@ while True:
                             "accumulated_volume": float(item.min.accumulated_volume),
                             "current_price": float(item.min.close),
                             "prev_close": float(item.prev_day.close),
-                            "timestamp": item.min.timestamp,
+                            # "timestamp": item.min.timestamp,
+                            "timestamp": item.updated,
                             "prev_volume": item.prev_day.volume,
                         }
                     )
 
     df = pl.DataFrame(data_list)
+    df = df.with_columns((pl.col("timestamp") // 1_000_000).alias("timestamp"))
 
     # save into cache
     updated_time = datetime.now(ZoneInfo("America/New_York")).strftime(

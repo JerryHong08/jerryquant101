@@ -84,6 +84,19 @@ def read_market_snapshot_with_timing(
 
         try:
             df = pl.read_csv(file)
+
+            # Update timestamp to match the file's historical time
+            file_timestamp_ms = int(
+                file_timestamp.timestamp() * 1000
+            )  # Convert to milliseconds
+
+            # Remove existing timestamp column if it exists to avoid conflicts
+            if "timestamp" in df.columns:
+                df = df.drop("timestamp")
+
+            # Add new timestamp column as numeric milliseconds
+            df = df.with_columns(pl.lit(file_timestamp_ms).alias("timestamp"))
+
             payload = df.write_json()
             r.publish("market_snapshot", payload)
 
