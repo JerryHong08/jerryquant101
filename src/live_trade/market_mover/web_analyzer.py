@@ -130,6 +130,24 @@ class WebAnalyzer:
             except Exception as e:
                 emit("error", {"message": str(e)})
 
+        @self.socketio.on("toggle_stock_highlight")
+        def handle_toggle_highlight(data):
+            """Handle request to toggle stock highlight status"""
+            ticker = data.get("ticker")
+            highlight = data.get("highlight", False)
+
+            if ticker:
+                # Update the highlight status in data manager
+                success = self.data_manager.toggle_stock_highlight(ticker, highlight)
+                if success:
+                    # Broadcast updated chart data to all clients
+                    chart_data = self.data_manager.get_chart_data()
+                    self.socketio.emit("chart_update", chart_data)
+                else:
+                    emit(
+                        "error", {"message": f"Failed to update highlight for {ticker}"}
+                    )
+
     def _redis_listener(self):
         """Redis message listener running in separate thread"""
         print("Starting Redis listener...")

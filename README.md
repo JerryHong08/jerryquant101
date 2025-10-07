@@ -12,7 +12,6 @@
 ## Roadmap
 
 * features to be add:
-* [ ] live trade monitor need to add more features such as live compare chart, basic fundamental metrics like floatshares
 * [ ] universal indicator plot
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
 * [ ] Polish **X news search function**.
@@ -20,6 +19,7 @@
 * [ ] Polars ETL + numba backtest engine(long-term)
 
 * bugs to be fixed:
+* [ ] market live monitor web version front end polish & stock info needed
 * [ ] backtest open positions need to be fixed.
 * [ ] Stock dividends
 * [ ] low_volume_tickers.csv, see more detail below in the changelog.
@@ -187,5 +187,9 @@ For example, most of the long-term like over years 0 volume is because of relist
 
 * ✅ add market mover replayer.
 * ✅ More universal indicator calculator.
+
+2025-10-07
+
+* ✅ market live monitor web version
 
 ---

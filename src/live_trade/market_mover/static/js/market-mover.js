@@ -13,6 +13,9 @@ class MarketMoverApp {
         this.timeRange = 'all';
         this.selectedStock = null;
         
+        // Global time clock - the current time reference for all operations
+        this.currentTime = null;
+        
         this.initializeApp();
     }
     
@@ -198,19 +201,41 @@ class MarketMoverApp {
         console.log('Timestamps count:', data.timestamps ? data.timestamps.length : 0);
         
         this.chartData = data;
+        
+        // Update global time clock with the latest timestamp from data
+        this.updateGlobalClock(data);
+        
         this.updateChart(data);
         this.updateRankings(data);
         this.updateHighlights(data);
         this.updateLastUpdateTime();
     }
     
-    handleHistoricalDataLoaded(data) {
-        this.showToast('Historical data loaded successfully', 'success');
-        this.handleChartUpdate(data);
+    // Global Time Clock Management
+    updateGlobalClock(data) {
+        let latestTime = null;
+        
+        if (data.datasets && data.datasets.length > 0) {
+            // Find the latest timestamp across all datasets
+            for (const dataset of data.datasets) {
+                if (dataset.data && dataset.data.length > 0) {
+                    const datasetLatestTime = new Date(dataset.data[dataset.data.length - 1].x);
+                    if (!latestTime || datasetLatestTime > latestTime) {
+                        latestTime = datasetLatestTime;
+                    }
+                }
+            }
+        }
+        
+        // Fallback to system time if no data available
+        this.currentTime = latestTime || new Date();
+        
+        console.log('Global clock updated to:', this.currentTime);
     }
     
-    handleStockDetailResponse(data) {
-        this.showStockDetail(data.ticker, data.detail);
+    getCurrentTime() {
+        // Return the current time reference (either from data or system time)
+        return this.currentTime || new Date();
     }
     
     // Chart Updates
@@ -250,26 +275,28 @@ class MarketMoverApp {
             return datasets;
         }
         
-        const now = new Date();
+        // Use global clock instead of system time
+        const referenceTime = this.getCurrentTime();
         let cutoffTime;
         
-        // need to change Date now to latest timestamp in point data
         switch (this.timeRange) {
             case '5m':
-                cutoffTime = new Date(now.getTime() - 5 * 60 * 1000);
+                cutoffTime = new Date(referenceTime.getTime() - 5 * 60 * 1000);
                 break;
             case '15m':
-                cutoffTime = new Date(now.getTime() - 15 * 60 * 1000);
+                cutoffTime = new Date(referenceTime.getTime() - 15 * 60 * 1000);
                 break;
             case '30m':
-                cutoffTime = new Date(now.getTime() - 30 * 60 * 1000);
+                cutoffTime = new Date(referenceTime.getTime() - 30 * 60 * 1000);
                 break;
             case '1h':
-                cutoffTime = new Date(now.getTime() - 60 * 60 * 1000);
+                cutoffTime = new Date(referenceTime.getTime() - 60 * 60 * 1000);
                 break;
             default:
                 return datasets;
         }
+        
+        console.log(`Time range filter: ${this.timeRange}, Reference time: ${referenceTime}, Cutoff: ${cutoffTime}`);
         
         return datasets.map(dataset => ({
             ...dataset,
@@ -324,21 +351,68 @@ class MarketMoverApp {
                 velocityIndicator = ` ↓${Math.abs(stock.velocity)}`;
             }
             
+            // Create checkbox for highlight toggle
+            const checkboxId = `highlight-${stock.label}`;
+            
             item.innerHTML = `
-                <div>
-                    <span class="ranking-ticker">#${stock.rank} ${stock.label}</span>
-                    ${velocityIndicator ? `<small style="color: #ffa500;">${velocityIndicator}</small>` : ''}
-                <span class="ranking-change ${changeClass}">
-                    ${changeSymbol}${numericChange.toFixed(2)}%
-                </span>
-                </span>
+                <div class="ranking-content">
+                    <div class="ranking-left">
+                        <input type="checkbox" id="${checkboxId}" class="highlight-checkbox" 
+                            ${stock.highlight ? 'checked' : ''} 
+                            data-ticker="${stock.label}">
+                        <label for="${checkboxId}" class="checkbox-label">
+                            <span class="ranking-ticker">#${stock.rank} ${stock.label}</span>
+                            ${velocityIndicator ? `<small style="color: #ffa500;">${velocityIndicator}</small>` : ''}
+                        </label>
+                    </div>
+                    <div class="ranking-right">
+                        <span class="ranking-change ${changeClass}">
+                            ${changeSymbol}${numericChange.toFixed(2)}%
+                        </span>
+                    </div>
+                </div>
             `;
             
-            item.addEventListener('click', () => {
+            // Add click handler for stock detail (excluding checkbox area)
+            const rankingContent = item.querySelector('.ranking-right');
+            rankingContent.addEventListener('click', () => {
                 this.requestStockDetail(stock.label);
             });
             
+            // Add change handler for checkbox
+            const checkbox = item.querySelector('.highlight-checkbox');
+            checkbox.addEventListener('change', (e) => {
+                e.stopPropagation(); // Prevent triggering stock detail
+                this.toggleStockHighlight(stock.label, e.target.checked);
+            });
+            
             rankingsList.appendChild(item);
+        });
+    }
+
+    // Add new method to handle highlight toggling
+    toggleStockHighlight(ticker, isHighlighted) {
+        console.log(`Toggling highlight for ${ticker}: ${isHighlighted}`);
+        
+        // Update local chart data immediately for responsive UI
+        if (this.chartData && this.chartData.datasets) {
+            const dataset = this.chartData.datasets.find(d => d.label === ticker);
+            if (dataset) {
+                dataset.highlight = isHighlighted;
+                dataset.borderWidth = isHighlighted ? 3 : 1;
+                
+                // Update chart immediately
+                this.chart.update('none');
+                
+                // Update highlights panel
+                this.updateHighlights(this.chartData);
+            }
+        }
+        
+        // Send update to server
+        this.socket.emit('toggle_stock_highlight', {
+            ticker: ticker,
+            highlight: isHighlighted
         });
     }
     
@@ -506,9 +580,10 @@ class MarketMoverApp {
     }
     
     updateLastUpdateTime() {
-        const now = new Date();
+        // Use global clock for consistent time display
+        const displayTime = this.getCurrentTime();
         document.getElementById('last-update-time').textContent = 
-            now.toLocaleTimeString();
+            displayTime.toLocaleTimeString();
     }
     
     getLatestValue(dataArray) {
@@ -517,10 +592,70 @@ class MarketMoverApp {
     }
     
     isNewEntrant(stock) {
-        // Simple heuristic: if it has very few data points, it's likely new
-        return stock.data && stock.data.length <= 3;
+        // Use global clock for more accurate new entrant detection
+        if (!stock.data || stock.data.length === 0) return false;
+        
+        const referenceTime = this.getCurrentTime();
+        const firstDataTime = new Date(stock.data[0].x);
+        
+        // Consider it new if first data point is within the last 5 minutes
+        const timeDiff = referenceTime.getTime() - firstDataTime.getTime();
+        const isNew = timeDiff <= 5 * 60 * 1000; // 5 minutes
+        
+        // Also check if it has very few data points (original logic)
+        const hasFewPoints = stock.data.length <= 3;
+        
+        return isNew || hasFewPoints;
     }
     
+    // Enhanced method to get time range for display purposes
+    getTimeRangeDisplay() {
+        const referenceTime = this.getCurrentTime();
+        let startTime;
+        
+        switch (this.timeRange) {
+            case '5m':
+                startTime = new Date(referenceTime.getTime() - 5 * 60 * 1000);
+                break;
+            case '15m':
+                startTime = new Date(referenceTime.getTime() - 15 * 60 * 1000);
+                break;
+            case '30m':
+                startTime = new Date(referenceTime.getTime() - 30 * 60 * 1000);
+                break;
+            case '1h':
+                startTime = new Date(referenceTime.getTime() - 60 * 60 * 1000);
+                break;
+            default:
+                return 'All Data';
+        }
+        
+        return `${startTime.toLocaleTimeString()} - ${referenceTime.toLocaleTimeString()}`;
+    }
+    
+    // Method to manually set the global clock (useful for testing or special scenarios)
+    setGlobalClock(time) {
+        this.currentTime = new Date(time);
+        console.log('Global clock manually set to:', this.currentTime);
+        
+        // Re-apply time range filter if needed
+        if (this.chartData && this.timeRange !== 'all') {
+            this.applyTimeRangeFilter();
+        }
+    }
+    
+    // Method to reset global clock to system time
+    resetGlobalClock() {
+        this.currentTime = new Date();
+        console.log('Global clock reset to system time:', this.currentTime);
+        
+        // Re-apply time range filter if needed
+        if (this.chartData && this.timeRange !== 'all') {
+            this.applyTimeRangeFilter();
+        }
+    }
+    
+    // Utility Functions
     formatNumber(num) {
         if (num >= 1e9) {
             return (num / 1e9).toFixed(1) + 'B';

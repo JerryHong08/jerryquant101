@@ -276,6 +276,14 @@ class DataManager:
         """Get detailed information for a specific stock"""
         return self.stock_data.get(ticker)
 
+    def toggle_stock_highlight(self, ticker: str, highlight: bool) -> bool:
+        """Toggle highlight status for a specific stock"""
+        if ticker in self.stock_data:
+            self.stock_data[ticker]["highlight"] = highlight
+            print(f"Updated highlight for {ticker}: {highlight}")
+            return True
+        return False
+
     def get_chart_data(self) -> Dict:
         """Get data formatted for chart visualization"""
         chart_data = {"datasets": [], "timestamps": [], "highlights": []}
