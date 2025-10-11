@@ -113,11 +113,20 @@ class WebAnalyzer:
         def handle_stock_detail_request(data):
             """Handle request for detailed stock information"""
             ticker = data.get("ticker")
-            if ticker:
-                stock_detail = self.data_manager.get_stock_detail(ticker)
+            if not ticker:
+                emit("error", {"message": "No ticker specified"})
+                return
+
+            detail = self.data_manager.get_stock_detail(ticker)
+            if detail:
+                # Convert datetime objects to ISO format strings for JSON serialization
+                serialized_detail = self._serialize_datetime_objects(detail)
                 emit(
-                    "stock_detail_response", {"ticker": ticker, "detail": stock_detail}
+                    "stock_detail_response",
+                    {"ticker": ticker, "detail": serialized_detail},
                 )
+            else:
+                emit("error", {"message": f"No details available for {ticker}"})
 
         @self.socketio.on("load_historical_data")
         def handle_load_historical(data):
@@ -147,6 +156,20 @@ class WebAnalyzer:
                     emit(
                         "error", {"message": f"Failed to update highlight for {ticker}"}
                     )
+
+    def _serialize_datetime_objects(self, obj):
+        """Recursively convert datetime objects to ISO format strings"""
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, dict):
+            return {
+                key: self._serialize_datetime_objects(value)
+                for key, value in obj.items()
+            }
+        elif isinstance(obj, list):
+            return [self._serialize_datetime_objects(item) for item in obj]
+        else:
+            return obj
 
     def _redis_listener(self):
         """Redis message listener running in separate thread"""

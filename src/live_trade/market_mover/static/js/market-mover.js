@@ -12,6 +12,7 @@ class MarketMoverApp {
         this.showHighlights = true;
         this.timeRange = 'all';
         this.selectedStock = null;
+        this.isLogScale = false; // 添加log模式状态
         
         // Global time clock - the current time reference for all operations
         this.currentTime = null;
@@ -128,15 +129,7 @@ class MarketMoverApp {
                             text: 'Time (EST)'
                         }
                     },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Percent Change (%)'
-                        },
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.1)'
-                        }
-                    }
+                    y: this.getYAxisConfig() // 使用动态Y轴配置
                 },
                 onClick: (event, elements) => {
                     if (elements.length > 0) {
@@ -147,6 +140,151 @@ class MarketMoverApp {
                 }
             }
         });
+    }
+
+    // 新方法：获取Y轴配置
+    getYAxisConfig() {
+        const baseConfig = {
+            title: {
+                display: true,
+                text: 'Percent Change (%)'
+            },
+            grid: {
+                color: 'rgba(0, 0, 0, 0.1)'
+            }
+        };
+
+        // 计算当前数据的最小值和最大值
+        const { minValue, maxValue } = this.getDataRange();
+
+        if (this.isLogScale) {
+            // 对数模式下，确保最小值大于0
+            const logMinValue = minValue <= 0 ? 0.01 : Math.max(minValue * 0.9, 0.01);
+            const logMaxValue = Math.max(maxValue * 1.1, logMinValue * 2);
+
+            return {
+                ...baseConfig,
+                type: 'logarithmic',
+                min: logMinValue,
+                max: logMaxValue,
+                ticks: {
+                    callback: function(value, index, values) {
+                        // 自定义刻度标签格式
+                        if (value >= 1) {
+                            return value.toFixed(1) + '%';
+                        } else {
+                            return value.toFixed(2) + '%';
+                        }
+                    }
+                }
+            };
+        } else {
+            // 线性模式下，设置合理的边距
+            const margin = (maxValue - minValue) * 0.1 || 1; // 10%边距，最小1%
+            const linearMinValue = minValue - margin;
+            const linearMaxValue = maxValue + margin;
+
+            return {
+                ...baseConfig,
+                min: linearMinValue,
+                max: linearMaxValue
+            };
+        }
+    }
+
+    // get current data range
+    getDataRange() {
+        let minValue = 0;
+        let maxValue = 0;
+        let hasData = false;
+
+        if (this.chart && this.chart.data.datasets) {
+            this.chart.data.datasets.forEach(dataset => {
+                // only consider visible datasets with data
+                if (!dataset.hidden && dataset.data && dataset.data.length > 0) {
+                    dataset.data.forEach(point => {
+                        if (point && typeof point.y === 'number') {
+                            if (!hasData) {
+                                minValue = point.y;
+                                maxValue = point.y;
+                                hasData = true;
+                            } else {
+                                minValue = Math.min(minValue, point.y);
+                                maxValue = Math.max(maxValue, point.y);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        if (!hasData) {
+            return { minValue: -5, maxValue: 5 };
+        }
+
+        return { minValue, maxValue };
+    }
+    
+    toggleLogScale() {
+        this.isLogScale = !this.isLogScale;
+        
+        const button = document.getElementById('log-scale-toggle');
+        button.textContent = this.isLogScale ? 'Log' : 'Linear';
+        button.classList.toggle('active', this.isLogScale);
+        
+        // need transform data in log scale mode
+        if (this.isLogScale) {
+            this.transformDataForLogScale();
+        } else {
+            this.restoreOriginalData();
+        }
+        
+        this.chart.options.scales.y = this.getYAxisConfig();
+        
+        this.chart.update();
+        
+        this.showToast(
+            `Switched to ${this.isLogScale ? 'logarithmic' : 'linear'} scale`, 
+            'info'
+        );
+    }
+
+    transformDataForLogScale() {
+        if (!this.chart.data.datasets) return;
+        
+        this.chart.data.datasets.forEach(dataset => {
+            if (dataset.data && dataset.originalData) {
+                // if there is already originalData, use it
+                dataset.data = dataset.originalData.map(point => ({
+                    x: point.x,
+                    y: this.convertToLogSafeValue(point.y)
+                }));
+            } else if (dataset.data) {
+                // if not set originalData
+                dataset.originalData = [...dataset.data];
+                dataset.data = dataset.data.map(point => ({
+                    x: point.x,
+                    y: this.convertToLogSafeValue(point.y)
+                }));
+            }
+        });
+    }
+
+    restoreOriginalData() {
+        if (!this.chart.data.datasets) return;
+        
+        this.chart.data.datasets.forEach(dataset => {
+            if (dataset.originalData) {
+                dataset.data = [...dataset.originalData];
+            }
+        });
+    }
+    
+    convertToLogSafeValue(value) {
+        if (value <= 0) {
+            return Math.max(Math.abs(value), 0.01);
+        }
+        return Math.max(value, 0.01);
     }
     
     // Event Listeners
@@ -166,15 +304,14 @@ class MarketMoverApp {
             this.applyTimeRangeFilter();
         });
         
-        // Reset zoom
+                // Reset zoom
         document.getElementById('reset-zoom-btn').addEventListener('click', () => {
             this.chart.resetZoom();
         });
-        
-        // Toggle highlights
-        document.getElementById('toggle-highlights-btn').addEventListener('click', () => {
-            this.showHighlights = !this.showHighlights;
-            this.updateHighlights();
+
+        // Log scale toggle
+        document.getElementById('log-scale-toggle').addEventListener('click', () => {
+            this.toggleLogScale();
         });
     }
     
@@ -200,6 +337,34 @@ class MarketMoverApp {
         console.log('Datasets count:', data.datasets ? data.datasets.length : 0);
         console.log('Timestamps count:', data.timestamps ? data.timestamps.length : 0);
         
+        // Store current visibility states from both chart and chartData before updating
+        const currentVisibilityStates = {};
+        
+        // First check chart datasets
+        if (this.chart.data.datasets) {
+            this.chart.data.datasets.forEach(dataset => {
+                currentVisibilityStates[dataset.label] = dataset.hidden;
+            });
+        }
+        
+        // Then check existing chartData as fallback
+        if (this.chartData && this.chartData.datasets) {
+            this.chartData.datasets.forEach(dataset => {
+                if (!currentVisibilityStates.hasOwnProperty(dataset.label)) {
+                    currentVisibilityStates[dataset.label] = dataset.hidden;
+                }
+            });
+        }
+        
+        // Apply visibility states to incoming data BEFORE storing it
+        if (data.datasets) {
+            data.datasets.forEach(dataset => {
+                if (currentVisibilityStates.hasOwnProperty(dataset.label)) {
+                    dataset.hidden = currentVisibilityStates[dataset.label];
+                }
+            });
+        }
+        
         this.chartData = data;
         
         // Update global time clock with the latest timestamp from data
@@ -209,6 +374,21 @@ class MarketMoverApp {
         this.updateRankings(data);
         this.updateHighlights(data);
         this.updateLastUpdateTime();
+    }
+
+    handleHistoricalDataLoaded(data) {
+        console.log('Historical data loaded:', data);
+        this.showToast('Historical data loaded successfully', 'success');
+        this.handleChartUpdate(data);
+    }
+
+    handleStockDetailResponse(data) {
+        console.log('Received stock detail response:', data);
+        if (data.detail) {
+            this.showStockDetail(data.ticker, data.detail);
+        } else {
+            this.showToast(`No details available for ${data.ticker}`, 'error');
+        }
     }
     
     // Global Time Clock Management
@@ -249,6 +429,14 @@ class MarketMoverApp {
         
         console.log('Raw datasets count:', data.datasets.length);
         
+        // Store current visibility states before updating
+        const currentVisibilityStates = {};
+        if (this.chart.data.datasets) {
+            this.chart.data.datasets.forEach(dataset => {
+                currentVisibilityStates[dataset.label] = dataset.hidden;
+            });
+        }
+        
         // Sort datasets by rank
         const sortedDatasets = data.datasets
             .filter(dataset => dataset.data && dataset.data.length > 0)
@@ -261,13 +449,30 @@ class MarketMoverApp {
             console.log('Sample dataset:', sortedDatasets[0]);
         }
         
-        // Apply time range filter if needed
+        // Apply time range filter if needed (this now preserves hidden state internally)
         const filteredDatasets = this.applyTimeRangeToDatasets(sortedDatasets);
+        
+        // Restore visibility states from previous chart state
+        filteredDatasets.forEach(dataset => {
+            if (currentVisibilityStates.hasOwnProperty(dataset.label)) {
+                dataset.hidden = currentVisibilityStates[dataset.label];
+            }
+        });
         
         console.log('Final datasets for chart:', filteredDatasets.length);
         
         this.chart.data.datasets = filteredDatasets;
+        
+        if (this.isLogScale) {
+            this.transformDataForLogScale();
+        }
+        
+        this.chart.options.scales.y = this.getYAxisConfig();
+        
         this.chart.update('none'); // Smooth update without animation
+        
+        // Sync checkbox states with chart visibility after update
+        this.syncCheckboxStates();
     }
     
     applyTimeRangeToDatasets(datasets) {
@@ -298,17 +503,74 @@ class MarketMoverApp {
         
         console.log(`Time range filter: ${this.timeRange}, Reference time: ${referenceTime}, Cutoff: ${cutoffTime}`);
         
-        return datasets.map(dataset => ({
-            ...dataset,
-            data: dataset.data.filter(point => 
-                point && new Date(point.x) >= cutoffTime
-            )
-        }));
+        return datasets.map(dataset => {
+            // Preserve existing hidden state during time range filtering
+            const existingDataset = this.chart.data.datasets ? 
+                this.chart.data.datasets.find(d => d.label === dataset.label) : null;
+            
+            return {
+                ...dataset,
+                data: dataset.data.filter(point => 
+                    point && new Date(point.x) >= cutoffTime
+                ),
+                // Preserve hidden state if it exists
+                hidden: existingDataset ? existingDataset.hidden : dataset.hidden
+            };
+        });
     }
     
     applyTimeRangeFilter() {
         if (this.chartData) {
+            // Store current visibility states before updating
+            const currentVisibilityStates = {};
+            if (this.chart.data.datasets) {
+                this.chart.data.datasets.forEach(dataset => {
+                    currentVisibilityStates[dataset.label] = dataset.hidden;
+                });
+            }
+            
             this.updateChart(this.chartData);
+            
+            // Ensure visibility states are preserved after filter
+            if (this.chart.data.datasets) {
+                this.chart.data.datasets.forEach(dataset => {
+                    if (currentVisibilityStates.hasOwnProperty(dataset.label)) {
+                        dataset.hidden = currentVisibilityStates[dataset.label];
+                    }
+                });
+                this.chart.update('none');
+                
+                // Sync checkbox states with chart visibility
+                this.syncCheckboxStates();
+            }
+        }
+    }
+
+    // New method to sync checkbox states with chart visibility
+    syncCheckboxStates() {
+        if (this.chart.data.datasets) {
+            const isInSolo = this.isInSoloMode();
+            
+            this.chart.data.datasets.forEach(dataset => {
+                const checkbox = document.querySelector(`[data-ticker="${dataset.label}"]`);
+                if (checkbox) {
+                    checkbox.checked = !dataset.hidden;
+                    
+                    // Update ranking item styling based on visibility and solo mode
+                    const rankingItem = checkbox.closest('.ranking-item');
+                    if (isInSolo) {
+                        if (!dataset.hidden) {
+                            rankingItem.classList.add('solo-mode');
+                            rankingItem.classList.remove('solo-hidden');
+                        } else {
+                            rankingItem.classList.add('solo-hidden');
+                            rankingItem.classList.remove('solo-mode');
+                        }
+                    } else {
+                        rankingItem.classList.remove('solo-mode', 'solo-hidden');
+                    }
+                }
+            });
         }
     }
     
@@ -351,46 +613,282 @@ class MarketMoverApp {
                 velocityIndicator = ` ↓${Math.abs(stock.velocity)}`;
             }
             
-            // Create checkbox for highlight toggle
-            const checkboxId = `highlight-${stock.label}`;
+            // Create checkbox for chart visibility toggle
+            const checkboxId = `visibility-${stock.label}`;
             
-            item.innerHTML = `
-                <div class="ranking-content">
-                    <div class="ranking-left">
-                        <input type="checkbox" id="${checkboxId}" class="highlight-checkbox" 
-                            ${stock.highlight ? 'checked' : ''} 
-                            data-ticker="${stock.label}">
-                        <label for="${checkboxId}" class="checkbox-label">
-                            <span class="ranking-ticker">#${stock.rank} ${stock.label}</span>
-                            ${velocityIndicator ? `<small style="color: #ffa500;">${velocityIndicator}</small>` : ''}
-                        </label>
-                    </div>
-                    <div class="ranking-right">
-                        <span class="ranking-change ${changeClass}">
-                            ${changeSymbol}${numericChange.toFixed(2)}%
-                        </span>
-                    </div>
+        // Format volume and price
+        const volume = this.formatNumber(stock.metadata?.volume || 0);
+        const currentPrice = stock.metadata?.current_price || 0;
+        const formattedPrice = currentPrice >= 1 ? `$${currentPrice.toFixed(2)}` : `$${currentPrice.toFixed(4)}`;
+        
+        item.innerHTML = `
+            <div class="ranking-content">
+                <div class="ranking-checkbox">
+                    <input type="checkbox" id="${checkboxId}" class="visibility-checkbox" 
+                           ${stock.hidden !== true ? 'checked' : ''} 
+                           data-ticker="${stock.label}">
                 </div>
-            `;
+                <div class="ranking-ticker">
+                    <span>#${stock.rank} ${stock.label}</span>
+                    ${velocityIndicator ? `<small style="color: #ffa500;">${velocityIndicator}</small>` : ''}
+                </div>
+                <div class="ranking-change ${changeClass}">
+                    ${changeSymbol}${numericChange.toFixed(2)}%
+                </div>
+                <div class="ranking-volume">
+                    ${volume}
+                </div>
+                <div class="ranking-price">
+                    ${formattedPrice}
+                </div>
+                <div class="ranking-detail">
+                    📊
+                </div>
+            </div>
+        `;
+        
+        // Add click handler for stock detail - ranking-detail
+        const rankingDetail = item.querySelector('.ranking-detail');
+        rankingDetail.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering highlight toggle
+            this.requestStockDetail(stock.label);
+        });
+
+        // Add click handler for highlight toggle (excluding checkbox and ranking-detail areas)
+        const rankingContent = item.querySelector('.ranking-content');
+        rankingContent.addEventListener('click', (e) => {
+            // Only toggle highlight if not clicking on checkbox or ranking-detail
+            if (!e.target.closest('.visibility-checkbox') && 
+                !e.target.closest('.ranking-detail')) {
+                this.toggleStockHighlight(stock.label, !stock.highlight);
+            }
+        });
+        
+        // Add click handler for checkbox - controls chart visibility
+        const checkbox = item.querySelector('.visibility-checkbox'); 
+        checkbox.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering highlight toggle
             
-            // Add click handler for stock detail (excluding checkbox area)
-            const rankingContent = item.querySelector('.ranking-right');
-            rankingContent.addEventListener('click', () => {
-                this.requestStockDetail(stock.label);
-            });
+            const chartDataset = this.chart.data.datasets ? 
+                this.chart.data.datasets.find(d => d.label === stock.label) : null;
+            const currentlyVisible = chartDataset ? !chartDataset.hidden : true;
             
-            // Add change handler for checkbox
-            const checkbox = item.querySelector('.highlight-checkbox');
-            checkbox.addEventListener('change', (e) => {
-                e.stopPropagation(); // Prevent triggering stock detail
-                this.toggleStockHighlight(stock.label, e.target.checked);
-            });
-            
-            rankingsList.appendChild(item);
+            // Check if Ctrl key is also pressed for solo mode
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault(); // Prevent default checkbox behavior
+                this.toggleSoloMode(stock.label, currentlyVisible);
+                return;
+            } else {
+                // Always sync checkbox with intended action
+                e.target.checked = currentlyVisible; // Set to intended state first
+                this.toggleStockVisibility(stock.label, currentlyVisible);
+            }
+        });
+        
+        rankingsList.appendChild(item);
         });
     }
 
-    // Add new method to handle highlight toggling
+    // New method to handle chart visibility toggling
+    toggleStockVisibility(ticker, currentlyVisible) {
+        const newVisibility = !currentlyVisible;
+        console.log(`Toggling visibility for ${ticker}: ${currentlyVisible} -> ${newVisibility}`);
+        
+        const isInSoloMode = this.isInSoloMode();
+        
+        if (isInSoloMode && newVisibility) {
+            console.log(`Adding ${ticker} to solo mode selection`);
+            
+            if (this.chart.data.datasets) {
+                const chartDataset = this.chart.data.datasets.find(d => d.label === ticker);
+                if (chartDataset) {
+                    chartDataset.hidden = false;
+                }
+            }
+            
+            if (this.chartData && this.chartData.datasets) {
+                const dataset = this.chartData.datasets.find(d => d.label === ticker);
+                if (dataset) {
+                    dataset.hidden = false;
+                }
+            }
+            
+            const checkbox = document.querySelector(`[data-ticker="${ticker}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+                const rankingItem = checkbox.closest('.ranking-item');
+                rankingItem.classList.add('solo-mode');
+                rankingItem.classList.remove('solo-hidden');
+            }
+            
+            this.chart.options.scales.y = this.getYAxisConfig();
+            this.chart.update('none');
+            this.showToast(`Added ${ticker} to solo view`, 'info');
+            
+        } else if (isInSoloMode && !newVisibility) {
+            console.log(`Removing ${ticker} from solo mode selection`);
+            
+            if (this.chart.data.datasets) {
+                const chartDataset = this.chart.data.datasets.find(d => d.label === ticker);
+                if (chartDataset) {
+                    chartDataset.hidden = true;
+                }
+            }
+            
+            if (this.chartData && this.chartData.datasets) {
+                const dataset = this.chartData.datasets.find(d => d.label === ticker);
+                if (dataset) {
+                    dataset.hidden = true;
+                }
+            }
+            
+            const checkbox = document.querySelector(`[data-ticker="${ticker}"]`);
+            if (checkbox) {
+                checkbox.checked = false;
+                const rankingItem = checkbox.closest('.ranking-item');
+                rankingItem.classList.remove('solo-mode');
+                rankingItem.classList.add('solo-hidden');
+            }
+            
+            this.chart.options.scales.y = this.getYAxisConfig();
+            this.chart.update('none');
+            this.showToast(`Removed ${ticker} from solo view`, 'info');
+            
+        } else {
+            // Normal mode - standard visibility toggle
+            // Update local chart data immediately for responsive UI
+            if (this.chartData && this.chartData.datasets) {
+                const dataset = this.chartData.datasets.find(d => d.label === ticker);
+                if (dataset) {
+                    dataset.hidden = !newVisibility;
+                }
+            }
+            
+            if (this.chart.data.datasets) {
+                const chartDataset = this.chart.data.datasets.find(d => d.label === ticker);
+                if (chartDataset) {
+                    chartDataset.hidden = !newVisibility;
+                }
+            }
+            
+            const checkbox = document.querySelector(`[data-ticker="${ticker}"]`);
+            if (checkbox) {
+                checkbox.checked = newVisibility;
+            }
+            
+            this.chart.options.scales.y = this.getYAxisConfig();
+            this.chart.update('none');
+        }
+    }
+
+    isInSoloMode() {
+        if (!this.chart.data.datasets || this.chart.data.datasets.length === 0) {
+            return false;
+        }
+        
+        const soloModeItems = document.querySelectorAll('.ranking-item.solo-mode');
+        return soloModeItems.length > 0;
+    }
+
+    // New method to handle solo mode (Ctrl+click)
+    toggleSoloMode(ticker, shouldActivateSolo) {
+        console.log(`Toggling solo mode for ${ticker}: ${shouldActivateSolo}`);
+        
+        if (this.chartData && this.chartData.datasets) {
+            const isCurrentlyInSoloMode = this.isInSoloMode();
+            
+            if (!isCurrentlyInSoloMode && shouldActivateSolo) {
+                // Activate solo mode: hide all except this ticker
+                this.chartData.datasets.forEach(dataset => {
+                    dataset.hidden = dataset.label !== ticker;
+                });
+                
+                // Update chart datasets as well
+                if (this.chart.data.datasets) {
+                    this.chart.data.datasets.forEach(dataset => {
+                        dataset.hidden = dataset.label !== ticker;
+                    });
+                }
+                
+                // Update all checkboxes to reflect state and add solo mode styling
+                document.querySelectorAll('.visibility-checkbox').forEach(checkbox => {
+                    const checkboxTicker = checkbox.getAttribute('data-ticker');
+                    checkbox.checked = checkboxTicker === ticker;
+                    
+                    // Add visual indicator for solo mode
+                    const rankingItem = checkbox.closest('.ranking-item');
+                    if (checkboxTicker === ticker) {
+                        rankingItem.classList.add('solo-mode');
+                        rankingItem.classList.remove('solo-hidden');
+                    } else {
+                        rankingItem.classList.add('solo-hidden');
+                        rankingItem.classList.remove('solo-mode');
+                    }
+                });
+                
+                console.log(`Solo mode activated for ${ticker}`);
+                this.showToast(`Solo mode: ${ticker}`, 'info');
+                
+            } else if (isCurrentlyInSoloMode) {
+                // Check if we're removing the last visible item or activating on an already solo item
+                const checkbox = document.querySelector(`[data-ticker="${ticker}"]`);
+                const rankingItem = checkbox ? checkbox.closest('.ranking-item') : null;
+                
+                if (rankingItem && rankingItem.classList.contains('solo-mode') && 
+                    document.querySelectorAll('.ranking-item.solo-mode').length === 1) {
+                    // This is the last solo item - exit solo mode completely
+                    this.exitSoloMode();
+                } else if (rankingItem && !rankingItem.classList.contains('solo-mode')) {
+                    // Adding another item to solo mode
+                    rankingItem.classList.add('solo-mode');
+                    rankingItem.classList.remove('solo-hidden');
+                    checkbox.checked = true;
+                    
+                    // Update chart
+                    if (this.chart.data.datasets) {
+                        const chartDataset = this.chart.data.datasets.find(d => d.label === ticker);
+                        if (chartDataset) {
+                            chartDataset.hidden = false;
+                        }
+                    }
+                    
+                    this.showToast(`Added ${ticker} to solo view`, 'info');
+                }
+            }
+            
+            // Update chart immediately
+            this.chart.update('none');
+        }
+    }
+
+    // Helper method to completely exit solo mode
+    exitSoloMode() {
+        console.log('Exiting solo mode completely');
+        
+        // Show all stocks
+        if (this.chartData && this.chartData.datasets) {
+            this.chartData.datasets.forEach(dataset => {
+                dataset.hidden = false;
+            });
+        }
+        
+        if (this.chart.data.datasets) {
+            this.chart.data.datasets.forEach(dataset => {
+                dataset.hidden = false;
+            });
+        }
+        
+        // Update all checkboxes and remove solo mode styling
+        document.querySelectorAll('.visibility-checkbox').forEach(checkbox => {
+            checkbox.checked = true;
+            const rankingItem = checkbox.closest('.ranking-item');
+            rankingItem.classList.remove('solo-mode', 'solo-hidden');
+        });
+        
+        this.showToast('Solo mode deactivated', 'info');
+    }
+
+    // Modified method to handle highlight toggling
     toggleStockHighlight(ticker, isHighlighted) {
         console.log(`Toggling highlight for ${ticker}: ${isHighlighted}`);
         
@@ -409,7 +907,7 @@ class MarketMoverApp {
             }
         }
         
-        // Send update to server
+        // Send highlight update to server
         this.socket.emit('toggle_stock_highlight', {
             ticker: ticker,
             highlight: isHighlighted
@@ -421,29 +919,65 @@ class MarketMoverApp {
         const highlightsList = document.getElementById('highlights-list');
         highlightsList.innerHTML = '';
         
-        if (!data.highlights || data.highlights.length === 0) {
-            highlightsList.innerHTML = '<div style="opacity: 0.7;">No hot movers detected</div>';
+        if (!data.datasets) return;
+        
+        const highlightedStocks = data.datasets
+            .filter(stock => stock.highlight)
+            .sort((a, b) => a.rank - b.rank);
+        
+        if (highlightedStocks.length === 0) {
+            highlightsList.innerHTML = '<p style="text-align: center; opacity: 0.7; padding: 20px;">No highlighted stocks</p>';
             return;
         }
         
-        data.highlights.forEach(highlight => {
+        highlightedStocks.forEach(stock => {
             const item = document.createElement('div');
-            item.className = 'highlight-item';
+            item.className = 'highlight-item'; // 确保使用正确的CSS类名
             
-            let description = '';
-            if (highlight.is_new) {
-                description = `🆕 New in Top 20 at rank ${highlight.rank}`;
-            } else if (highlight.velocity > 0) {
-                description = `🚀 Jumped ${highlight.velocity} positions to rank ${highlight.rank}`;
+            const latestChange = this.getLatestValue(
+                stock.data && stock.data.length > 0 
+                    ? stock.data.map(point => point.y) 
+                    : []
+            );
+            const numericChange = typeof latestChange === 'number' ? latestChange : 0;
+            const changeClass = numericChange >= 0 ? 'positive' : 'negative';
+            const changeSymbol = numericChange >= 0 ? '+' : '';
+            
+            let velocityIndicator = '';
+            if (stock.velocity > 0) {
+                velocityIndicator = ` ↑${stock.velocity}`;
+            } else if (stock.velocity < 0) {
+                velocityIndicator = ` ↓${Math.abs(stock.velocity)}`;
             }
             
+            // 确保HTML结构与CSS匹配
             item.innerHTML = `
-                <span class="highlight-ticker">${highlight.ticker}</span>
-                <div class="highlight-info">${description}</div>
+                <div class="highlight-content">
+                    <div class="highlight-left">
+                        <span class="highlight-ticker">#${stock.rank} ${stock.label}</span>
+                        ${velocityIndicator ? `<small style="color: #ffa500;">${velocityIndicator}</small>` : ''}
+                    </div>
+                    <div class="highlight-right">
+                        <span class="highlight-change ${changeClass}">
+                            ${changeSymbol}${numericChange.toFixed(2)}%
+                        </span>
+                    </div>
+                </div>
             `;
             
-            item.addEventListener('click', () => {
-                this.requestStockDetail(highlight.ticker);
+            // Add click handler for stock detail
+            const highlightRight = item.querySelector('.highlight-right');
+            highlightRight.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.requestStockDetail(stock.label);
+            });
+
+            // Add click handler to remove from highlights
+            const highlightContent = item.querySelector('.highlight-content');
+            highlightContent.addEventListener('click', (e) => {
+                if (!e.target.closest('.highlight-right')) {
+                    this.toggleStockHighlight(stock.label, false); // 取消highlight
+                }
             });
             
             highlightsList.appendChild(item);
@@ -508,6 +1042,10 @@ class MarketMoverApp {
             this.miniChart.destroy();
         }
         
+        // 确保canvas有正确的尺寸
+        ctx.style.height = '200px';
+        ctx.style.maxHeight = '200px';
+        
         const timestamps = detail.timestamps || [];
         const percentChanges = detail.percent_changes || [];
         
@@ -531,7 +1069,7 @@ class MarketMoverApp {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: false, /* 重要：不保持宽高比 */
                 plugins: {
                     legend: {
                         display: false
@@ -551,6 +1089,13 @@ class MarketMoverApp {
                             display: true,
                             text: 'Change (%)'
                         }
+                    }
+                },
+                // 添加resize事件处理，防止无限增长
+                onResize: (chart, size) => {
+                    if (size.height > 200) {
+                        chart.canvas.style.height = '200px';
+                        chart.resize(size.width, 200);
                     }
                 }
             }
@@ -606,53 +1151,6 @@ class MarketMoverApp {
         const hasFewPoints = stock.data.length <= 3;
         
         return isNew || hasFewPoints;
-    }
-    
-    // Enhanced method to get time range for display purposes
-    getTimeRangeDisplay() {
-        const referenceTime = this.getCurrentTime();
-        let startTime;
-        
-        switch (this.timeRange) {
-            case '5m':
-                startTime = new Date(referenceTime.getTime() - 5 * 60 * 1000);
-                break;
-            case '15m':
-                startTime = new Date(referenceTime.getTime() - 15 * 60 * 1000);
-                break;
-            case '30m':
-                startTime = new Date(referenceTime.getTime() - 30 * 60 * 1000);
-                break;
-            case '1h':
-                startTime = new Date(referenceTime.getTime() - 60 * 60 * 1000);
-                break;
-            default:
-                return 'All Data';
-        }
-        
-        return `${startTime.toLocaleTimeString()} - ${referenceTime.toLocaleTimeString()}`;
-    }
-    
-    // Method to manually set the global clock (useful for testing or special scenarios)
-    setGlobalClock(time) {
-        this.currentTime = new Date(time);
-        console.log('Global clock manually set to:', this.currentTime);
-        
-        // Re-apply time range filter if needed
-        if (this.chartData && this.timeRange !== 'all') {
-            this.applyTimeRangeFilter();
-        }
-    }
-    
-    // Method to reset global clock to system time
-    resetGlobalClock() {
-        this.currentTime = new Date();
-        console.log('Global clock reset to system time:', this.currentTime);
-        
-        // Re-apply time range filter if needed
-        if (this.chartData && this.timeRange !== 'all') {
-            this.applyTimeRangeFilter();
-        }
     }
     
     // Utility Functions

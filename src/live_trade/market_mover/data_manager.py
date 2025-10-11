@@ -53,6 +53,9 @@ class DataManager:
                     .drop("active", "composite_figi")
                     .join(df, on="ticker", how="inner")
                     .sort("percent_change", descending=True)
+                ).filter(
+                    (pl.col("percent_change") > 0)
+                    & (pl.col("accumulated_volume") > 1000)
                 )
                 self._process_snapshot(df, timestamp, is_historical=True)
             except Exception as e:
@@ -67,7 +70,8 @@ class DataManager:
             # Extract timestamp from DataFrame's timestamp column
             timestamp_value = None
             if hasattr(df, "select") and "timestamp" in df.columns:
-                timestamp_value = df.select("timestamp").item(0, 0)
+                # timestamp_value = df.select("timestamp").item(0, 0)
+                timestamp_value = df["timestamp"].max()
                 print(
                     f"DEBUG: timestamp_value type: {type(timestamp_value)}, value: {timestamp_value}"
                 )
@@ -359,17 +363,16 @@ class DataManager:
             # Color gradient based on rank
             # Top ranks: Blue to Green, Lower ranks: Yellow to Red
             if rank <= 5:
-                # base_color = f"{50 + rank * 40}, {100 + rank * 30}, 255"  # Blue shades
-                base_color = f"{10 + rank * 32}, {60 + rank * 32}, 255"  # Blue shades
+                base_color = f"{127 + (rank - 1) * 28}, {(rank - 1) * 51}, 255"
             elif rank <= 10:
                 base_color = (
                     f"{100 + (rank-5) * 30}, 255, {200 - (rank-5) * 30}"  # Green shades
                 )
             elif rank <= 15:
-                base_color = f"255, {255 - (rank-10) * 30}, {100 - (rank-10) * 20}"  # Yellow to orange
+                base_color = f"200, {200 - (rank-10) * 20}, {120 - (rank-10) * 15}"  # Lighter yellow to orange
             else:
                 base_color = (
-                    f"255, {150 - (rank-15) * 30}, {50 - (rank-15) * 10}"  # Red shades
+                    f"{10 + (20-rank) * 32}, {60 + (20-rank) * 32}, 255"  # Blue shades
                 )
             # print('find top rank:', ticker, stock_data['current_rank'], base_color)
 

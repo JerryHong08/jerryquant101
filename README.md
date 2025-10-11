@@ -12,10 +12,10 @@
 ## Roadmap
 
 * features to be add:
+* [ ] market live monitor replay rewrite to web-embedded with play, pause, play back and speed control.
 * [ ] universal indicator plot
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
 * [ ] Polish **X news search function**.
-* [ ] Add **trade volume filter** or other ticker filter conditions.
 * [ ] Polars ETL + numba backtest engine(long-term)
 
 * bugs to be fixed:

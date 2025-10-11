@@ -15,7 +15,7 @@ body {
 }
 
 .container {
-    max-width: 1400px;
+    max-width: 1800px; /* 增加最大宽度 */
     margin: 0 auto;
     padding: 20px;
     height: 100vh; /* 容器占满视口 */
@@ -130,7 +130,7 @@ body {
 /* Main Content */
 .main-content {
     display: grid;
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: 1fr 450px; /* 增加side panel宽度 */
     gap: 20px;
     flex: 1; /* 占用剩余所有空间 */
     min-height: 0; /* 允许缩小 */
@@ -240,72 +240,35 @@ body {
     margin-bottom: 0;
 }
 
-.ranking-item.highlighted {
-    background: rgba(255, 193, 7, 0.3);
-    border-left: 4px solid #ffc107;
-}
-
-.ranking-item.new-entrant {
-    background: rgba(244, 67, 54, 0.3);
-    border-left: 4px solid #f44336;
-    animation: newEntrantGlow 2s infinite;
-}
-
-@keyframes newEntrantGlow {
-    0%, 100% { box-shadow: 0 0 5px rgba(244, 67, 54, 0.5); }
-    50% { box-shadow: 0 0 20px rgba(244, 67, 54, 0.8); }
-}
-
 .ranking-content {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto auto auto; /* checkbox, ticker, change%, volume, price, detail */
+    gap: 8px;
     align-items: center;
     width: 100%;
+    cursor: pointer; /* 整个内容区域可点击来切换highlight */
     max-width: calc(100% - 10px);
 }
 
-.ranking-left {
+.ranking-checkbox {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex: 1;
-}
-
-.ranking-right {
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 4px;
-    transition: background-color 0.2s;
-}
-
-.ranking-right:hover {
-    background-color: rgba(0, 0, 0, 0.05);
-}
-
-.highlight-checkbox {
-    margin: 0;
-    cursor: pointer;
-}
-
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    cursor: pointer;
-    flex: 1;
-    margin: 0;
-}
-
-.ranking-item.highlighted .highlight-checkbox {
-    accent-color: #ff6b35;
+    justify-self: start;
+    padding: 4px; /* 增加点击区域 */
 }
 
 .ranking-ticker {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    justify-self: start;
     font-weight: 500;
 }
 
 .ranking-change {
-    font-size: 0.9em;
+    font-weight: 600;
+    text-align: right;
+    justify-self: end;
 }
 
 .ranking-change.positive {
@@ -316,24 +279,189 @@ body {
     color: #f44336;
 }
 
-/* Highlight Item */
+.ranking-volume {
+    font-size: 0.85em;
+    color: rgba(255, 255, 255, 0.8);
+    text-align: right;
+    justify-self: end;
+}
+
+.ranking-price {
+    font-size: 0.85em;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: right;
+    justify-self: end;
+}
+
+.ranking-detail {
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    cursor: pointer;
+    font-size: 0.8em;
+    background: rgba(255, 255, 255, 0.1);
+    justify-self: end;
+}
+
+.ranking-detail:hover {
+    background-color: rgba(255, 255, 255, 0.2); /* 增强hover效果 */
+    transform: scale(1.05); /* 轻微放大效果 */
+}
+
+/* 更新复选框样式 - 现在用于控制可见性 */
+.visibility-checkbox {
+    margin: 0;
+    cursor: pointer;
+    /* 使用蓝色表示可见性控制 */
+    accent-color: #2196F3;
+    /* 增大复选框尺寸 */
+    width: 16px;
+    height: 16px;
+    transform: scale(1.2); /* 进一步放大 */
+}
+
+/* Remove old checkbox-label styles as we're using new grid structure */
+
+/* 删除原来的highlight-checkbox样式，因为现在checkbox是控制可见性的 */
+/* .highlight-checkbox 相关样式已删除 */
+
+/* 高亮状态样式 */
+.ranking-item.highlighted {
+    background: rgba(255, 107, 53, 0.3);
+    border-left: 4px solid #ff6b35;
+    transform: translateX(3px);
+}
+
+.ranking-item.highlighted .visibility-checkbox {
+    accent-color: #ff6b35; /* 高亮时复选框变为橙色 */
+}
+
+/* Solo mode styles */
+.ranking-item.solo-mode {
+    background: rgba(33, 150, 243, 0.3) !important; /* 蓝色背景表示solo模式 */
+    border-left: 4px solid #2196F3;
+    transform: translateX(3px);
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.4); /* 添加阴影效果 */
+}
+
+.ranking-item.solo-mode .visibility-checkbox {
+    accent-color: #2196F3;
+    transform: scale(1.4); /* Solo模式下复选框更大 */
+}
+
+.ranking-item.solo-mode:hover {
+    background: rgba(33, 150, 243, 0.4) !important;
+    transform: translateX(5px);
+}
+
+.ranking-item.solo-hidden {
+    opacity: 0.3;
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.ranking-item.solo-hidden:hover {
+    opacity: 0.5; /* hover时稍微提高可见度 */
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Hover effects */
+.ranking-item:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateX(5px);
+}
+
+.ranking-item.highlighted:hover {
+    background: rgba(255, 107, 53, 0.4);
+}
+
+/* 新增：隐藏股票的视觉反馈 */
+.ranking-item:has(.visibility-checkbox:not(:checked)) {
+    opacity: 0.6;
+}
+
+.ranking-item:has(.visibility-checkbox:not(:checked)) .ranking-ticker {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+/* 新增：鼠标悬停时的视觉提示 */
+.ranking-content:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+}
+
+.ranking-item.highlighted .ranking-content:hover {
+    background-color: rgba(255, 107, 53, 0.2);
+}
+
+/* Highlight Item - 添加这个新的样式 */
 .highlight-item {
-    padding: 10px;
-    margin-bottom: 8px;
-    background: rgba(255, 165, 0, 0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 5px;
+    margin-right: 2px;
+    background: rgba(255, 107, 53, 0.2); /* 使用highlight颜色 */
     border-radius: 8px;
-    border-left: 4px solid #ffa500;
+    border-left: 3px solid #ff6b35;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    z-index: 1;
+}
+
+.highlight-item:hover {
+    background: rgba(255, 107, 53, 0.3);
+    transform: translateX(5px);
+    z-index: 2;
+}
+
+.highlight-item:last-child {
+    margin-bottom: 0;
+}
+
+.highlight-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.highlight-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.highlight-right {
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.highlight-right:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
 }
 
 .highlight-ticker {
-    font-weight: bold;
-    display: block;
-    margin-bottom: 5px;
+    font-weight: 500;
+    color: #ffffff;
 }
 
-.highlight-info {
-    font-size: 0.8em;
-    opacity: 0.9;
+.highlight-change {
+    font-weight: 600;
+}
+
+.highlight-change.positive {
+    color: #4CAF50;
+}
+
+.highlight-change.negative {
+    color: #f44336;
 }
 
 /* Modal Styles */
@@ -356,8 +484,12 @@ body {
     border-radius: 15px;
     width: 80%;
     max-width: 600px;
+    max-height: 80vh; /* 限制最大高度 */
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     animation: modalSlideIn 0.3s ease-out;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* 防止内容溢出 */
 }
 
 @keyframes modalSlideIn {
@@ -377,6 +509,7 @@ body {
     align-items: center;
     padding: 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    flex-shrink: 0; /* 防止header被压缩 */
 }
 
 .modal-header h2 {
@@ -399,6 +532,11 @@ body {
 .modal-body {
     padding: 20px;
     color: white;
+    flex: 1; /* 占用剩余空间 */
+    overflow-y: auto; /* 允许滚动 */
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* 重要：允许flex缩小 */
 }
 
 .detail-grid {
@@ -406,6 +544,7 @@ body {
     grid-template-columns: 1fr 1fr;
     gap: 15px;
     margin-bottom: 20px;
+    flex-shrink: 0; /* 防止grid被压缩 */
 }
 
 .detail-item {
@@ -422,14 +561,21 @@ body {
 
 .mini-chart-container {
     margin-top: 20px;
+    flex: 1; /* 占用剩余空间 */
+    min-height: 0; /* 重要：允许flex缩小 */
+    display: flex;
+    flex-direction: column;
 }
 
 .mini-chart-container h4 {
     margin-bottom: 10px;
+    flex-shrink: 0; /* 防止标题被压缩 */
 }
 
 #detail-mini-chart {
-    height: 200px;
+    height: 200px !important; /* 强制设置固定高度 */
+    max-height: 200px;
+    flex-shrink: 0; /* 防止chart被压缩 */
 }
 
 /* Toast Notifications */
@@ -475,6 +621,20 @@ body {
 }
 
 /* Responsive Design */
+@media (max-width: 1400px) {
+    .main-content {
+        grid-template-columns: 1fr 400px; /* 稍微减少side panel宽度 */
+    }
+    
+    .ranking-content {
+        grid-template-columns: auto 1fr auto auto auto; /* 隐藏price列 */
+    }
+    
+    .ranking-price {
+        display: none;
+    }
+}
+
 @media (max-width: 1200px) {
     .main-content {
         grid-template-columns: 1fr;
@@ -494,11 +654,20 @@ body {
     .highlights-panel {
         flex: 1;
     }
+    
+    .ranking-content {
+        grid-template-columns: auto 1fr auto auto; /* 进一步简化 */
+    }
+    
+    .ranking-volume,
+    .ranking-price {
+        display: none;
+    }
 }
 
 @media (max-width: 768px) {
     .container {
-        padding: 10px; /* 减少padding */
+        padding: 10px;
     }
     
     .header {
@@ -525,11 +694,16 @@ body {
     
     .modal-content {
         width: 95%;
-        margin: 10% auto;
+        margin: 2% auto; /* 减少margin，给内容更多空间 */
+        max-height: 95vh; /* 在小屏幕上允许更大的高度 */
     }
     
     .detail-grid {
         grid-template-columns: 1fr;
+    }
+    
+    #detail-mini-chart {
+        height: 150px !important; /* 在小屏幕上使用较小的高度 */
     }
 }
 
@@ -569,4 +743,95 @@ body {
 .highlights-list {
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* Highlight Item - 确保样式优先级 */
+.highlights-list .highlight-item {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 5px;
+    margin-right: 2px;
+    background: rgba(255, 107, 53, 0.2) !important; /* 使用!important确保应用 */
+    border-radius: 8px;
+    border-left: 3px solid #ff6b35;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    z-index: 1;
+}
+
+.highlights-list .highlight-item:hover {
+    background: rgba(255, 107, 53, 0.3) !important;
+    transform: translateX(5px);
+    z-index: 2;
+}
+
+.highlights-list .highlight-item:last-child {
+    margin-bottom: 0;
+}
+
+.highlights-list .highlight-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.highlights-list .highlight-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.highlights-list .highlight-right {
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.highlights-list .highlight-right:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.highlights-list .highlight-ticker {
+    font-weight: 500;
+    color: #ffffff;
+}
+
+.highlights-list .highlight-change {
+    font-weight: 600;
+}
+
+.highlights-list .highlight-change.positive {
+    color: #4CAF50;
+}
+
+.highlights-list .highlight-change.negative {
+    color: #f44336;
+}
+
+#log-scale-toggle {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    background: #f8f9fa;
+    color: #333;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#log-scale-toggle:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+#log-scale-toggle.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
 }
