@@ -2,9 +2,10 @@ import os
 import time
 
 import polars as pl
-from core_2.config import splits_dir
 from dotenv import load_dotenv
 from polygon import RESTClient
+
+from cores.config import splits_dir
 
 load_dotenv()
 

@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 import polars as pl
 
 from backtesting.backtest_pre_data import only_common_stocks
-from core_2.config import cache_dir
+from cores.config import cache_dir
 
 
 class DataManager:

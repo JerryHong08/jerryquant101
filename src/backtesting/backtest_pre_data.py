@@ -3,7 +3,7 @@ import os
 
 import polars as pl
 
-from core_2.config import all_tickers_dir
+from cores.config import all_tickers_dir
 
 
 def load_irx_data(start, end):

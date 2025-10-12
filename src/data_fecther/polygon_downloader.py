@@ -16,9 +16,10 @@ from datetime import datetime, timedelta
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError, EndpointConnectionError
-from core_2.config import data_dir
 from dotenv import load_dotenv
 from tqdm import tqdm
+
+from cores.config import data_dir
 
 load_dotenv()
 

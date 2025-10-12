@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import polars as pl
 import redis
 
-from core_2.config import cache_dir
+from cores.config import cache_dir
 
 r = redis.Redis(host="localhost", port=6379, db=0)
 

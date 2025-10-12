@@ -49,7 +49,7 @@ def get_asset_dir(asset):
 
 def get_asset_overview_data(asset):
     asset_dir, asset_error_file, asset_error_file_copy = get_asset_dir(asset)
-    print(f"Loading {asset} data from {asset_dir}")
+    # print(f"Loading {asset} data from {asset_dir}")
     try:
         asset_file = os.path.join(
             asset_dir,
@@ -63,7 +63,7 @@ def get_asset_overview_data(asset):
         )
         asset_original = pl.read_parquet(asset_file)
         if os.path.exists(asset_error_file):
-            print(f"Applying error corrections from {asset_error_file}")
+            # print(f"Applying error corrections from {asset_error_file}")
             asset_errors = pl.read_csv(asset_error_file)
             asset_errors.write_csv(
                 asset_error_file_copy

@@ -197,5 +197,6 @@ For example, most of the long-term like over years 0 volume is because of relist
 
 * ✅ update versatile_tickers_fetch.py
 * ✅ update weekly_update.sh in scripts
+* ✅ add file_examiner in scripts
 
 ---

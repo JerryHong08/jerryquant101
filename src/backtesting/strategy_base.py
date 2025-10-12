@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 import polars as pl
 
 from backtesting.backtest_pre_data import load_irx_data
-from core_2.config import cache_dir
+from cores.config import cache_dir
 
 strategy_cache_dir = os.path.join(cache_dir, "strategies")
 

@@ -2,7 +2,7 @@ import os
 
 import polars as pl
 
-from core_2.config import get_asset_overview_data
+from cores.config import get_asset_overview_data
 
 
 def get_mapped_tickers():

@@ -28,6 +28,7 @@ backtest_output/
 
 # Logs
 *.log
+logs/
 
 # Secrets
 .env

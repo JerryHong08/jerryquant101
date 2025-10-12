@@ -16,8 +16,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import polars as pl
-from core_2.config import data_dir
 from tqdm import tqdm
+
+from cores.config import data_dir
 
 # Base directories
 RAW_DIR = os.path.join(data_dir, "raw")

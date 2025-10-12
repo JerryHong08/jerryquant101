@@ -3,9 +3,10 @@ import time
 from datetime import datetime, timedelta
 
 import polars as pl
-from core_2.config import data_dir
 from dotenv import load_dotenv
 from polygon import RESTClient
+
+from cores.config import data_dir
 
 load_dotenv()
 
