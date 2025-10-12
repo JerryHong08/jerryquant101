@@ -2,8 +2,8 @@
 
 * [Roadmap](#roadmap)
 * [Document & Guide (Detailed)](#document--guide-detailed)
-  * [data_1](#data_1)
-  * [core_2](#core_2)
+  * [data_fecther](#data_fecther)
+  * [cores](#cores)
   * [live_trade](#live_trade)
 * [Change Log](#change-log)
 
@@ -19,8 +19,9 @@
 * [ ] Polars ETL + numba backtest engine(long-term)
 
 * bugs to be fixed:
-* [ ] market live monitor web version front end polish & stock info needed
+* [ ] backtest engine needed rewrite.
 * [ ] backtest open positions need to be fixed.
+* [ ] market live monitor web version front end polish & stock info needed
 * [ ] Stock dividends
 * [ ] low_volume_tickers.csv, see more detail below in the changelog.
 
@@ -28,7 +29,7 @@
 
 ## Document & Guide (Detailed)
 
-## `data_1`
+## `data_fecther`
 
 This directory handles **data download & save**.
 
@@ -38,7 +39,7 @@ This directory handles **data download & save**.
 
     ```bash
     # Download recent 7 days
-    python src/data_1/polygon_downloader.py \
+    python src/data_fecther/polygon_downloader.py \
         --asset-class us_stocks_sip \
         --data-type minute_aggs_v1 \
         --recent-days 7
@@ -47,7 +48,7 @@ This directory handles **data download & save**.
 ### ⚡ First Time Setup
 
 1. Configure your data directory in
-   `core_2/config.py`
+   `cores/config.py`
 2. Suggested file structure:
 
         ├── lake/          # parquet files
@@ -77,7 +78,7 @@ This directory handles **data download & save**.
 For faster access using Polars.
 
     # Convert recent 7 days
-    python src/data_1/csvgz_to_parquet.py \
+    python src/data_fecther/csvgz_to_parquet.py \
         --asset-class us_stocks_sip \
         --data-type day_aggs_v1 \
         --recent-days 7
@@ -90,7 +91,7 @@ Other options:`--file`, `--directory`, `--asset-class`, `--date-range`, `--info`
 
 splits&merge data are from Polygon.io, and there will be some discrepancy, and you can customize by editing `splits_error.csv`.
 
-I have left mine in[`src/data_1/data_discrepancy_fixed/splits_error.csv`](src/data_1/data_discrepancy_fixed/splits_error.csv), which comes from my experience, you can use it as a reference.
+I have left mine in[`src/data_fecther/data_discrepancy_fixed/splits_error.csv`](src/data_fecther/data_discrepancy_fixed/splits_error.csv), which comes from my experience, you can use it as a reference.
 
 * Example:
 
@@ -103,7 +104,7 @@ I have left mine in[`src/data_1/data_discrepancy_fixed/splits_error.csv`](src/da
 
 ---
 
-## `core_2`
+## `cores`
 
 This directory includes **configs, loaders, and plotting tools**.
 
@@ -164,7 +165,7 @@ This directory includes **configs, loaders, and plotting tools**.
 2025-09-24
 
 * 🥹 `low_volume_tickers.csv` the specious low volume tickers have too much to examined and each case seems to be different, which would cost too much time for me to do it.
-And the most important part about low_volume_tickers is that it can show the correctness of your data load process. As you can find some notes in the [`src/data_1/data_discrepancy_fixed/low_volume_tickers_copy.csv`](src/data_1/data_discrepancy_fixed/low_volume_tickers_copy.csv).
+And the most important part about low_volume_tickers is that it can show the correctness of your data load process. As you can find some notes in the [`src/data_fecther/data_discrepancy_fixed/low_volume_tickers_copy.csv`](src/data_fecther/data_discrepancy_fixed/low_volume_tickers_copy.csv).
 For example, most of the long-term like over years 0 volume is because of relisted on the market or there is a new ticker has the same name, which complicates the situation now for it's hard to distinguish. So, as for now, 2025-09-24, I have decided to leave this tickers(max_duration_days > 50) as skipped tickers. I know it's unwise, but it saves me time for now.
 
 2025-09-27
@@ -191,5 +192,10 @@ For example, most of the long-term like over years 0 volume is because of relist
 2025-10-07
 
 * ✅ market live monitor web version
+
+2025-10-07
+
+* ✅ update versatile_tickers_fetch.py
+* ✅ update weekly_update.sh in scripts
 
 ---

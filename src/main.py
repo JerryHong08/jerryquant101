@@ -1,28 +1,12 @@
 import polars as pl
 
-from backtesting.visualizer import BacktestVisualizer
-from core_2.data_loader import stock_load_process
-from strategies.indicators.registry import get_indicator
+df = pl.read_parquet("I:IRXday.parquet")
 
-visualizer = BacktestVisualizer()
-
-ticker = "AA"
-start_date = "2024-10-01"
-end_date = "2025-10-03"
-ohlcv_data = stock_load_process(ticker, start_date, end_date).collect()
-print(ohlcv_data.head())
-
-func = get_indicator("bbiboll")
-indicators = func(ohlcv_data)
-
-with pl.Config(tbl_rows=50, tbl_cols=50):
-    print(indicators.filter(pl.col("dev_pct") == 1))
-
-visualizer.plot_candlestick_with_signals(
-    ohlcv_data,
-    trades=None,
-    ticker=ticker,
-    start_date=start_date,
-    end_date=end_date,
-    indicators=indicators,
+df = df.with_columns(
+    pl.from_epoch(pl.col("timestamp"), time_unit="ms").dt.convert_time_zone("UTC")
 )
+
+df = df.sort("timestamp")
+
+print(df.head())
+print(df.tail())

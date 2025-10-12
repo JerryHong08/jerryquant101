@@ -9,8 +9,8 @@ import polars as pl
 from backtesting.backtest_pre_data import load_spx_benchmark, only_common_stocks
 from backtesting.engine import BacktestEngine
 from backtesting.visualizer import BacktestVisualizer
-from core_2.config import all_tickers_dir
-from core_2.data_loader import stock_load_process
+from cores.config import all_tickers_dir
+from cores.data_loader import stock_load_process
 
 
 def run_backtest(strategy, strategy_config=None):
@@ -151,22 +151,22 @@ if __name__ == "__main__":
     print("=" * 60)
 
     strategy_config = {
-        "result_customized_name": "test",  # distinguish different config runs
+        "result_customized_name": "20251012",  # distinguish different config runs
         "boll_length": 11,
         "boll_multiple": 6,
         "max_dev_pct": 1,
         "loss_threshold": -0.15,
         "profit_threshold": 0.1,
-        "selected_tickers": ["QCLS"],
-        # "selected_tickers": ["random"],  # change it to 'random' to select random stocks
+        # "selected_tickers": ["QCLS"],
+        "selected_tickers": ["random"],  # change it to 'random' to select random stocks
         "random_count": None,
         # "min_turnover": 0,
-        "plot_all": True,
-        # "plot_all": False,
+        # "plot_all": True,
+        "plot_all": False,
         "timeframe": "1d",
-        "data_start_date": "2023-10-01",
-        "trade_start_date": "2025-05-01",
-        "end_date": "2025-10-03",
+        "data_start_date": "2023-12-01",
+        "trade_start_date": "2024-12-01",
+        "end_date": "2025-10-10",
         "initial_capital": 10000.0,
         "add_risk_free_rate": True,
     }

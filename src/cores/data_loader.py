@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 import pandas
 import polars as pl
 import s3fs
-from dotenv import load_dotenv
-
 from core_2.config import data_dir, splits_data
 from core_2.plotter import plot_candlestick
+from dotenv import load_dotenv
+
 from utils.tickers_name_alignment_polars import get_mapped_tickers
 
 load_dotenv()

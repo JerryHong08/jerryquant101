@@ -16,9 +16,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import polars as pl
-from tqdm import tqdm
-
 from core_2.config import data_dir
+from tqdm import tqdm
 
 # Base directories
 RAW_DIR = os.path.join(data_dir, "raw")
@@ -602,30 +601,30 @@ def main():
         print("\nUsage examples:")
         print(" Convert recent 7 days:")
         print(
-            "    python src/data_1/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days 7"
+            "    python src/data_fecther/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days 7"
         )
         print("\n  Convert single file:")
         print(
-            "    python src/data_1/csvgz_to_parquet.py --file /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/2024/03/2024-03-01.csv.gz"
+            "    python src/data_fecther/csvgz_to_parquet.py --file /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/2024/03/2024-03-01.csv.gz"
         )
         print("\n  Convert directory:")
         print(
-            "    python src/data_1/csvgz_to_parquet.py --directory /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/"
+            "    python src/data_fecther/csvgz_to_parquet.py --directory /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/"
         )
         print("\n  Convert by asset class:")
         print(
-            "    python src/data_1/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1"
+            "    python src/data_fecther/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1"
         )
         print("\n  Convert date range:")
         print(
-            "    python src/data_1/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
+            "    python src/data_fecther/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
         )
         print("\n  Show file info:")
         print(
-            "    python src/data_1/csvgz_to_parquet.py --info /mnt/blackdisk/quant_data/polygon_data/lake/us_stocks_sip/trades_v1/2024/03/2024-03-01.parquet"
+            "    python src/data_fecther/csvgz_to_parquet.py --info /mnt/blackdisk/quant_data/polygon_data/lake/us_stocks_sip/trades_v1/2024/03/2024-03-01.parquet"
         )
         print("\n  List schemas:")
-        print("    python src/data_1/csvgz_to_parquet.py --list-schemas")
+        print("    python src/data_fecther/csvgz_to_parquet.py --list-schemas")
 
 
 if __name__ == "__main__":

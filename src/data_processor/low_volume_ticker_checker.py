@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import polars as pl
+from core_2.data_loader import stock_load_process
 
 from backtesting.backtest_pre_data import only_common_stocks
-from core_2.data_loader import stock_load_process
 from utils.longbridge_utils import update_watchlist
 
 updated_time = datetime.now().strftime("%Y-%m-%d")

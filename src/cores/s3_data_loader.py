@@ -4,9 +4,8 @@ from datetime import datetime
 import duckdb
 import polars as pl
 import s3fs
-from dotenv import load_dotenv
-
 from core_2.data_loader import data_loader
+from dotenv import load_dotenv
 
 load_dotenv()
 

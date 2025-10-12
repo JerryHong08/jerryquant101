@@ -5,7 +5,7 @@ import polars as pl
 from dotenv import load_dotenv
 from polygon import RESTClient
 
-from core_2.config import all_indices_dir, all_tickers_dir
+from cores.config import all_indices_dir, all_tickers_dir
 
 load_dotenv()
 polygon_api_key = os.getenv("POLYGON_API_KEY")
@@ -54,16 +54,16 @@ def fetch_and_save(asset_type: str, out_dir: str):
 for asset, outdir in ASSET_CONFIG.items():
     fetch_and_save(asset, outdir)
 
-with pl.Config(tbl_rows=50, tbl_cols=20):
-    asset = "indices"
-    all_asset = pl.read_parquet(
-        os.path.join(ASSET_CONFIG[asset], f"all_{asset}_{updated_time}.parquet")
-    )
-    print(all_asset.shape)
-    print(
-        all_asset.filter(
-            (pl.col("active") == True)
-            # & (pl.col('type').is_in(['ADRC', 'CS', 'ETF', 'ETN', 'ETS', 'ETV']))
-            & (pl.col("ticker").str.contains("SPX"))
-        )
-    )
+# with pl.Config(tbl_rows=50, tbl_cols=20):
+#     asset = "indices"
+#     all_asset = pl.read_parquet(
+#         os.path.join(ASSET_CONFIG[asset], f"all_{asset}_{updated_time}.parquet")
+#     )
+#     print(all_asset.shape)
+#     print(
+#         all_asset.filter(
+#             (pl.col("active") == True)
+#             # & (pl.col('type').is_in(['ADRC', 'CS', 'ETF', 'ETN', 'ETS', 'ETV']))
+#             & (pl.col("ticker").str.contains("SPX"))
+#         )
+#     )
