@@ -6,11 +6,14 @@ import os
 
 import polars as pl
 
-from backtesting.backtest_pre_data import load_spx_benchmark, only_common_stocks
 from backtesting.engine import BacktestEngine
 from backtesting.visualizer import BacktestVisualizer
 from cores.config import all_tickers_dir
 from cores.data_loader import stock_load_process
+from utils.backtest_utils.backtest_pre_data import (
+    load_spx_benchmark,
+    only_common_stocks,
+)
 
 
 def run_backtest(strategy, strategy_config=None):

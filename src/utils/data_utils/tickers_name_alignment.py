@@ -28,6 +28,7 @@ def get_mapped_tickers():
         .group_by([pl.all().exclude("last_updated_utc")])
         .agg(pl.col("last_updated_utc").max())
         .sort("last_updated_utc")
+        .unique(subset=["ticker", "cik"], keep="last")
     )
 
     # ======================
@@ -36,7 +37,7 @@ def get_mapped_tickers():
     edges = (
         df.select(["ticker", "type", "composite_figi", "share_class_figi"])
         .unpivot(index=["ticker", "type"], value_name="figi")
-        .filter(~pl.col("figi").str.starts_with("NULL_"))  # 关键
+        .filter(~pl.col("figi").str.starts_with("NULL_"))  # filter out null FIGI
         .select(["ticker", "type", "figi"])
         .unique()
     )
@@ -129,4 +130,4 @@ if __name__ == "__main__":
         pl.col("all_last_updated_utc").list.join(", "),
     ).sort("group_id")
 
-    result.write_csv("tickers_name_alignment_polars.csv")
+    result.write_csv("tickers_name_alignment.csv")

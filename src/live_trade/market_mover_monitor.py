@@ -9,9 +9,9 @@ from dotenv import load_dotenv
 from polygon import RESTClient
 from polygon.rest.models import Agg, TickerSnapshot
 
-from backtesting.backtest_pre_data import only_common_stocks
 from cores.config import cache_dir
-from utils.longbridge_utils import update_watchlist
+from utils.backtest_utils.backtest_pre_data import only_common_stocks
+from utils.longbridge_utils.update_watchlist import update_watchlist
 
 market_mover_dir = os.path.join(cache_dir, "market_mover")
 os.makedirs(market_mover_dir, exist_ok=True)

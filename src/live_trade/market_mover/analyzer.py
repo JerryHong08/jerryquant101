@@ -10,8 +10,8 @@ from zoneinfo import ZoneInfo
 import polars as pl
 import redis
 
-from backtesting.backtest_pre_data import only_common_stocks
-from utils.longbridge_utils import update_watchlist
+from utils.backtest_utils.backtest_pre_data import only_common_stocks
+from utils.longbridge_utils.update_watchlist import update_watchlist
 
 
 def run_cli_mode():

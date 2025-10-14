@@ -23,32 +23,30 @@ class BacktestVisualizer:
         self.maximize_window = maximize_window
 
     def _setup_window(self):
-        """设置窗口显示"""
+        """set up window size and mode"""
         if not self.maximize_window:
             return
 
-        # 设置窗口显示模式
         try:
             manager = plt.get_current_fig_manager()
             if hasattr(manager, "full_screen_toggle"):
-                # 全屏模式（无边框）
                 manager.full_screen_toggle()
-                print("窗口已设置为全屏模式")
+                print("windows set to full screen mode")
             elif hasattr(manager, "window"):
                 if hasattr(manager.window, "state"):
-                    # 最大化模式（有边框）
+                    # maximize window
                     manager.window.state("zoomed")
-                    print("窗口已设置为最大化")
+                    print("window has been set to maximized")
                 elif hasattr(manager.window, "wm_state"):
                     manager.window.wm_state("zoomed")
-                    print("窗口已设置为最大化")
+                    print("window has been set to maximized")
             else:
-                print("当前后端不支持窗口控制")
+                print("set up window to maximized not supported in this environment")
         except Exception as e:
-            print(f"设置窗口状态失败: {e}")
+            print(f"set up window state failed: {e}")
 
     def _normalize_date_string(self, date_obj):
-        """标准化日期字符串格式"""
+        """normalize date string to 'YYYY-MM-DD' format"""
         try:
             if pd.isna(date_obj):
                 return None

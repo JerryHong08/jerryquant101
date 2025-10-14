@@ -8,8 +8,8 @@ from typing import Any, Dict, Optional
 
 import polars as pl
 
-from backtesting.backtest_pre_data import load_irx_data
 from cores.config import cache_dir
+from utils.backtest_utils.backtest_pre_data import load_irx_data
 
 strategy_cache_dir = os.path.join(cache_dir, "strategies")
 

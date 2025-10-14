@@ -2,6 +2,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 from datetime import datetime, time, timedelta
 
 import duckdb
@@ -10,137 +11,18 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas
 import polars as pl
-import s3fs
 from dotenv import load_dotenv
 
 from cores.config import data_dir, splits_data
-from cores.plotter import plot_candlestick
-from utils.tickers_name_alignment_polars import get_mapped_tickers
+from utils.data_utils.path_loader import DataPathFetcher
+from utils.data_utils.tickers_name_alignment import get_mapped_tickers
 
 load_dotenv()
 
 ACCESS_KEY_ID = os.getenv("ACCESS_KEY_ID")
 SECRET_ACCESS_KEY = os.getenv("SECRET_ACCESS_KEY")
 
-# 创建 S3 文件系统对象
-fs = s3fs.S3FileSystem(
-    key=ACCESS_KEY_ID,
-    secret=SECRET_ACCESS_KEY,
-    endpoint_url="https://files.polygon.io",
-    client_kwargs={"region_name": "us-east-1"},
-)
-
-all_tickers = get_mapped_tickers().lazy()
-
-
-def s3_data_dir_calculate(asset: str, data_type: str, start_date: str, end_date: str):
-    """
-    Calculate data directory paths based on asset type, timeframe, date range.
-
-    Args:
-        start_date: Start date in format 'YYYY-MM-DD'
-        end_date: End date in format 'YYYY-MM-DD'
-
-    Returns:
-        List of S3 file paths
-    """
-
-    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-
-    data_dirs = []
-
-    for y in range(start_dt.year, end_dt.year + 1):
-        start_month = start_dt.month if y == start_dt.year else 1
-        end_month = end_dt.month if y == end_dt.year else 12
-
-        for m in range(start_month, end_month + 1):
-            month_str = f"{m:02d}"  # Format as two digits
-            # S3 路径
-            s3_prefix = f"flatfiles/{asset}/{data_type}/{y}/{month_str}/"
-            file_extension = "csv.gz"
-
-            print(f"Searching in S3 path: {s3_prefix}")
-
-            try:
-                # 列出该路径下的所有文件
-                all_files = fs.ls(s3_prefix)
-                # 过滤出正确扩展名的文件
-                month_all_file = [
-                    f"s3://{f}" for f in all_files if f.endswith(file_extension)
-                ]
-
-                print(f"Found {len(month_all_file)} files")
-
-                if m in [start_month, end_month]:
-                    filtered_files = []
-                    for file in month_all_file:
-                        # 从 s3://flatfiles/... 中提取文件名
-                        file_name = os.path.basename(file).split(".")[0]
-                        try:
-                            file_date = datetime.strptime(file_name, "%Y-%m-%d").date()
-                        except ValueError:
-                            continue  # skip files that don't match the date format
-                        if (m == start_month and file_date < start_dt.date()) or (
-                            m == end_month and file_date > end_dt.date()
-                        ):
-                            continue  # skip files outside the range
-                        filtered_files.append(file)
-                    data_dirs.extend(filtered_files)
-                else:
-                    data_dirs.extend(month_all_file)
-            except Exception as e:
-                print(f"Error accessing S3 path {s3_prefix}: {e}")
-                continue
-
-    return data_dirs
-
-
-def data_dir_calculate(
-    asset: str, data_type: str, start_date: str, end_date: str, lake: bool = True
-):
-    """
-    Calculate data directory paths based on asset type, timeframe, date range.
-
-    Args:
-        start_date: Start date in format 'YYYY-MM-DD'
-        end_date: End date in format 'YYYY-MM-DD'
-
-    Returns:
-        List of parquet file paths
-    """
-
-    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-
-    data_dirs = []
-
-    for y in range(start_dt.year, end_dt.year + 1):
-        start_month = start_dt.month if y == start_dt.year else 1
-        end_month = end_dt.month if y == end_dt.year else 12
-
-        for m in range(start_month, end_month + 1):
-            month_str = f"{m:02d}"  # Format as two digits
-            file_pattern = f"{data_dir}/{'lake' if lake else 'raw'}/{asset}/{data_type}/{y}/{month_str}/*.{'parquet' if lake else 'csv.gz'}"
-            month_all_file = glob.glob(file_pattern)
-            if m in [start_month, end_month]:
-                filtered_files = []
-                for file in month_all_file:
-                    _, file_name = os.path.split(file)
-                    file_name = file_name.split(".")[0]
-                    try:
-                        file_date = datetime.strptime(file_name, "%Y-%m-%d").date()
-                    except ValueError:
-                        continue  # skip files that don't match the date format
-                    if (m == start_month and file_date < start_dt.date()) or (
-                        m == end_month and file_date > end_dt.date()
-                    ):
-                        continue  # skip files outside the range
-                    filtered_files.append(file)
-                data_dirs.extend(filtered_files)
-            else:
-                data_dirs.extend(month_all_file)
-    return data_dirs
+mapped_all_tickers = get_mapped_tickers().lazy()
 
 
 def generate_full_timestamp(start_date, end_date, timeframe, full_hour: bool = False):
@@ -154,11 +36,9 @@ def generate_full_timestamp(start_date, end_date, timeframe, full_hour: bool = F
         Schema([('timestamps', Datetime(time_unit='us', time_zone='America/New_York'))])
     """
 
-    # 纽约证券交易所 (美国)
     xnys = xcals.get_calendar("XNYS")
     snys_schedule = xnys.schedule.loc[start_date:end_date]
 
-    # 转换为 Polars DataFrame
     df_schedule = pl.from_pandas(snys_schedule.reset_index())
 
     df_schedule = df_schedule.with_columns(
@@ -170,12 +50,10 @@ def generate_full_timestamp(start_date, end_date, timeframe, full_hour: bool = F
 
     if timeframe == "1d":
 
-        # 直接使用交易所日历中的交易日，而不是生成连续日期
         trading_days_df = df_schedule.select(
             pl.col("open").dt.date().alias("trade_date")
         )
 
-        # 创建时间戳DataFrame，使用交易日
         generated_trade_timestamp = trading_days_df.with_columns(
             pl.col("trade_date")
             .cast(pl.Datetime)
@@ -185,17 +63,17 @@ def generate_full_timestamp(start_date, end_date, timeframe, full_hour: bool = F
         ).select("timestamps")
 
     else:
-        # 为每个交易日生成时间戳
+        # generate intraday timestamps
         all_timestamps = []
 
         for row in df_schedule.iter_rows(named=True):
-            is_half_day = row["close"].hour == 13
 
-            # 确定时间段
+            # some days are half days
+            is_half_day = row["close"].hour == 13
             if not full_hour:
                 time_segments = [(row["open"], row["close"])]
             elif is_half_day:
-                # 半日分两段
+                # when it was half-day trading day, it will close intraday at 13:00, and the after hour will be 16:00 to 17:00
                 time_segments = [
                     (
                         row["open"].replace(hour=4, minute=0, second=0),
@@ -207,7 +85,7 @@ def generate_full_timestamp(start_date, end_date, timeframe, full_hour: bool = F
                     ),
                 ]
             else:
-                # 正常全天
+                # full day and full_hour(pre-market and after-hours)
                 time_segments = [
                     (
                         row["open"].replace(hour=4, minute=0, second=0),
@@ -215,7 +93,6 @@ def generate_full_timestamp(start_date, end_date, timeframe, full_hour: bool = F
                     )
                 ]
 
-            # 生成所有时间段的时间戳
             for start_time, end_time in time_segments:
                 timestamps = (
                     pl.select(
@@ -232,7 +109,6 @@ def generate_full_timestamp(start_date, end_date, timeframe, full_hour: bool = F
                 )
                 all_timestamps.extend(timestamps)
 
-        # 创建完整的时间戳DataFrame
         generated_trade_timestamp = (
             pl.DataFrame({"timestamps": all_timestamps})
             .with_columns(
@@ -550,7 +426,7 @@ def save_cache_metadata(cache_path, params):
 
 def tickers_alignment(tickers):
     tickers = tickers.join(
-        all_tickers.select(
+        mapped_all_tickers.select(
             ["ticker", "tickers", "group_id", "latest_ticker", "all_delisted_utc"]
         ).filter(pl.col("group_id").is_not_null()),
         on="ticker",
@@ -559,100 +435,12 @@ def tickers_alignment(tickers):
     return tickers
 
 
-def data_loader(
-    asset: str = "us_stocks_sip",
-    data_type: str = "day_aggs_v1",
-    start_date: str = "",
-    end_date: str = "",
-    use_s3: bool = False,
-    duck_db=False,
-):
-    if not duck_db:
-        if use_s3:
-            lake_file_paths = s3_data_dir_calculate(
-                asset=asset,
-                data_type=data_type,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        else:
-            lake_file_paths = data_dir_calculate(
-                asset=asset,
-                data_type=data_type,
-                start_date=start_date,
-                end_date=end_date,
-                # lake=False
-            )
-
-        print("1. data path loaded.")
-
-        # local lake/*/.parquet
-        if all(f.endswith(".parquet") for f in lake_file_paths):
-            lf = pl.scan_parquet(lake_file_paths)
-        # s3 */.csv.gz
-        elif use_s3:
-            lf = pl.scan_csv(
-                lake_file_paths,
-                storage_options={
-                    "aws_access_key_id": ACCESS_KEY_ID,
-                    "aws_secret_access_key": SECRET_ACCESS_KEY,
-                    "aws_endpoint": "https://files.polygon.io",
-                    "aws_region": "us-east-1",
-                },
-            )
-        # local raw/*/.csv.gz
-        else:
-            lf = pl.scan_csv(lake_file_paths)
-    else:
-        # 连接数据库（内存模式）
-        con = duckdb.connect()
-        if use_s3:
-            # 加载 DuckDB 的 S3 插件
-            con.execute("INSTALL httpfs;")
-            con.execute("LOAD httpfs;")
-
-            # 配置 S3 连接参数
-            con.execute("SET s3_region='us-east-1';")
-            con.execute("SET s3_endpoint='files.polygon.io';")
-            # -- 重点：Polygon flat files 的 endpoint
-            con.execute(f"SET s3_access_key_id='{ACCESS_KEY_ID}';")
-            con.execute(f"SET s3_secret_access_key='{SECRET_ACCESS_KEY}';")
-            con.execute("SET s3_url_style='path';")
-            # -- 避免走 virtual-host 风格 URL
-
-            # 直接在远程 S3 上跑 SQL
-
-            # Calculate the appropriate file patterns based on date range
-            s3_paths = s3_data_dir_calculate(asset, data_type, start_date, end_date)
-
-            query = f"""
-            SELECT *
-            FROM read_csv_auto({s3_paths})
-            ;
-            """
-        else:
-            local_paths = data_dir_calculate(
-                asset, data_type, start_date, end_date, lake=True
-            )
-            # Format as array for DuckDB
-            local_paths_array = "['" + "', '".join(local_paths) + "']"
-            query = f"""
-            SELECT *
-            FROM read_parquet({local_paths_array})
-            ;
-            """
-        print(query)
-        lf = con.execute(query).fetchdf()
-
-    return lf
-
-
 def splits_figi_alignment(df):
     print("Processing figi alignment...")
     df = (
         df.lazy()
         .join(
-            all_tickers.select(["ticker", "group_id", "latest_ticker"]),
+            mapped_all_tickers.select(["ticker", "group_id", "latest_ticker"]),
             on="ticker",
             how="left",
         )
@@ -671,7 +459,7 @@ def ohlcv_figi_alignment(lf):
     """
     # 首先添加 group_id 和 ticker 顺序信息
     lf = lf.join(
-        all_tickers.select(
+        mapped_all_tickers.select(
             [
                 "ticker",
                 "group_id",
@@ -852,53 +640,99 @@ def ohlcv_figi_alignment(lf):
     return final_data.select(columns_to_keep).sort(["ticker", "timestamps"])
 
 
+def raw_data_loader(
+    asset: str = "us_stocks_sip",
+    data_type: str = "day_aggs_v1",
+    start_date: str = "",
+    end_date: str = "",
+    lake: bool = True,
+    use_s3: bool = False,
+    duck_db=False,
+):
+    # universal data loader function
+    path_fetcher = DataPathFetcher(asset, data_type, start_date, end_date, lake, use_s3)
+    paths = path_fetcher.data_dir_calculate()
+    print("1. data path loaded.")
+
+    if not duck_db:
+        # use polars to load data
+
+        # local lake/*/.parquet
+        if all(f.endswith(".parquet") for f in paths):
+            lf = pl.scan_parquet(paths)
+        # s3 */.csv.gz
+        elif use_s3:
+            lf = pl.scan_csv(
+                paths,
+                storage_options={
+                    "aws_access_key_id": ACCESS_KEY_ID,
+                    "aws_secret_access_key": SECRET_ACCESS_KEY,
+                    "aws_endpoint": "https://files.polygon.io",
+                    "aws_region": "us-east-1",
+                },
+            )
+        # local raw/*/.csv.gz
+        else:
+            lf = pl.scan_csv(paths)
+
+    else:
+        # use duckdb to load data
+        con = duckdb.connect()
+        if use_s3:
+            # use duckdb to read S3 files
+            # install httpfs extension
+            con.execute("INSTALL httpfs;")
+            con.execute("LOAD httpfs;")
+            # config S3 parameters for duckdb
+            con.execute("SET s3_region='us-east-1';")
+            con.execute("SET s3_endpoint='files.polygon.io';")
+            # config Polygon flat files endpoint
+            con.execute(f"SET s3_access_key_id='{ACCESS_KEY_ID}';")
+            con.execute(f"SET s3_secret_access_key='{SECRET_ACCESS_KEY}';")
+            con.execute("SET s3_url_style='path';")
+
+            query = f"""
+            SELECT *
+            FROM read_csv_auto({paths})
+            ;
+            """
+        else:
+            # use duckdb to read local files
+            # Format as array for DuckDB
+            local_paths_array = "['" + "', '".join(paths) + "']"
+
+            query = f"""
+            SELECT *
+            FROM read_parquet({local_paths_array})
+            ;
+            """
+
+        print(query)
+        lf = con.execute(query).fetchdf()
+
+    return lf
+
+
 def stock_load_process(
-    tickers: str = None,
+    tickers: list[str],
     start_date: str = "",
     end_date: str = "",
     timeframe: str = "1d",
     asset: str = "us_stocks_sip",
     data_type: str = "day_aggs_v1",
     full_hour: bool = False,
+    lake: bool = True,
     use_s3: bool = False,
     use_cache: bool = True,
-    duck_db: bool = False,
+    use_duck_db: bool = False,
     skip_low_volume: bool = True,
 ):
-    aligned_tickers = tickers_alignment(pl.DataFrame({"ticker": tickers}).lazy())
-
-    if skip_low_volume:
-        skipped = (
-            pl.read_csv("low_volume_tickers.csv", truncate_ragged_lines=True)
-            .filter(
-                (pl.col("max_duration_days") > 50) | (pl.col("avg_turnover") < 60000),
-            )
-            .select(pl.col("ticker").unique())
-        )
-
-        skipped = tickers_alignment(skipped.lazy())
-
-        print(
-            f"there are {len(skipped.collect())} tickers to skip due to specious low volume."
-        )
-        aligned_tickers = aligned_tickers.join(skipped, on="ticker", how="anti")
-
-    tickers = (
-        aligned_tickers.select("tickers")
-        .collect()
-        .to_series()
-        .explode()
-        .unique()
-        .to_list()
-    )
-
-    # Generate cache key
+    # Check if cache exists and use_cache is True
     cache_key = generate_cache_key(
         tickers, timeframe, asset, data_type, start_date, end_date, full_hour
     )
     cache_path = get_cache_path(asset, data_type, cache_key)
 
-    # Check if cache exists and use_cache is True
     if use_cache and os.path.exists(cache_path):
         print(f"Loading from cache: {cache_path}")
         try:
@@ -912,24 +746,20 @@ def stock_load_process(
 
     print("Processing data from source...")
 
-    # 解析timeframe以确定数据源
-    import re
-
-    match = re.match(r"(\d+)([mhd]|w|mo|q|y)", timeframe.lower())
-    if not match:
-        raise ValueError(f"Invalid timeframe: {timeframe}")
-
-    value, unit = int(match.group(1)), match.group(2)
-    is_daily_or_above = unit in ["d", "w", "mo", "q", "y"]
-
-    lf = data_loader(
+    lf = raw_data_loader(
         asset=asset,
         data_type=data_type,
         start_date=start_date,
         end_date=end_date,
+        lake=lake,
         use_s3=use_s3,
-        duck_db=duck_db,
+        duck_db=use_duck_db,
     )
+
+    if use_duck_db:
+        lf = pl.DataFrame(lf).lazy()
+    else:
+        pass
 
     lf = lf.with_columns(
         pl.from_epoch(pl.col("window_start"), time_unit="ns")
@@ -937,24 +767,67 @@ def stock_load_process(
         .alias("timestamps")
     ).sort("ticker", "timestamps")
 
-    if tickers == None:
-        tickers = lf.select("ticker").unique().collect()["ticker"]
-        print(f"All tickers count: {len(tickers)}")
-    elif len(tickers) == 0:
+    # return all tickers
+    if tickers is None:
+        tickers = lf.select("ticker").unique().collect()["ticker"].to_list()
+        print(f"raw data all tickers count: {len(tickers)}")
+
+    aligned_tickers = tickers_alignment(pl.DataFrame({"ticker": tickers}).lazy())
+    # print(f"after aligned tickers count: {len(aligned_tickers.select(pl.col('tickers')).collect())}")
+    print(
+        f"after alignment, unique groups: {aligned_tickers.select('ticker').unique().collect().n_unique()}"
+    )
+    print(
+        f"after alignment, total tickers in lists: {aligned_tickers.select('tickers').collect().to_series().explode().n_unique()}"
+    )
+
+    # TODO: this method need to be optimized,
+    # as currently there's too much low specious volume tickers
+    # so I need to manually filter them out simply but not the best way
+    if skip_low_volume:
+        skipped = (
+            pl.read_csv("low_volume_tickers.csv", truncate_ragged_lines=True)
+            .filter(
+                (pl.col("max_duration_days") > 50) | (pl.col("avg_turnover") < 60000),
+            )
+            .select(pl.col("ticker").unique())
+        )
+        skipped = tickers_alignment(skipped.lazy())
+
+        aligned_tickers = aligned_tickers.join(skipped, on="ticker", how="anti")
+
+        print(f"removed {len(skipped.collect())} tickers due to specious low volume.")
+
+    tickers = (
+        aligned_tickers.select("tickers")
+        .collect()
+        .to_series()
+        .explode()
+        .unique()
+        .to_list()
+    )
+
+    if len(tickers) == 0:
         raise ValueError("Tickers list is empty after alignment.")
-    else:
-        print(f"Selected tickers count: {len(tickers)}")
-        lf = lf.filter(pl.col("ticker").is_in(tickers))
+
+    print(f"final selected tickers count: {len(tickers)}")
+    lf = lf.filter(pl.col("ticker").is_in(tickers))
 
     print("2. data loaded.")
 
     lf = ohlcv_figi_alignment(lf).lazy()
     splits_data_figi = splits_figi_alignment(splits_data)
-    # print(splits_data_figi.filter(pl.col("ticker").is_in(['TNFA'])).sort("ticker").head(10))
 
     lf = splits_adjust(lf.lazy(), splits_data_figi.collect(), price_decimals=4)
 
     print("3. splits adjusted.")
+
+    match = re.match(r"(\d+)(mo|[mhdwqy])", timeframe.lower())
+    if not match:
+        raise ValueError(f"Invalid timeframe: {timeframe}")
+
+    value, unit = int(match.group(1)), match.group(2)
+    is_daily_or_above = unit in ["d", "w", "mo", "q", "y"]
 
     ticker_date_ranges = (
         lf.group_by("ticker")
@@ -1001,9 +874,8 @@ def stock_load_process(
             .lazy()
         )
 
-    # 先在1 min timeframe上forward fill，再resample到目标timeframe
-    # 所有操作都在 LazyFrame 中进行
     lf_full = (
+        # forward fill the missing data on the basic timeframe unit
         time_range_lf.join(lf, on=["ticker", "timestamps"], how="left")
         .with_columns([pl.col("close").forward_fill().alias("close_filled")])
         .with_columns(
@@ -1034,14 +906,12 @@ def stock_load_process(
     print("6. timeframe fillna.")
 
     if timeframe not in ("1m", "1d"):
+        # resample from basic timeframe unit to required timeframe
         lf_full = resample_ohlcv(lf_full, timeframe)
-
-    print("7. resample done.")
+        print("7. resample done.")
 
     # lf_full = lf_full.drop(["split_date", "window_start", "split_ratio"])
 
-    # Save to cache if use_cache is True
-    # if use_cache and not use_s3:
     try:
         print(f"Saving to cache: {cache_path}")
         data = lf_full.collect()
@@ -1074,27 +944,27 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    from backtesting.backtest_pre_data import only_common_stocks
+    from utils.backtest_utils.backtest_pre_data import only_common_stocks
 
     # tickers = only_common_stocks(filter_date='2024-10-01').to_series().to_list()
     tickers = ["BULL"]
     # tickers = ['LCID','TNFA', 'MYMD', 'NVDA', 'FFIE', 'FFAI']
-    # tickers = None
+    tickers_ = None
     with pl.Config(tbl_cols=50, tbl_width_chars=1000):
-        print(all_tickers.filter(pl.col("ticker") == tickers[0]).collect())
+        print(mapped_all_tickers.filter(pl.col("ticker") == tickers[0]).collect())
 
     timeframe = "1d"  # timeframe: '1m', '3m', '5m', '10m', '15m', '20m', '30m', '45m', '1h', '2h', '3h', '4h', '1d' 等
     asset = "us_stocks_sip"
     data_type = "day_aggs_v1" if timeframe == "1d" else "minute_aggs_v1"
-    start_date = "2024-10-01"
-    end_date = "2025-10-03"
+    start_date = "2025-01-01"
+    end_date = "2025-10-10"
     full_hour = False
     plot = True
     # plot = False
     ticker_plot = tickers[0]
 
     lf_result = stock_load_process(
-        tickers=tickers,
+        tickers=tickers_,
         timeframe=timeframe,
         asset=asset,
         data_type=data_type,
@@ -1102,9 +972,10 @@ if __name__ == "__main__":
         end_date=end_date,
         full_hour=full_hour,
         use_cache=False,
+        # lake=False,
+        # use_s3=True,
+        # use_duck_db=True
     ).collect()
-
-    # print(lf_result.filter(pl.col('timestamps').cast(pl.Datetime("us")).is_between(pl.datetime(2024, 6, 3), pl.datetime(2024, 6, 11))))
 
     with pl.Config(tbl_cols=50):
         print(
@@ -1123,9 +994,11 @@ if __name__ == "__main__":
             indicators.filter(
                 pl.col("timestamps")
                 .dt.date()
-                .is_between(pl.date(2025, 4, 6), pl.date(2025, 4, 11))
+                .is_between(pl.date(2025, 10, 1), pl.date(2025, 10, 11))
             )
         )
+
+    from visualizer.plotter import plot_candlestick
 
     if plot:
         plot_candlestick(

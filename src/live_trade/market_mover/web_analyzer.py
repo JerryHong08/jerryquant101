@@ -13,8 +13,8 @@ import redis
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
-from backtesting.backtest_pre_data import only_common_stocks
 from live_trade.market_mover.data_manager import DataManager
+from utils.backtest_utils.backtest_pre_data import only_common_stocks
 
 
 class WebAnalyzer:
