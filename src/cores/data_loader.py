@@ -4,6 +4,7 @@ import json
 import os
 import re
 from datetime import datetime, time, timedelta
+from typing import Any, Dict, List, Optional
 
 import duckdb
 import exchange_calendars as xcals
@@ -14,8 +15,8 @@ import polars as pl
 from dotenv import load_dotenv
 
 from cores.config import data_dir, splits_data
+from utils.data_utils.data_uitils import get_mapped_tickers, resolve_date_range
 from utils.data_utils.path_loader import DataPathFetcher
-from utils.data_utils.tickers_name_alignment import get_mapped_tickers
 
 load_dotenv()
 
@@ -716,7 +717,8 @@ def raw_data_loader(
 def stock_load_process(
     tickers: list[str],
     start_date: str = "",
-    end_date: str = "",
+    end_date: Optional[str] = None,
+    timedelta: Optional[int] = None,
     timeframe: str = "1d",
     asset: str = "us_stocks_sip",
     data_type: str = "day_aggs_v1",
@@ -727,22 +729,35 @@ def stock_load_process(
     use_duck_db: bool = False,
     skip_low_volume: bool = True,
 ):
+    if end_date is None and timedelta:
+        start_date, end_date = resolve_date_range(
+            start_date=start_date, timedelta=timedelta
+        )
+        print(f"time range after timedelta adjusted: {start_date} → {end_date}")
+
     # Check if cache exists and use_cache is True
     cache_key = generate_cache_key(
         tickers, timeframe, asset, data_type, start_date, end_date, full_hour
     )
     cache_path = get_cache_path(asset, data_type, cache_key)
 
-    if use_cache and os.path.exists(cache_path):
-        print(f"Loading from cache: {cache_path}")
-        try:
-            cached_data = pl.scan_parquet(cache_path)
-            print("Cache loaded successfully.")
-            print(f"Cache Size: {cached_data.collect().estimated_size('mb'):.2f} MB")
-            print(f"Cache rows: {len(cached_data.collect()):,}")
-            return cached_data
-        except Exception as e:
-            print(f"Failed to load cache: {e}, proceeding with normal data loading...")
+    if use_cache:
+        if os.path.exists(cache_path):
+            print(f"Loading from cache: {cache_path}")
+            try:
+                cached_data = pl.scan_parquet(cache_path)
+                print("Cache loaded successfully.")
+                print(
+                    f"Cache Size: {cached_data.collect().estimated_size('mb'):.2f} MB"
+                )
+                print(f"Cache rows: {len(cached_data.collect()):,}")
+                return cached_data
+            except Exception as e:
+                print(
+                    f"Failed to load cache: {e}, proceeding with normal data loading..."
+                )
+        else:
+            print(f"no cache found")
 
     print("Processing data from source...")
 
@@ -946,8 +961,8 @@ if __name__ == "__main__":
     from utils.backtest_utils.backtest_pre_data import only_common_stocks
 
     # tickers = only_common_stocks(filter_date='2024-10-01').to_series().to_list()
-    tickers = ["BULL"]
-    # tickers = ['LCID','TNFA', 'MYMD', 'NVDA', 'FFIE', 'FFAI']
+    # tickers = ["BULL"]
+    tickers = ["LCID", "TNFA", "MYMD", "NVDA", "FFIE", "FFAI"]
     tickers_ = None
     with pl.Config(tbl_cols=50, tbl_width_chars=1000):
         print(mapped_all_tickers.filter(pl.col("ticker") == tickers[0]).collect())
@@ -963,7 +978,7 @@ if __name__ == "__main__":
     ticker_plot = tickers[0]
 
     lf_result = stock_load_process(
-        tickers=tickers_,
+        tickers=tickers,
         timeframe=timeframe,
         asset=asset,
         data_type=data_type,

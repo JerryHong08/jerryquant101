@@ -1,5 +1,8 @@
 import os
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
+import exchange_calendars as xcals
 import polars as pl
 
 from cores.config import get_asset_overview_data
@@ -115,19 +118,69 @@ def get_mapped_tickers():
     return result
 
 
+def resolve_date_range(
+    start_date: str, timedelta: int = 0, calendar_name: str = "XNYS"
+) -> Tuple[str, str]:
+    """
+    Return exact start and end date based on
+    given start_date, end_date, timedelta, calendar
+    """
+    cal = xcals.get_calendar(calendar_name)
+    snys_schedule = cal.schedule
+
+    df_schedule = snys_schedule.reset_index()
+    start = datetime.fromisoformat(start_date)
+
+    try:
+        date_column = df_schedule.columns[0]
+
+        # find the closest date before or equal to given start_date
+        mask = df_schedule[date_column].dt.date <= start.date()
+        matching_indices = df_schedule.index[mask].tolist()
+
+        if not matching_indices or len(matching_indices) == len(df_schedule):
+            raise ValueError(f"start_date is out of range")
+        else:
+            start_idx = matching_indices[-1]
+
+        start_date = str(df_schedule.iloc[start_idx][date_column].date())
+        target_idx = start_idx + timedelta
+
+        # make sure end_date not out of the range
+        if target_idx < 0 or target_idx >= len(df_schedule):
+            raise IndexError(
+                f"Target index {target_idx} is out of range [0, {len(df_schedule)-1}]"
+            )
+
+        end_row = df_schedule.iloc[target_idx]
+
+        if end_row[date_column].date() < start.date():
+            end_date = start_date
+            start_date = str(end_row[date_column].date())
+        else:
+            end_date = str(end_row[date_column].date())
+
+        return start_date, end_date
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return start_date, start_date
+
+
 if __name__ == "__main__":
-    result = get_mapped_tickers()
+    resolve_date_range(start_date="2025-10-17", timedelta=-1)
+    # result = get_mapped_tickers()
 
     # print(result.with_columns(
     #       pl.col('tickers').list.len()
     #     ).sort('tickers', descending=True)
     # )
 
-    result = result.with_columns(
-        pl.col("tickers").list.join(", "),
-        pl.col("all_types").list.join(", "),
-        pl.col("all_delisted_utc").list.join(", "),
-        pl.col("all_last_updated_utc").list.join(", "),
-    ).sort("group_id")
+    # result = result.with_columns(
+    #     pl.col("tickers").list.join(", "),
+    #     pl.col("all_types").list.join(", "),
+    #     pl.col("all_delisted_utc").list.join(", "),
+    #     pl.col("all_last_updated_utc").list.join(", "),
+    # ).sort("group_id")
 
-    result.write_csv("tickers_name_alignment.csv")
+    # result.write_csv("tickers_name_alignment.csv")
