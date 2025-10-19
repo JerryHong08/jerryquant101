@@ -814,7 +814,6 @@ def stock_load_process(
     lf = lf.filter(pl.col("ticker").is_in(tickers))
 
     print("2. data loaded.")
-
     lf = ohlcv_figi_alignment(lf).lazy()
     splits_data_figi = splits_figi_alignment(splits_data)
 
@@ -972,10 +971,11 @@ if __name__ == "__main__":
         end_date=end_date,
         full_hour=full_hour,
         use_cache=False,
+        skip_low_volume=False,
         # lake=False,
         # use_s3=True,
         # use_duck_db=True
-    ).collect(engine="gpu")
+    ).collect()
 
     with pl.Config(tbl_cols=50):
         print(

@@ -12,6 +12,7 @@
 ## Roadmap
 
 * features to be add:
+* [ ] market live monitor trades timespan replayer
 * [ ] universal indicator plot
 * [ ] market live monitor replay rewrite to web-embedded with play, pause, play back and speed control.
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
@@ -193,7 +194,7 @@ For example, most of the long-term like over years 0 volume is because of relist
 
 * ✅ market live monitor web version
 
-2025-10-07
+2025-10-12
 
 * ✅ update versatile_tickers_fetch.py
 * ✅ update weekly_update.sh in scripts

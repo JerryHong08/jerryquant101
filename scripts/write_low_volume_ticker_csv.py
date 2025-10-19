@@ -16,7 +16,6 @@ config = {
     "end_date": updated_time,
 }
 
-print(config)
 tickers = only_common_stocks(filter_date=config["start_date"])
 
 ohlcv_data = (
@@ -25,7 +24,7 @@ ohlcv_data = (
         timeframe=config["timeframe"],
         start_date=config["start_date"],
         end_date=config["end_date"],
-        # use_cache=False,
+        use_cache=False,
         skip_low_volume=False,
     )
     # .collect()
@@ -109,14 +108,26 @@ duration = (
 )
 
 result = (duration).collect()
-
-notes = pl.read_csv(
-    "low_volume_tickers.csv", truncate_ragged_lines=True
-)  # load previous tickers information with notes on it.
-result = result.join(
-    notes.select(["ticker", "notes", "source", "cut_off_date", "counts"]),
-    on="ticker",
-    how="left",
-)
+try:
+    notes = pl.read_csv(
+        "low_volume_tickers.csv", truncate_ragged_lines=True
+    )  # load previous tickers information with notes on it.
+    result = result.join(
+        notes.select(["ticker", "notes", "source", "cut_off_date", "counts"]),
+        on="ticker",
+        how="left",
+    )
+    print("Loaded previous low_volume_tickers notes")
+except FileNotFoundError:  # Be more specific about the exception
+    print("there is no low volume csv, initiation.")
+    result = result.with_columns(
+        [
+            pl.lit(None).alias("notes"),
+            pl.lit(None).alias("source"),
+            pl.lit(None).alias("cut_off_date"),
+            pl.lit(None).alias("counts"),
+        ]
+    )
 
 result.sort("max_duration_days", descending=True).write_csv("low_volume_tickers.csv")
+print("low_volume_tickers.csv updated")

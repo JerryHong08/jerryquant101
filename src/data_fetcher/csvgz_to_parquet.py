@@ -259,7 +259,13 @@ class CSVGZToParquetConverter:
                 # )
 
                 # Use lazy reading and writing for big files in case the RAM is limited
-                lazy_df = pl.scan_csv(csv_gz_path)
+                lazy_df = pl.scan_csv(
+                    csv_gz_path,
+                    schema_overrides=schema,
+                    infer_schema_length=10000 if not schema else None,
+                    try_parse_dates=False,
+                    null_values=["", "null", "NULL", "N/A", "n/a"],
+                )
                 # print(f"Read {len(lazy_df)} rows with {len(lazy_df.columns)} columns")
                 lazy_df.sink_parquet(
                     parquet_path,
