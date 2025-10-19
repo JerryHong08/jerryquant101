@@ -20,7 +20,7 @@ splits_dir = os.path.join(data_dir, "raw/us_stocks_sip/splits")
 splits_error_file_copy = os.path.join(
     data_dir, "raw/us_stocks_sip/splits/splits_error.csv"
 )
-splits_error_file = "src/data_fecther/data_discrepancy_fixed/splits_error.csv"
+splits_error_file = "src/data_fetcher/data_discrepancy_fixed/splits_error.csv"
 
 # ===================== all_asset_overview with error correction ==============
 all_tickers_dir = os.path.join(data_dir, "raw/us_stocks_sip/us_all_tickers")
@@ -40,7 +40,7 @@ def get_asset_dir(asset):
 
     asset_dir = os.path.join(data_dir, asset_dir_config[asset][0])
     asset_error_file = os.path.join(
-        "src/data_fecther/data_discrepancy_fixed", f"{asset}_error.csv"
+        "src/data_fetcher/data_discrepancy_fixed", f"{asset}_error.csv"
     )
     asset_error_file_copy = os.path.join(asset_dir, f"{asset}_error.csv")
 

@@ -72,4 +72,33 @@ while True:
     r.publish("market_snapshot", payload)
     print(f"Published {len(df)} rows at {datetime.now(ZoneInfo('America/New_York'))}")
 
+    ## debug
+    # df = df.with_columns(
+    #     pl.from_epoch(
+    #         pl.col('timestamp'), time_unit='ms'
+    #     ).dt.convert_time_zone('America/New_York')
+    # )
+    # # Filter only common stocks and sort by percent_change
+    # updated_time = datetime.now(ZoneInfo("America/New_York")).strftime(
+    #     "%Y%m%d%H%M%S"
+    # )
+    # filter_date = (
+    #     f"{updated_time[:4]}-{updated_time[4:6]}-{updated_time[6:8]}"
+    # )
+
+    # try:
+    #     from utils.backtest_utils.backtest_pre_data import only_common_stocks
+    #     df = (
+    #         only_common_stocks(filter_date)
+    #         .drop("active", "composite_figi")
+    #         .join(df, on="ticker", how="inner")
+    #         .sort("percent_change", descending=True)
+    #     )
+    # except Exception as e:
+    #     print(f"Error filtering common stocks: {e}")
+    #     # Fallback: just sort by percent_change
+    #     df = df.sort("percent_change", descending=True)
+    # # print(df.select('timestamp').head())
+    # print(df.head())
+
     time.sleep(5)

@@ -154,7 +154,7 @@ if __name__ == "__main__":
     print("=" * 60)
 
     strategy_config = {
-        "result_customized_name": "20251012",  # distinguish different config runs
+        "result_customized_name": "20251017",  # distinguish different config runs
         "boll_length": 11,
         "boll_multiple": 6,
         "max_dev_pct": 1,
@@ -169,7 +169,7 @@ if __name__ == "__main__":
         "timeframe": "1d",
         "data_start_date": "2023-12-01",
         "trade_start_date": "2024-12-01",
-        "end_date": "2025-10-10",
+        "end_date": "2025-10-17",
         "initial_capital": 10000.0,
         "add_risk_free_rate": True,
     }

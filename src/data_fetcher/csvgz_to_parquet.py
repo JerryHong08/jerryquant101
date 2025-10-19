@@ -16,9 +16,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import polars as pl
-from tqdm import tqdm
 
 from cores.config import data_dir
+
+# pl.Config.set_tbl_formatting("UTF8_FULL")
+# pl.Config.set_verbose(True)
+
 
 # Base directories
 RAW_DIR = os.path.join(data_dir, "raw")
@@ -236,28 +239,41 @@ class CSVGZToParquetConverter:
                     schema = adjusted_schema if adjusted_schema else None
 
                 # Read the file with Polars
-                df = pl.read_csv(
-                    csv_gz_path,
-                    schema_overrides=schema,
-                    infer_schema_length=10000 if not schema else None,
-                    try_parse_dates=False,
-                    null_values=["", "null", "NULL", "N/A", "n/a"],
-                )
+                # df = pl.read_csv(
+                #     csv_gz_path,
+                #     schema_overrides=schema,
+                #     infer_schema_length=10000 if not schema else None,
+                #     try_parse_dates=False,
+                #     null_values=["", "null", "NULL", "N/A", "n/a"],
+                # )
 
-                print(f"Read {len(df)} rows with {len(df.columns)} columns")
+                # print(f"Read {len(df)} rows with {len(df.columns)} columns")
 
-                # Write to Parquet
-                df.write_parquet(
+                # # Write to Parquet
+                # df.write_parquet(
+                #     parquet_path,
+                #     compression=compression,
+                #     compression_level=compression_level,
+                #     statistics=True,
+                #     use_pyarrow=True,
+                # )
+
+                # Use lazy reading and writing for big files in case the RAM is limited
+                lazy_df = pl.scan_csv(csv_gz_path)
+                # print(f"Read {len(lazy_df)} rows with {len(lazy_df.columns)} columns")
+                lazy_df.sink_parquet(
                     parquet_path,
                     compression=compression,
                     compression_level=compression_level,
-                    statistics=True,
-                    use_pyarrow=True,
                 )
 
                 print(
-                    f"Successfully converted {len(df):,} rows to {parquet_path}, compression_level: {compression_level}"
+                    f"Successfully converted {csv_gz_path} to {parquet_path}, compression_level: {compression_level}"
                 )
+                # print(
+                #     f"Successfully converted {len(lazy_df):,} rows to {parquet_path}, compression_level: {compression_level}"
+                # )
+
                 return parquet_path
 
             except Exception as e:
@@ -602,30 +618,30 @@ def main():
         print("\nUsage examples:")
         print(" Convert recent 7 days:")
         print(
-            "    python src/data_fecther/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days 7"
+            "    python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days 7"
         )
         print("\n  Convert single file:")
         print(
-            "    python src/data_fecther/csvgz_to_parquet.py --file /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/2024/03/2024-03-01.csv.gz"
+            "    python src/data_fetcher/csvgz_to_parquet.py --file /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/2024/03/2024-03-01.csv.gz"
         )
         print("\n  Convert directory:")
         print(
-            "    python src/data_fecther/csvgz_to_parquet.py --directory /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/"
+            "    python src/data_fetcher/csvgz_to_parquet.py --directory /mnt/blackdisk/quant_data/polygon_data/raw/us_stocks_sip/trades_v1/"
         )
         print("\n  Convert by asset class:")
         print(
-            "    python src/data_fecther/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1"
+            "    python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1"
         )
         print("\n  Convert date range:")
         print(
-            "    python src/data_fecther/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
+            "    python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
         )
         print("\n  Show file info:")
         print(
-            "    python src/data_fecther/csvgz_to_parquet.py --info /mnt/blackdisk/quant_data/polygon_data/lake/us_stocks_sip/trades_v1/2024/03/2024-03-01.parquet"
+            "    python src/data_fetcher/csvgz_to_parquet.py --info /mnt/blackdisk/quant_data/polygon_data/lake/us_stocks_sip/trades_v1/2024/03/2024-03-01.parquet"
         )
         print("\n  List schemas:")
-        print("    python src/data_fecther/csvgz_to_parquet.py --list-schemas")
+        print("    python src/data_fetcher/csvgz_to_parquet.py --list-schemas")
 
 
 if __name__ == "__main__":

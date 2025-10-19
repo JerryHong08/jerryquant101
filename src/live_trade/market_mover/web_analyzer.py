@@ -176,6 +176,9 @@ class WebAnalyzer:
         print("Starting Redis listener...")
 
         for message in self.pubsub.listen():
+            print(
+                f'received message from redis at {datetime.now(ZoneInfo("America/New_York"))}'
+            )
             if message["type"] == "message":
                 try:
                     json_data = message["data"]
@@ -208,6 +211,7 @@ class WebAnalyzer:
                         # Fallback: just sort by percent_change
                         df = df.sort("percent_change", descending=True)
                     # print(df.select('timestamp').head())
+                    print(df.head())
                     # Update data manager
                     self.data_manager.update_from_realtime(df)
 

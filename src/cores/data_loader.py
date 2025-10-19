@@ -975,7 +975,7 @@ if __name__ == "__main__":
         # lake=False,
         # use_s3=True,
         # use_duck_db=True
-    ).collect()
+    ).collect(engine="gpu")
 
     with pl.Config(tbl_cols=50):
         print(
