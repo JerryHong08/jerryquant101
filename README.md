@@ -12,12 +12,11 @@
 ## Roadmap
 
 * features to be add:
-* [ ] market live monitor trades timespan replayer
 * [ ] universal indicator plot
-* [ ] market live monitor replay rewrite to web-embedded with play, pause, play back and speed control.
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
 * [ ] Polish **X news search function**.
 * [ ] Polars ETL + numba backtest engine(long-term)
+* [ ] market live monitor replay rewrite to web-embedded with play, pause, play back and speed control.
 
 * bugs to be fixed:
 * [ ] backtest engine needed rewrite.
@@ -199,5 +198,9 @@ For example, most of the long-term like over years 0 volume is because of relist
 * ✅ update versatile_tickers_fetch.py
 * ✅ update weekly_update.sh in scripts
 * ✅ add file_examiner in scripts
+
+2025-10-20
+
+* ✅ market live monitor trades timespan replayer
 
 ---
