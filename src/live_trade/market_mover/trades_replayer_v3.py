@@ -50,6 +50,7 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
         lake=True,
         s3=False,
     )
+
     paths = path_fetcher.data_dir_calculate()
 
     # ---- Step 1: Load prev_data ----

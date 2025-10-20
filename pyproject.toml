@@ -33,11 +33,10 @@ dependencies = [
     "igraph (>=0.11.9,<0.12.0)",
     "quantstats (>=0.0.77,<0.0.78)",
     "redis (>=6.4.0,<7.0.0)",
-    "vectorbt[full] (>=0.28.1,<0.29.0)",
     "anywidget (>=0.9.18,<0.10.0)",
     "flask (>=3.1.2,<4.0.0)",
     "flask-socketio (>=5.5.1,<6.0.0)",
-    "polars (>=1.34.0,<2.0.0)",
+    "polars (>=1.32.0,<2.0.0)",
 ]
 
 [tool.poetry]

@@ -93,7 +93,7 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
         .sort("bucket_id")
     )
 
-    bucket_ids = bucket_lf.collect(streaming=True)["bucket_id"].to_list()
+    bucket_ids = bucket_lf.collect(engine="streaming")["bucket_id"].to_list()
 
     # Process each bucket separately
     for bucket_id in bucket_ids:
@@ -114,13 +114,15 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
                     pl.col("timestamp").dt.timestamp(time_unit="ns")
                     // int(1e9)
                     // bucket_size
-                ).alias("bucket_id")
+                ).alias("bucket_id"),
+                pl.col("size").cum_sum().over("ticker").alias("accumulated_volume"),
             )
+            # Select the exact time(bucket_id) snapshot
             .filter(pl.col("bucket_id") == bucket_id)
             .sort(["ticker", "timestamp"])
         )
 
-        bucket_df = bucket_lf.collect(streaming=True)
+        bucket_df = bucket_lf.collect(engine="streaming")
 
         if bucket_df.is_empty():
             continue
@@ -136,15 +138,9 @@ def process_bucket(bucket_df, prev_data_dict, bucket_id, sleep_duration):
     """
     Process a single bucket of data
     """
-    # Calculate accumulated volume for each ticker in this bucket
-    bucket_processed = bucket_df.with_columns(
-        pl.col("size").cum_sum().over("ticker").alias("accumulated_volume")
-    )
 
     # Create market snapshot for this bucket
-    whole_market_snapshot = bucket_processed.group_by(
-        "ticker", maintain_order=True
-    ).agg(
+    whole_market_snapshot = bucket_df.group_by("ticker", maintain_order=True).agg(
         pl.col("timestamp").last(),
         pl.col("price").last().alias("current_price"),
         pl.col("accumulated_volume").last(),
