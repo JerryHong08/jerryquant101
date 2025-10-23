@@ -13,15 +13,12 @@ from utils.data_utils.path_loader import DataPathFetcher
 
 r = redis.Redis(host="localhost", port=6379, db=0)
 
-
-# TODO:
-# This version forward fill the missing data for all tickers
-# but it is too slow.
+# optimized to 12-18s per market snapshot.
 
 
 def load_previous_data(
     replay_date: str, tickers: list[str] = None, use_cache=True
-) -> pl.DataFrame:
+) -> pl.LazyFrame:
     replay_date = datetime.strptime(replay_date, "%Y%m%d").strftime("%Y-%m-%d")
     prev_date, _ = resolve_date_range(replay_date, -1)
     prev_data = stock_load_process(
@@ -35,7 +32,7 @@ def load_previous_data(
         pl.col("ticker"),
         pl.col("volume").alias("prev_volume"),
         pl.col("close").alias("prev_close"),
-    ).collect()
+    )
 
 
 def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
@@ -55,12 +52,6 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
 
     # ---- Step 1: Load prev_data ----
     prev_data = load_previous_data(replay_date=replay_date, use_cache=True)
-    prev_data_dict = {}
-    for row in prev_data.iter_rows(named=True):
-        prev_data_dict[row["ticker"]] = {
-            "prev_volume": row["prev_volume"],
-            "prev_close": row["prev_close"],
-        }
 
     # ---- Step 2: Load all tickers and create a mapping of ticker to all trades ----
     print("Loading all tickers and their trades...")
@@ -85,12 +76,11 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
 
     # Process data in smaller chunks by ticker groups
     ticker_groups = [
-        all_tickers[i : i + 50] for i in range(0, len(all_tickers), 50)
-    ]  # Process 50 tickers at a time
+        all_tickers[i : i + 3000] for i in range(0, len(all_tickers), 3000)
+    ]
 
     # ---- Step 3: Process data by buckets with forward filling ----
     bucket_size = 30  # seconds
-    sleep_duration = bucket_size / speed_multiplier
 
     print("Starting trades replay...")
 
@@ -126,95 +116,43 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
         bucket_end_time = bucket_time.replace(
             tzinfo=None
         )  # Remove timezone for comparison
-        print(bucket_end_time)
+        print(f"bucket_end_time:{bucket_end_time}")
 
+        process_start_time = datetime.now()
         # Process tickers in groups to save memory
         all_snapshots = []
         for ticker_group in ticker_groups:
-            # Filter data for these tickers and times up to the current bucket
-            # We'll handle the time comparison differently to avoid type mismatch
-            group_lf = lf.filter(pl.col("ticker").is_in(ticker_group))
-
-            group_df = group_lf.collect(engine="streaming")
-
-            if group_df.is_empty():
-                continue
-
-            # Filter by timestamp after collection to avoid type issues
-            group_df_filtered = group_df.filter(
-                pl.col("timestamp").dt.replace_time_zone(None) <= bucket_end_time
-            )
-
-            if group_df_filtered.is_empty():
-                continue
-
-            # For each ticker, get the last trade before or at the bucket end time
-            latest_trades = group_df_filtered.group_by("ticker").agg(
-                pl.all().sort_by("timestamp").last()
-            )
-
-            # Calculate accumulated volume for each ticker
-            # We need to calculate this based on all trades up to this point
-            volume_lf = lf.filter(pl.col("ticker").is_in(ticker_group)).filter(
-                pl.col("timestamp").dt.replace_time_zone(None) <= bucket_end_time
-            )
-
-            volume_df = volume_lf.collect(engine="streaming")
-
-            if not volume_df.is_empty():
-                accumulated_volumes = volume_df.group_by("ticker").agg(
-                    pl.col("size").sum().alias("accumulated_volume")
+            snapshot_df = (
+                lf.filter(
+                    (pl.col("ticker").is_in(ticker_group)),
+                    pl.col("timestamp").dt.replace_time_zone(None) <= bucket_end_time,
                 )
-
-                # Join accumulated volumes to latest trades
-                latest_trades = latest_trades.join(
-                    accumulated_volumes, on="ticker", how="left"
+                .group_by("ticker")
+                .agg(
+                    pl.all().sort_by("timestamp").last(),
+                    pl.col("size").sum().alias("accumulated_volume"),
                 )
-
-            # Add prev_data and calculate percent change
-            rows = []
-            for row in latest_trades.iter_rows(named=True):
-                ticker = row["ticker"]
-                prev_info = prev_data_dict.get(
-                    ticker, {"prev_volume": 0, "prev_close": 0}
-                )
-
-                percent_change = (
+                .join(prev_data, on="ticker", how="left")
+                .with_columns(
                     (
-                        (row["price"] - prev_info["prev_close"])
-                        / prev_info["prev_close"]
+                        (pl.col("price") - pl.col("prev_close"))
+                        / pl.col("prev_close")
                         * 100
-                    )
-                    if prev_info["prev_close"]
-                    else 0
+                    ).alias("percent_change"),
+                    pl.col("price").alias("current_price"),
                 )
+                .filter(
+                    (pl.col("percent_change") > 5)
+                )  # for market-mover-monitor replayer we only want to find the gainers
+            ).collect(engine="streaming")
 
-                rows.append(
-                    {
-                        "ticker": ticker,
-                        "timestamp": row["timestamp"],
-                        "current_price": row["price"],
-                        "percent_change": percent_change,
-                        "accumulated_volume": row.get("accumulated_volume", 0),
-                        "prev_close": prev_info["prev_close"],
-                        "prev_volume": prev_info["prev_volume"],
-                    }
-                )
-
-            if rows:
-                snapshot_df = pl.DataFrame(rows)
+            if not snapshot_df.is_empty():
                 all_snapshots.append(snapshot_df)
 
             # Clear memory
-            del (
-                group_lf,
-                group_df,
-                group_df_filtered,
-                latest_trades,
-                volume_lf,
-                volume_df,
-            )
+            del snapshot_df
 
+        print(f"latest_trades collect costs: {datetime.now() - process_start_time}")
         # Combine all snapshots for this bucket
         if all_snapshots:
             whole_market_snapshot = pl.concat(all_snapshots)
@@ -231,7 +169,9 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
                     f"[Bucket {bucket_id}] {bucket_time}, {len(whole_market_snapshot)} tickers pushed."
                 )
 
-        time.sleep(sleep_duration)
+        print(
+            f"current {bucket_id} time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}"
+        )
 
 
 if __name__ == "__main__":

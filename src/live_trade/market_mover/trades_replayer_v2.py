@@ -13,9 +13,12 @@ from utils.data_utils.path_loader import DataPathFetcher
 
 r = redis.Redis(host="localhost", port=6379, db=0)
 
-# TODO:
-# This version will have missing data in some bucket
-# but it's very fast and memory save. and the bugs can be fixed in the reciever end.
+# v2 > v3
+# the core efficiency comes from it query filter of bucket_id,
+# so it only process the current timeframe.
+# but it will have missing data in some bucket due to there may not have trades in some bucket timespan.
+# can be fixed in the reciever end. and fixed now, so it works.
+# and it's very fast and memory save.
 
 
 def load_previous_data(
@@ -98,6 +101,7 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
     # Process each bucket separately
     for bucket_id in bucket_ids:
         print(f"Processing bucket {bucket_id}...")
+        process_start_time = datetime.now()
 
         # Load only the data for this specific bucket
         bucket_lf = (
@@ -115,10 +119,12 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
                     // int(1e9)
                     // bucket_size
                 ).alias("bucket_id"),
-                pl.col("size").cum_sum().over("ticker").alias("accumulated_volume"),
             )
             # Select the exact time(bucket_id) snapshot
             .filter(pl.col("bucket_id") == bucket_id)
+            .with_columns(
+                pl.col("size").cum_sum().over("ticker").alias("accumulated_volume"),
+            )
             .sort(["ticker", "timestamp"])
         )
 
@@ -130,6 +136,7 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
         # Process this bucket
         process_bucket(bucket_df, prev_data_dict, bucket_id, sleep_duration)
 
+        print(f"latest_trades collect costs: {datetime.now() - process_start_time}")
         # Clear memory
         del bucket_lf, bucket_df
 

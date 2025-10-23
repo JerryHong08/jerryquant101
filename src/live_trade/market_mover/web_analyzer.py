@@ -30,6 +30,7 @@ class WebAnalyzer:
 
         # Initialize data manager
         self.data_manager = DataManager()
+        self.last_df = pl.DataFrame()
 
         # Redis setup
         self.redis_client = redis.Redis(host="localhost", port=6379, db=0)
@@ -210,10 +211,29 @@ class WebAnalyzer:
                         print(f"Error filtering common stocks: {e}")
                         # Fallback: just sort by percent_change
                         df = df.sort("percent_change", descending=True)
-                    # print(df.select('timestamp').head())
-                    print(df.head())
+
+                    if len(self.last_df) != len(df):
+                        print(len(df))
+                        filled_df = (
+                            pl.concat([self.last_df, df], how="vertical")
+                            .sort("timestamp")
+                            .group_by(["ticker"])
+                            .agg(
+                                pl.col("timestamp").last(),
+                                pl.col("current_price").last(),
+                                pl.col("percent_change").last(),
+                                pl.col("accumulated_volume").last(),
+                                pl.col("prev_close").last(),
+                                pl.col("prev_volume").last(),
+                            )
+                        )
+                        print(len(filled_df))
+                    else:
+                        filled_df = df
+
+                    self.data_manager.update_from_realtime(filled_df)
                     # Update data manager
-                    self.data_manager.update_from_realtime(df)
+                    self.last_df = df
 
                     # Get updated chart data
                     chart_data = self.data_manager.get_chart_data()

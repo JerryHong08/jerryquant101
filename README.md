@@ -203,4 +203,8 @@ For example, most of the long-term like over years 0 volume is because of relist
 
 * ✅ market live monitor trades timespan replayer
 
+2025-10-23
+
+* ✅ market live monitor trades timespan replayer v2 & v3(v2 is better.) optimized, data_manager add last_df to concate for v2.
+
 ---
