@@ -16,7 +16,7 @@ run_task() {
     local task_name="$1"
     shift  # 移除第一个参数
     local command=("$@")  # 剩余参数作为命令
-    
+
     current_task=$((current_task + 1))
     echo "[$current_task/$TOTAL_TASKS] $task_name" | tee -a "$LOGFILE"
     "${command[@]}" | tee -a "$LOGFILE"
@@ -41,11 +41,11 @@ run_task "versatile tickers 更新..." python src/data_fetcher/versatile_tickers
 
 run_task "low_volume_tickers 更新..." python scripts/write_low_volume_ticker_csv.py
 
-echo "===== 数据更新完成：$(date) =====" | tee -a "$LOGFILE"low_volume_tickers 更新：$(date) =====" | tee -a "$LOGFILE"
-python scripts/write_low_volume_ticker_csv.py | tee -a "$LOGFILE"
 echo "===== low_volume_tickers 更新完成：$(date) =====" | tee -a "$LOGFILE"
 
 echo "===== 数据更新完成：$(date) =====" | tee -a "$LOGFILE"
+
+exit 0
 
 # chmod +x scripts/weekly_update.sh
 # ./scripts/weekly_update.sh

@@ -1,75 +1,56 @@
 # Table of Contents
 
-* [Roadmap](#roadmap)
-* [Document & Guide (Detailed)](#document--guide-detailed)
+* [Document](#document)
   * [data_fecther](#data_fecther)
   * [cores](#cores)
+  * [backtest](#backtest)
   * [live_trade](#live_trade)
 * [Change Log](#change-log)
+* [Roadmap](#roadmap)
 
 ---
 
-## Roadmap
+## Document
 
-* features to be add:
-* [ ] universal indicator plot
-* [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
-* [ ] Polish **X news search function**.
-* [ ] Polars ETL + numba backtest engine(long-term)
-* [ ] market live monitor replay rewrite to web-embedded with play, pause, play back and speed control.
-
-* bugs to be fixed:
-* [ ] backtest engine needed rewrite.
-* [ ] backtest open positions need to be fixed.
-* [ ] market live monitor web version front end polish & stock info needed
-* [ ] Stock dividends
-* [ ] low_volume_tickers.csv, see more detail below in the changelog.
-
----
-
-## Document & Guide (Detailed)
-
-## `data_fecther`
+### `data_fecther`
 
 This directory handles **data download & save**.
 
+I use a bash scripts [`scripts/weekly_update.sh`](scripts/weekly_update.sh) to handle all the data_fecther process in one. You can walk through each file below to pick what you need.
+
 ### 1. Polygon.io Flat File Downloader
 
-    Use prefixes to download specific files by **date range** or **recent days**.
+Use prefixes to download specific files by **date range** or **recent days**.
 
-    ```bash
-    # Download recent 7 days
     python src/data_fecther/polygon_downloader.py \
         --asset-class us_stocks_sip \
         --data-type minute_aggs_v1 \
         --recent-days 7
-    ```
 
-### ⚡ First Time Setup
+* First Time Setup
 
-1. Configure your data directory in
-   `cores/config.py`
-2. Suggested file structure:
+    1. Configure your data directory in `cores/config.py`
+    2. Suggested file structure:
 
-        ├── lake/          # parquet files
-        │   ├── us_options_opra/trades_v1
-        │   └── us_stocks_sip/{day_aggs_v1, minute_aggs_v1}
-        ├── processed/     # cache
-        │   └── us_stocks_sip/day_aggs_v1
-        └── raw/           # original csv.gz files
-            ├── global_crypto/minute_aggs_v1
-            ├── us_indices/{day_aggs_v1, minute_aggs_v1, us_all_indices}
-            ├── us_options_opra/{day_aggs_v1, minute_aggs_v1, quotes_v1, trades_v1}
-            └── us_stocks_sip/{day_aggs_v1, minute_aggs_v1, splits, us_all_tickers}
+            ├── lake/          # parquet files
+            │   ├── us_options_opra/trades_v1
+            │   └── us_stocks_sip/{day_aggs_v1, minute_aggs_v1}
+            ├── processed/     # cache
+            │   └── us_stocks_sip/day_aggs_v1
+            └── raw/           # original csv.gz files
+                ├── global_crypto/minute_aggs_v1
+                ├── us_indices/{day_aggs_v1, minute_aggs_v1, us_all_indices}
+                ├── us_options_opra/{day_aggs_v1, minute_aggs_v1, quotes_v1, trades_v1}
+                └── us_stocks_sip/{day_aggs_v1, minute_aggs_v1, splits, us_all_tickers}
 
-### 💾 File Size Reference (per year)
+* File Size Reference (per year)
 
-| Data Type        | Stock | Option | Indice | Forex     | Crypto |
-| ---------------- | ----- | ------ | ------ | --------- | ------ |
-| Day Aggregate    | 50 MB | 600 MB | 80 MB  | 8 MB      | 5 MB   |
-| Minute Aggregate | 4.5GB | 4.5GB  | 25 GB  | 3 GB      | 1 GB   |
-| Trades           | 350GB | 10 GB  | —      | —         | 15 GB  |
-| Quotes           | 1.5TB | 22 TB  | 2TB/M  | 100GB/day | 60 GB  |
+    | Data Type        | Stock | Option | Indice | Forex     | Crypto |
+    | ---------------- | ----- | ------ | ------ | --------- | ------ |
+    | Day Aggregate    | 50 MB | 600 MB | 80 MB  | 8 MB      | 5 MB   |
+    | Minute Aggregate | 4.5GB | 4.5GB  | 25 GB  | 3 GB      | 1 GB   |
+    | Trades           | 350GB | 10 GB  | —      | —         | 15 GB  |
+    | Quotes           | 1.5TB | 22 TB  | 2TB/M  | 100GB/day | 60 GB  |
 
 ---
 
@@ -104,7 +85,7 @@ I have left mine in[`src/data_fecther/data_discrepancy_fixed/splits_error.csv`](
 
 ---
 
-## `cores`
+### `cores`
 
 This directory includes **configs, loaders, and plotting tools**.
 
@@ -127,15 +108,58 @@ This directory includes **configs, loaders, and plotting tools**.
 
 ![NVDA 1-day price chart showing technical analysis indicators and trading signals](./figures/NVDA1d_Chart.png)
 
-## `live_trade`
+### `backtest`
 
-### live_news_fetcher
+### 1. Backtest Engine
 
-    grab the latest news of tickers.
+### 2. StrategyBase
 
-### market_mover_monitor
+### 3. Backtester
 
-    prototype for pre-market momentum trading.
+### 4. Results Analyzer
+
+![backtest/trades_analyzer.py](./figures/Trades_Analyzer_plotly.png)
+
+### `live_trade`
+
+### 1. market_mover_monitor
+
+    This is a another huge part of this project, which concentrates on the US pre-market trading.
+
+1.1. Analyzer and Plotter
+
+First start the web dashboard,
+
+    python src/live_trade/market_mover/start.py web
+
+Open `http://localhost:5000`, then choose the data supply,see below. And you will see Top20 tickers updated continuously.
+
+![Market Mover Monitor dashboard screenshot](./figures/Market_Mover_Monitor.png)
+
+You can highlight the tickers line, choose the timeframe, see the Hot Movers etc....
+
+1.2. Data Supply
+
+1.2.1. `collector.py`
+
+Using the polygon api collect the real time market snapshot, using html+css+js to monitor the real time market mover to get a early catch on.
+
+    python src/live_trade/market_mover/start.py collector
+
+1.2.2. `replayer.py`
+
+Replay data that collector have fecthed and saved to `analyzer`.
+
+    python src/live_trade/market_mover/start.py replay --date 20251016 --speed 5.0
+
+1.2.3. `trades_replayer`
+
+Aggregate the trades level flatfile data to `analyzer`.
+
+    python src/live_trade/market_mover_monitor/start.py replay --date 20251016 --speed 5.0 --type trade_replay
+
+**Currently it's only a dashboard, though enough for a hands-on trader, more mathematical analysis and data process to be added.**
+
 ---
 
 ## Change Log
@@ -206,5 +230,28 @@ For example, most of the long-term like over years 0 volume is because of relist
 2025-10-23
 
 * ✅ market live monitor trades timespan replayer v2 & v3(v2 is better.) optimized, data_manager add last_df to concate for v2.
+
+2025-10-27
+
+* ✅ updated README.md
+* ✅ add trades_analyzer.py
+
+---
+
+## Roadmap
+
+* features to be add:
+* [ ] universal indicator plot
+* [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
+* [ ] Polish **X news search function**.
+* [ ] Polars ETL + numba backtest engine(long-term)
+* [ ] market live monitor replay rewrite to web-embedded with play, pause, play back and speed control.
+
+* bugs to be fixed:
+* [ ] backtest engine needed rewrite.
+* [ ] backtest open positions need to be fixed.
+* [ ] market live monitor web version front end polish & stock info needed
+* [ ] Stock dividends
+* [ ] low_volume_tickers.csv, see more detail below in the changelog.
 
 ---

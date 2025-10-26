@@ -60,6 +60,19 @@ def start_replayer(date, speed=1.0):
     )
 
 
+def start_trades_replayer(date, speed=1.0):
+    """Start trade level replayer for historical data"""
+    trades_replayer_path = os.path.join(
+        os.path.dirname(__file__), "trades_replayer_v2.py"
+    )
+    print(
+        f"⏪ Starting Market Mover trades_replayer_v2 for {date} at {speed}x speed..."
+    )
+    subprocess.run(
+        [sys.executable, trades_replayer_path, "--date", date, "--speed", str(speed)]
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Market Mover System - Quick Start",
@@ -116,7 +129,9 @@ Typical Workflow:
     replay_parser.add_argument(
         "--speed", type=float, default=1.0, help="Replay speed multiplier"
     )
-
+    replay_parser.add_argument(
+        "--type", type=str, default="collector_replay", help="Choose replayer type"
+    )
     args = parser.parse_args()
 
     if not args.command:
@@ -136,7 +151,11 @@ Typical Workflow:
                 load_history=args.load_history,
             )
         elif args.command == "replay":
-            start_replayer(args.date, args.speed)
+            if args.type == "trade_replay":
+                start_trades_replayer(args.date, args.speed)
+            elif args.type == "collector_replay":
+                start_replayer(args.date, args.speed)
+
     except KeyboardInterrupt:
         print("\n👋 Shutting down...")
     except Exception as e:

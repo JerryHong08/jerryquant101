@@ -21,11 +21,11 @@ class VersatileFetcher:
     def fetch_tickers(
         self,
         tickers: list,
-        start_date: str = None,
+        # start_date: str = None,
         end_date: str = None,
         timespan: str = "day",
     ):
-        self.start_ = start_date
+        # self.start_ = start_date
         self.end_ = (
             end_date if end_date else time.strftime("%Y-%m-%d", time.localtime())
         )
@@ -35,27 +35,26 @@ class VersatileFetcher:
             self.ticker_file_path = f"{ticker}{timespan}.parquet"
             # initialize empty dataframe
             ticker_data = pl.DataFrame()
-            # if start_date is not provided, which means likely updated from existing data or initialize parquet data first time
-            if not self.start_:
-                # updated from existing data
-                if os.path.exists(self.ticker_file_path):
-                    ticker_data = pl.read_parquet(self.ticker_file_path)
-                    update_data = ticker_data.with_columns(
-                        pl.from_epoch(pl.col("timestamp"), time_unit="ms")
-                    ).sort("timestamp")
-                    last_updated = update_data["timestamp"].max().strftime("%Y-%m-%d")
-                    self.start_ = (
-                        datetime.strptime(last_updated, "%Y-%m-%d") + timedelta(days=1)
-                    ).strftime("%Y-%m-%d")
-                    print(f"Start date set to {self.start_} based on existing data.")
-                # initialize parquet data first time
-                else:
-                    self.start_ = "2022-12-31"  # polygon only provides indices data since 2023, you can set earlier date for stocks/options/crypto
-                    print(
-                        f"No existing data found for {ticker}. Start date set to {self.start_}."
-                    )
+            # updated from existing data
+            if os.path.exists(self.ticker_file_path):
+                ticker_data = pl.read_parquet(self.ticker_file_path)
+                update_data = ticker_data.with_columns(
+                    pl.from_epoch(pl.col("timestamp"), time_unit="ms")
+                ).sort("timestamp")
+                print(f"debug: update_data {update_data}")
+                last_updated = update_data["timestamp"].max().strftime("%Y-%m-%d")
+                start_ = (
+                    datetime.strptime(last_updated, "%Y-%m-%d") + timedelta(days=1)
+                ).strftime("%Y-%m-%d")
+                print(f"Start date set to {start_} based on existing data.")
+            # initialize parquet data first time
+            else:
+                start_ = "2022-12-31"  # polygon only provides indices data since 2023, you can set earlier date for stocks/options/crypto
+                print(
+                    f"No existing data found for {ticker}. Start date set to {start_}."
+                )
 
-            print(f"Fetching {ticker} data from {self.start_} to {self.end_}...")
+            print(f"Fetching {ticker} data from {start_} to {self.end_}...")
             self.fetch_ticker_data(ticker, ticker_data)
 
     def fetch_ticker_data(self, ticker: str, ticker_data: pl.DataFrame = None):

@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 import polars as pl
 import redis
 
-from utils.backtest_utils.backtest_pre_data import only_common_stocks
+from utils.backtest_utils.backtest_utils import only_common_stocks
 from utils.longbridge_utils.update_watchlist import update_watchlist
 
 
@@ -67,7 +67,7 @@ def run_cli_mode():
 
 def run_web_mode(**kwargs):
     """New web mode with real-time visualization"""
-    from live_trade.market_mover.web_analyzer import WebAnalyzer
+    from live_trade.market_mover_monitor.web_analyzer import WebAnalyzer
 
     web_analyzer = WebAnalyzer(
         host=kwargs.get("host", "localhost"), port=kwargs.get("port", 5000)

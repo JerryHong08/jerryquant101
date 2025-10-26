@@ -6,7 +6,7 @@ import pandas as pd
 import polars as pl
 
 from cores.data_loader import stock_load_process
-from utils.backtest_utils.backtest_pre_data import only_common_stocks
+from utils.backtest_utils.backtest_utils import only_common_stocks
 from utils.longbridge_utils.update_watchlist import update_watchlist
 
 updated_time = datetime.now().strftime("%Y-%m-%d")

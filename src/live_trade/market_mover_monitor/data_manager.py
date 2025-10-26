@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 import polars as pl
 
 from cores.config import cache_dir
-from utils.backtest_utils.backtest_pre_data import only_common_stocks
+from utils.backtest_utils.backtest_utils import only_common_stocks
 
 
 class DataManager:
@@ -67,10 +67,8 @@ class DataManager:
         """Update data from real-time DataFrame"""
         try:
 
-            # Extract timestamp from DataFrame's timestamp column
             timestamp_value = None
             if hasattr(df, "select") and "timestamp" in df.columns:
-                # timestamp_value = df.select("timestamp").item(0, 0)
                 timestamp_value = df["timestamp"].max()
                 print(
                     f"DEBUG: timestamp_value type: {type(timestamp_value)}, value: {timestamp_value}"
@@ -155,6 +153,7 @@ class DataManager:
         self.top_20_history.append(current_top_20_tickers)
 
         # Keep only recent history to manage memory
+        print(f"Debug: current {len(self.top_20_history)}")
         if len(self.top_20_history) > self.max_history_points:
             self.top_20_history = self.top_20_history[-self.max_history_points :]
 

@@ -156,7 +156,7 @@ class BacktestVisualizer:
 
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
-            print(f"资金曲线图已保存到: {save_path}")
+            print(f"equity_curve plot saved: {save_path}")
         self._setup_window()
         plt.show()
 
@@ -167,15 +167,17 @@ class BacktestVisualizer:
         save_path: Optional[str] = None,
     ):
         """
-        绘制月度收益热力图
+        plot monthly heatmap
 
         Args:
-            portfolio_daily: 每日组合表现
-            strategy_name: 策略名称
-            save_path: 保存路径
+            portfolio_daily, return daily
+            strategy_name,
+            save_path,
         """
         try:
-            # 计算月度收益
+
+            # print(f'debug portfolio_daily:{portfolio_daily.head()}')
+
             monthly_data = portfolio_daily.with_columns(
                 [
                     pl.col("date").dt.year().alias("year"),
@@ -183,8 +185,8 @@ class BacktestVisualizer:
                     (pl.col("portfolio_return") + 1).alias("return_factor"),
                 ]
             )
+            # print(f'debug monthly_data:{monthly_data.head()}')
 
-            # 转换为pandas pivot表
             monthly_df = monthly_data.to_pandas()
 
             monthly_returns = (
@@ -198,7 +200,6 @@ class BacktestVisualizer:
                 index="year", columns="month", values="monthly_return"
             )
 
-            # 创建热力图
             plt.figure(figsize=(12, 8))
             sns.heatmap(
                 monthly_pivot * 100,
@@ -334,17 +335,15 @@ class BacktestVisualizer:
         ax1.legend()
         ax1.grid(True, alpha=0.3)
 
-        print(f"open_positions: {open_positions}")
-        print(f"ticker_trades: {ticker_trades}")
-
         missing_cols = [
-            col for col in ticker_trades.columns if col not in open_positions.columns
+            col for col in ticker_trades.columns if col not in ticker_positions.columns
         ]
-        open_positions_aligned = open_positions.with_columns(
+        open_positions_aligned = ticker_positions.with_columns(
             [pl.lit(None).alias(col) for col in missing_cols]
         ).select(ticker_trades.columns)
 
         tick_all_trades = pl.concat([ticker_trades, open_positions_aligned])
+
         # mouse hover interaction
         self._add_interactive_features(fig, ax1, ax2, df, tick_all_trades)
 
@@ -435,9 +434,7 @@ class BacktestVisualizer:
     def _add_interactive_features(self, fig, ax1, ax2, df, trades):
         """添加交互功能：鼠标悬停显示OHLCV和交易信息"""
         # 创建交易信息映射
-        print(trades)
         trades_pd = trades.to_pandas() if not trades.is_empty() else pd.DataFrame()
-        print(trades_pd)
 
         trade_info_map = {}
 

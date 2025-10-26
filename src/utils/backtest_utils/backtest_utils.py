@@ -6,6 +6,69 @@ import polars as pl
 from cores.config import all_tickers_dir
 
 
+def generate_backtest_date(
+    start_date: str,
+    reverse: bool,
+    reverse_limit: str = None,
+    period: str = "week",
+    reverse_limit_count: int = 52,
+):
+
+    backtest_dates = []
+    if not reverse:
+        current_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+
+        today = datetime.datetime.now()
+
+        while current_date <= today:
+            backtest_dates.append(current_date.strftime("%Y-%m-%d"))
+
+            if period == "week":
+                current_date += datetime.timedelta(weeks=1)
+            elif period == "month":
+                if current_date.month == 12:
+                    current_date = current_date.replace(
+                        year=current_date.year + 1, month=1
+                    )
+                else:
+                    current_date = current_date.replace(month=current_date.month + 1)
+            elif period == "day":
+                current_date += datetime.timedelta(days=1)
+    else:
+        current_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+
+        if reverse_limit:
+            limit_date = datetime.datetime.strptime(reverse_limit, "%Y-%m-%d")
+        else:
+            limit_date = None
+
+        count = 0
+        while True:
+            # 检查是否到达限制
+            if reverse_limit and current_date < limit_date:
+                break
+            if not reverse_limit and count >= reverse_limit_count:
+                break
+
+            backtest_dates.append(current_date.strftime("%Y-%m-%d"))
+
+            if period == "week":
+                current_date -= datetime.timedelta(weeks=1)
+            elif period == "month":
+                if current_date.month == 1:
+                    current_date = current_date.replace(
+                        year=current_date.year - 1, month=12
+                    )
+                else:
+                    current_date = current_date.replace(month=current_date.month - 1)
+            elif period == "day":
+                current_date -= datetime.timedelta(days=1)
+
+            count += 1
+
+    return backtest_dates
+
+
 def load_irx_data(start, end):
     try:
         irx = pl.read_parquet("I:IRXday.parquet")

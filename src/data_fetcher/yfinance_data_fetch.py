@@ -3,7 +3,7 @@ import yfinance as yf
 
 # ^IRX
 # ^SPX
-ticker = ["^IRX"]
+ticker = ["^SPX"]
 start = "2015-01-01"
 end = "2025-10-05"
 data = yf.download(ticker, start=start, end=end, interval="1d")
@@ -24,7 +24,7 @@ df = df.with_columns(
 )
 
 df.write_parquet(
-    f"I:{ticker[0].replace('^', '')}day.parquet",
+    f"I:{ticker[0].replace('^', '')}day_yfinance.parquet",
     compression="zstd",
     compression_level=3,
 )

@@ -1,27 +1,30 @@
 import os
+from typing import List
 
 import dotenv
 import polars as pl
-from polygon import RESTClient
+from polygon import RESTClient, WebSocketClient
 from polygon.rest.models import (
     TickerSnapshot,
 )
+from polygon.websocket.models import Feed, Market, WebSocketMessage
 
 dotenv.load_dotenv()
 
 polygon_api_key = os.getenv("POLYGON_API_KEY")
 
-client = RESTClient(polygon_api_key)
+client = WebSocketClient(
+    api_key=polygon_api_key, feed=Feed.RealTime, market=Market.Stocks
+)
 
-tickers = client.get_snapshot_direction("stocks", direction="gainers")
-# quote = pl.DataFrame(quote)
+# quotes
+client.subscribe("Q.QLGN")
 
-# print(quote)
 
-# print ticker with % change
-for item in tickers:
-    # verify this is a TickerSnapshot
-    if isinstance(item, TickerSnapshot):
-        # verify this is a float
-        if isinstance(item.todays_change_percent, float):
-            print("{:<15}{:.2f} %".format(item.ticker, item.todays_change_percent))
+def handle_msg(msgs: List[WebSocketMessage]):
+    for m in msgs:
+        print(m)
+
+
+# print messages
+client.run(handle_msg)

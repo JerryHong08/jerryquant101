@@ -6,11 +6,12 @@ import os
 
 import polars as pl
 
-from backtesting.engine import BacktestEngine
-from backtesting.visualizer import BacktestVisualizer
+from backtest.engine import BacktestEngine
+from backtest.visualizer import BacktestVisualizer
 from cores.config import all_tickers_dir
 from cores.data_loader import stock_load_process
-from utils.backtest_utils.backtest_pre_data import (
+from utils.backtest_utils.backtest_utils import (
+    generate_backtest_date,
     load_spx_benchmark,
     only_common_stocks,
 )
@@ -72,6 +73,7 @@ def run_backtest(strategy, strategy_config=None):
         if (
             len(strategy_config.get("selected_tickers", [])) > 2000
             or selected_ticker == "random"
+            and not strategy_config["silent"]
         ):
             engine.plot_results(
                 strategy_name=strategy_name,
@@ -85,9 +87,13 @@ def run_backtest(strategy, strategy_config=None):
         visualizer = BacktestVisualizer()
 
         if (
-            len(strategy_config.get("selected_tickers", [])) > 2000
-            or selected_ticker == "random"
-        ) and (strategy_config["plot_all"] == False):
+            (
+                len(strategy_config.get("selected_tickers", [])) > 2000
+                or selected_ticker == "random"
+            )
+            and (strategy_config["plot_all"] == False)
+            and not strategy_config["silent"]
+        ):
             selected_ticker = (
                 results["trades"].select("ticker").unique().to_series().sample(1)[0]
             )
@@ -104,7 +110,7 @@ def run_backtest(strategy, strategy_config=None):
                 save_path=f"{output_dir}/{selected_ticker}_signals.png",
             )
 
-        elif strategy_config["plot_all"]:
+        elif strategy_config["plot_all"] and not strategy_config["silent"]:
             for selected_ticker in strategy_config.get("selected_tickers", []):
                 print(f"plot {selected_ticker} k-line and trade signal...")
                 visualizer.plot_candlestick_with_signals(
@@ -154,7 +160,7 @@ if __name__ == "__main__":
     print("=" * 60)
 
     strategy_config = {
-        "result_customized_name": "20251017",  # distinguish different config runs
+        "result_customized_name": "20251026",  # distinguish different config runs
         "boll_length": 11,
         "boll_multiple": 6,
         "max_dev_pct": 1,
@@ -169,13 +175,26 @@ if __name__ == "__main__":
         "timeframe": "1d",
         "data_start_date": "2023-12-01",
         "trade_start_date": "2024-12-01",
-        "end_date": "2025-10-17",
+        "end_date": "2025-10-26",
         "initial_capital": 10000.0,
         "add_risk_free_rate": True,
+        "silent": False,
     }
 
-    strategy = BBIBOLLStrategy(config=strategy_config)
+    backtest_dates = generate_backtest_date(
+        start_date="2025-10-24",
+        period="week",
+        reverse=True,
+        reverse_limit="2024-12-01",
+        # reverse_limit_count=2
+    )
 
-    run_backtest(strategy, strategy_config=strategy_config)
+    for backtest_date in backtest_dates:
+        strategy_config["silent"] = True
+        print(f"info: backtesing: {backtest_date}")
 
-    # run_multiple_strategies_example()
+        strategy_config["result_customized_name"] = backtest_date
+        strategy_config["end_date"] = backtest_date
+
+        strategy = BBIBOLLStrategy(config=strategy_config)
+        run_backtest(strategy, strategy_config=strategy_config)

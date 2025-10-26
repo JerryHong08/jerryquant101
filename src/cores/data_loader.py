@@ -396,7 +396,11 @@ def generate_cache_key(
 ):
     """Generate a unique cache key based on parameters"""
     cache_params = {
-        "tickers": sorted([t for t in tickers if t is not None]) if tickers else None,
+        "tickers": (
+            sorted([t for t in tickers if t is not None])
+            if tickers is not None and len(tickers) > 0
+            else None
+        ),
         "timeframe": timeframe,
         "asset": asset,
         "data_type": data_type,
@@ -958,11 +962,11 @@ def stock_load_process(
 
 
 if __name__ == "__main__":
-    from utils.backtest_utils.backtest_pre_data import only_common_stocks
+    from utils.backtest_utils.backtest_utils import only_common_stocks
 
     # tickers = only_common_stocks(filter_date='2024-10-01').to_series().to_list()
     # tickers = ["BULL"]
-    tickers = ["LCID", "TNFA", "MYMD", "NVDA", "FFIE", "FFAI"]
+    tickers = ["NXTT", "TNFA", "MYMD", "NVDA", "FFIE", "FFAI"]
     tickers_ = None
     with pl.Config(tbl_cols=50, tbl_width_chars=1000):
         print(mapped_all_tickers.filter(pl.col("ticker") == tickers[0]).collect())

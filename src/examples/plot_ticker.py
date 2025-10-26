@@ -1,6 +1,6 @@
 import polars as pl
 
-from backtesting.visualizer import BacktestVisualizer
+from backtest.visualizer import BacktestVisualizer
 from cores.data_loader import stock_load_process
 from strategies.indicators.registry import get_indicator
 from visualizer.figure import Visualizer
@@ -8,9 +8,9 @@ from visualizer.figure import Visualizer
 visualizer = BacktestVisualizer()
 flexible_visualizer = Visualizer()
 
-ticker = "TSLA"
-start_date = "2023-01-01"
-end_date = "2023-12-31"
+ticker = "NXTT"
+start_date = "2025-09-01"
+end_date = "2025-10-10"
 ohlcv_data = stock_load_process(ticker, start_date, end_date).collect()
 print(ohlcv_data.head())
 

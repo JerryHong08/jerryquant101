@@ -13,8 +13,8 @@ import redis
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
-from live_trade.market_mover.data_manager import DataManager
-from utils.backtest_utils.backtest_pre_data import only_common_stocks
+from live_trade.market_mover_monitor.data_manager import DataManager
+from utils.backtest_utils.backtest_utils import only_common_stocks
 
 
 class WebAnalyzer:
@@ -185,7 +185,6 @@ class WebAnalyzer:
                     json_data = message["data"]
                     df = pl.read_json(json_data)
 
-                    # Add timezone conversion
                     df = df.with_columns(
                         pl.from_epoch(
                             pl.col("timestamp"), time_unit="ms"
@@ -199,7 +198,6 @@ class WebAnalyzer:
                     filter_date = (
                         f"{updated_time[:4]}-{updated_time[4:6]}-{updated_time[6:8]}"
                     )
-
                     try:
                         df = (
                             only_common_stocks(filter_date)
@@ -213,7 +211,6 @@ class WebAnalyzer:
                         df = df.sort("percent_change", descending=True)
 
                     if len(self.last_df) != len(df):
-                        print(len(df))
                         filled_df = (
                             pl.concat([self.last_df, df], how="vertical")
                             .sort("timestamp")
@@ -227,18 +224,17 @@ class WebAnalyzer:
                                 pl.col("prev_volume").last(),
                             )
                         )
-                        print(len(filled_df))
+                        print(
+                            f"df need fullfilled: fullfilled_df:{len(filled_df)} recieved df: {len(df)}"
+                        )
                     else:
+                        print(f"df dont't need fullfilled, original length: {len(df)}")
                         filled_df = df
 
                     self.data_manager.update_from_realtime(filled_df)
-                    # Update data manager
-                    self.last_df = df
+                    self.last_df = filled_df
 
-                    # Get updated chart data
                     chart_data = self.data_manager.get_chart_data()
-
-                    # Debug: Print chart data summary
                     print(
                         f"Chart data summary: {len(chart_data.get('datasets', []))} datasets, "
                         f"{len(chart_data.get('timestamps', []))} timestamps, "

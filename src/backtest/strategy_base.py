@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 import polars as pl
 
 from cores.config import cache_dir
-from utils.backtest_utils.backtest_pre_data import load_irx_data
+from utils.backtest_utils.backtest_utils import load_irx_data
 
 strategy_cache_dir = os.path.join(cache_dir, "strategies")
 
@@ -96,107 +96,107 @@ class StrategyBase(ABC):
         """
         pass
 
-    def vectorbt_trade(self, signals: pl.DataFrame) -> None:
-        """
-        use vectorbt backtest
+    # def vectorbt_trade(self, signals: pl.DataFrame) -> None:
+    #     """
+    #     use vectorbt backtest
 
-        Args:
-            signals: pl.DataFrame
-        """
-        import numpy as np
-        import pandas as pd
-        import vectorbt as vbt
+    #     Args:
+    #         signals: pl.DataFrame
+    #     """
+    #     import numpy as np
+    #     import pandas as pd
+    #     import vectorbt as vbt
 
-        self.ohlcv_data = self.ohlcv_data.filter(
-            pl.col("ticker").is_in(signals["ticker"].unique())
-        )
+    #     self.ohlcv_data = self.ohlcv_data.filter(
+    #         pl.col("ticker").is_in(signals["ticker"].unique())
+    #     )
 
-        price = (
-            self.ohlcv_data.sort(["ticker", "timestamps"])
-            .pivot(
-                index="timestamps",
-                columns="ticker",
-                values="close",
-                aggregate_function="first",
-            )
-            .to_pandas()
-        )
+    #     price = (
+    #         self.ohlcv_data.sort(["ticker", "timestamps"])
+    #         .pivot(
+    #             index="timestamps",
+    #             columns="ticker",
+    #             values="close",
+    #             aggregate_function="first",
+    #         )
+    #         .to_pandas()
+    #     )
 
-        # Reset index to make timestamps a regular column, then set it back as index
-        # This ensures proper column structure
-        price = price.reset_index().set_index("timestamps")
+    #     # Reset index to make timestamps a regular column, then set it back as index
+    #     # This ensures proper column structure
+    #     price = price.reset_index().set_index("timestamps")
 
-        # 创建买卖信号的 DataFrame
-        buy_signals = (
-            signals.filter(pl.col("signal") == 1)
-            .select(["ticker", "signal_date"])
-            .to_pandas()
-        )
-        sell_signals = (
-            signals.filter(pl.col("signal") == -1)
-            .select(["ticker", "signal_date"])
-            .to_pandas()
-        )
+    #     # 创建买卖信号的 DataFrame
+    #     buy_signals = (
+    #         signals.filter(pl.col("signal") == 1)
+    #         .select(["ticker", "signal_date"])
+    #         .to_pandas()
+    #     )
+    #     sell_signals = (
+    #         signals.filter(pl.col("signal") == -1)
+    #         .select(["ticker", "signal_date"])
+    #         .to_pandas()
+    #     )
 
-        # 创建布尔型信号矩阵 - 确保只包含股票列
-        stock_columns = price.columns.tolist()  # 获取股票列名
+    #     # 创建布尔型信号矩阵 - 确保只包含股票列
+    #     stock_columns = price.columns.tolist()  # 获取股票列名
 
-        entries = pd.DataFrame(
-            data=np.full((len(price.index), len(stock_columns)), False),
-            index=price.index,
-            columns=stock_columns,
-            dtype=bool,
-        )
+    #     entries = pd.DataFrame(
+    #         data=np.full((len(price.index), len(stock_columns)), False),
+    #         index=price.index,
+    #         columns=stock_columns,
+    #         dtype=bool,
+    #     )
 
-        exits = pd.DataFrame(
-            data=np.full((len(price.index), len(stock_columns)), False),
-            index=price.index,
-            columns=stock_columns,
-            dtype=bool,
-        )
+    #     exits = pd.DataFrame(
+    #         data=np.full((len(price.index), len(stock_columns)), False),
+    #         index=price.index,
+    #         columns=stock_columns,
+    #         dtype=bool,
+    #     )
 
-        for _, row in buy_signals.iterrows():
-            ticker = row["ticker"]
-            signal_date = row["signal_date"]
-            if ticker in entries.columns and signal_date in entries.index:
-                entries.loc[signal_date, ticker] = True
+    #     for _, row in buy_signals.iterrows():
+    #         ticker = row["ticker"]
+    #         signal_date = row["signal_date"]
+    #         if ticker in entries.columns and signal_date in entries.index:
+    #             entries.loc[signal_date, ticker] = True
 
-        for _, row in sell_signals.iterrows():
-            ticker = row["ticker"]
-            signal_date = row["signal_date"]
-            if ticker in exits.columns and signal_date in exits.index:
-                exits.loc[signal_date, ticker] = True
+    #     for _, row in sell_signals.iterrows():
+    #         ticker = row["ticker"]
+    #         signal_date = row["signal_date"]
+    #         if ticker in exits.columns and signal_date in exits.index:
+    #             exits.loc[signal_date, ticker] = True
 
-        # Verify data types are correct
-        assert (
-            entries.dtypes.nunique() == 1 and entries.dtypes.iloc[0] == bool
-        ), "Entries must be all boolean"
-        assert (
-            exits.dtypes.nunique() == 1 and exits.dtypes.iloc[0] == bool
-        ), "Exits must be all boolean"
+    #     # Verify data types are correct
+    #     assert (
+    #         entries.dtypes.nunique() == 1 and entries.dtypes.iloc[0] == bool
+    #     ), "Entries must be all boolean"
+    #     assert (
+    #         exits.dtypes.nunique() == 1 and exits.dtypes.iloc[0] == bool
+    #     ), "Exits must be all boolean"
 
-        portfolio = vbt.Portfolio.from_signals(
-            close=price,
-            entries=entries,
-            exits=exits,
-            init_cash=self.config.get("initial_capital", 100000),
-            fees=self.config.get("fees", 0.001),
-            slippage=self.config.get("slippage", 0.001),
-            freq=self.config.get("timeframe", "1d"),
-            call_seq="auto",
-        )
+    #     portfolio = vbt.Portfolio.from_signals(
+    #         close=price,
+    #         entries=entries,
+    #         exits=exits,
+    #         init_cash=self.config.get("initial_capital", 100000),
+    #         fees=self.config.get("fees", 0.001),
+    #         slippage=self.config.get("slippage", 0.001),
+    #         freq=self.config.get("timeframe", "1d"),
+    #         call_seq="auto",
+    #     )
 
-        last_row = portfolio.value().iloc[-1]
-        top_5_columns = last_row.nlargest(5)
-        print("last rows max 5 columns:")
-        print(top_5_columns)
+    #     last_row = portfolio.value().iloc[-1]
+    #     top_5_columns = last_row.nlargest(5)
+    #     print("last rows max 5 columns:")
+    #     print(top_5_columns)
 
-        self.trades_vbt = portfolio.trades.records_readable
-        self.portfolio_daily_vbt = (
-            portfolio.total_return().to_frame(name="total_return").reset_index()
-        )
-        print(self.portfolio_daily_vbt.tail())
-        print(f"vectorbt backtest done, total {len(self.trades_vbt)} trades.")
+    #     self.trades_vbt = portfolio.trades.records_readable
+    #     self.portfolio_daily_vbt = (
+    #         portfolio.total_return().to_frame(name="total_return").reset_index()
+    #     )
+    #     print(self.portfolio_daily_vbt.tail())
+    #     print(f"vectorbt backtest done, total {len(self.trades_vbt)} trades.")
 
     def run_backtest(self, use_cached_indicators: bool = False) -> Dict[str, Any]:
         """
