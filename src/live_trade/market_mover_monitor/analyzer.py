@@ -62,6 +62,7 @@ def run_cli_mode():
             # if new tickers in top 20, update watchlist
             # 选top20更新watchlist
             top_20 = df.select("ticker").to_series().to_list()[:20]
+            print(top_20)
             # update_watchlist(watchlist_name="market_mover", tickers=top_20)
 
 
