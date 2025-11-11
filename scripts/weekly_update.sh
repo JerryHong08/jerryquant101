@@ -10,6 +10,7 @@ mkdir -p logs
 # 初始化计数器
 current_task=0
 TOTAL_TASKS=8
+TOTAL_DAYS=7
 
 # 执行任务的函数
 run_task() {
@@ -25,13 +26,13 @@ run_task() {
 echo "===== 开始数据更新：$(date) =====" | tee -a "$LOGFILE"
 
 # 执行所有任务
-run_task "下载 minute_aggs_v1 数据中..." python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days 7
+run_task "下载 minute_aggs_v1 数据中..." python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
 
-run_task "下载 day_aggs_v1 数据中..." python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days 7
+run_task "下载 day_aggs_v1 数据中..." python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
 
-run_task "转换 minute_aggs_v1 为 Parquet..." python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days 7
+run_task "转换 minute_aggs_v1 为 Parquet..." python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
 
-run_task "转换 day_aggs_v1 为 Parquet..." python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days 7
+run_task "转换 day_aggs_v1 为 Parquet..." python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
 
 run_task "获取最新拆股信息..." python src/data_fetcher/splits_fetch.py
 

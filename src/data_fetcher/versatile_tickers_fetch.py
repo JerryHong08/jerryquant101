@@ -55,15 +55,17 @@ class VersatileFetcher:
                 )
 
             print(f"Fetching {ticker} data from {start_} to {self.end_}...")
-            self.fetch_ticker_data(ticker, ticker_data)
+            self.fetch_ticker_data(ticker, start_, ticker_data)
 
-    def fetch_ticker_data(self, ticker: str, ticker_data: pl.DataFrame = None):
+    def fetch_ticker_data(
+        self, ticker: str, start_: str, ticker_data: pl.DataFrame = None
+    ):
         aggs = []
         for a in self.client.list_aggs(
             ticker,
             1,
             self.timespan,
-            self.start_,
+            start_,
             self.end_,
             sort="asc",
             limit=50000,

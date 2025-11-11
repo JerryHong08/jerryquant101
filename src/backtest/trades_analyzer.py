@@ -13,7 +13,7 @@ from utils.longbridge_utils.update_watchlist import update_watchlist
 strategy_name = "bbiboll"
 
 backtest_dates = generate_backtest_date(
-    start_date="2025-10-24",
+    start_date="2025-11-07",
     period="week",
     reverse=True,
     reverse_limit="2024-12-01",
@@ -520,19 +520,19 @@ optimized_fig.write_html(
     f"backtest_output/{strategy_name}/positions_animation_optimized.html"
 )
 
-print("\n=== Metrics for each backtest_date ===")
-for date in backtest_dates:
-    date_data = plot_df[plot_df["backtest_date"] == date]
-    active_count = (date_data["status"] == "Active").sum()
-    delisted_count = (date_data["status"] == "Delisted").sum()
-    total_count = len(date_data)
+# print("\n=== Metrics for each backtest_date ===")
+# for date in backtest_dates:
+#     date_data = plot_df[plot_df["backtest_date"] == date]
+#     active_count = (date_data["status"] == "Active").sum()
+#     delisted_count = (date_data["status"] == "Delisted").sum()
+#     total_count = len(date_data)
 
-    print(f"\n{date}:")
-    print(f"  Total holdings: {total_count}")
-    print(f"  Still active: {active_count}")
-    print(f"  Delisted: {delisted_count}")
-    print(
-        f"  Delisting Rate: {delisted_count/total_count*100:.1f}%"
-        if total_count > 0
-        else "  Delisted Ratio: 0%"
-    )
+#     print(f"\n{date}:")
+#     print(f"  Total holdings: {total_count}")
+#     print(f"  Still active: {active_count}")
+#     print(f"  Delisted: {delisted_count}")
+#     print(
+#         f"  Delisting Rate: {delisted_count/total_count*100:.1f}%"
+#         if total_count > 0
+#         else "  Delisted Ratio: 0%"
+#     )

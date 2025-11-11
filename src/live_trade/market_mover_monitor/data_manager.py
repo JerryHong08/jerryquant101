@@ -10,9 +10,16 @@ from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 import polars as pl
+from prometheus_client import Counter, Gauge, Summary, start_http_server
 
 from cores.config import cache_dir
 from utils.backtest_utils.backtest_utils import only_common_stocks
+
+start_http_server(9090)  # 浏览器访问 localhost:9090/metrics
+
+PROCESS_LATENCY = Summary(
+    "datamanager_process_latency_seconds", "Time spent processing snapshot"
+)
 
 
 class DataManager:
@@ -63,6 +70,7 @@ class DataManager:
 
         print(f"Loaded historical data for {len(self.stock_data)} stocks")
 
+    @PROCESS_LATENCY.time()
     def update_from_realtime(self, df: pl.DataFrame):
         """Update data from real-time DataFrame"""
         try:
@@ -153,7 +161,7 @@ class DataManager:
         self.top_20_history.append(current_top_20_tickers)
 
         # Keep only recent history to manage memory
-        print(f"Debug: current {len(self.top_20_history)}")
+        # print(f"Debug: current {len(self.top_20_history)}")
         if len(self.top_20_history) > self.max_history_points:
             self.top_20_history = self.top_20_history[-self.max_history_points :]
 
@@ -173,7 +181,7 @@ class DataManager:
                     "first_appearance": timestamp,
                     "is_new_entrant": not is_historical,
                     "rank_velocity": 0.0,
-                    "alpha": self._calculate_alpha(current_rank),
+                    "alpha": 1.0,
                     "highlight": not is_historical,  # Highlight new entrants in real-time
                     "metadata": {
                         "current_price": row.get("current_price", 0.0),
@@ -196,7 +204,7 @@ class DataManager:
                     if not is_historical and rank_change >= 5:  # Moved up 5+ positions
                         stock_info["highlight"] = True
 
-                stock_info["alpha"] = self._calculate_alpha(current_rank)
+                # stock_info["alpha"] = self._calculate_alpha(current_rank)
                 stock_info["is_new_entrant"] = False
 
                 # Update metadata
@@ -227,12 +235,6 @@ class DataManager:
                 # Clean up stocks that are no longer in top 20
 
         self._cleanup_old_stocks(current_top_20_tickers)
-
-    def _calculate_alpha(self, rank: int) -> float:
-        """Calculate alpha transparency based on rank (1-20)"""
-        # Rank 1 = alpha 1.0 (fully opaque), Rank 20 = alpha 0.2 (more transparent)
-        return 1.0
-        # return max(0.6, 1.0 - (rank - 1) * 0.02)
 
     def _cleanup_old_stocks(self, current_top_20: List[str]) -> None:
         """Remove stocks that haven't been in top 20 for a while"""
@@ -268,24 +270,6 @@ class DataManager:
 
         dt = datetime(year, month, day, hour, minute, second)
         return dt.replace(tzinfo=ZoneInfo("America/New_York"))
-
-    def get_top_stocks(self, limit: int = 20) -> List[Tuple[str, Dict]]:
-        """Get top stocks sorted by current rank"""
-        ranked_stocks = [(ticker, data) for ticker, data in self.stock_data.items()]
-        ranked_stocks.sort(key=lambda x: x[1]["current_rank"])
-        return ranked_stocks[:limit]
-
-    def get_stock_detail(self, ticker: str) -> Optional[Dict]:
-        """Get detailed information for a specific stock"""
-        return self.stock_data.get(ticker)
-
-    def toggle_stock_highlight(self, ticker: str, highlight: bool) -> bool:
-        """Toggle highlight status for a specific stock"""
-        if ticker in self.stock_data:
-            self.stock_data[ticker]["highlight"] = highlight
-            print(f"Updated highlight for {ticker}: {highlight}")
-            return True
-        return False
 
     def get_chart_data(self) -> Dict:
         """Get data formatted for chart visualization"""
@@ -343,6 +327,18 @@ class DataManager:
 
         return chart_data
 
+    def toggle_stock_highlight(self, ticker: str, highlight: bool) -> bool:
+        """Toggle highlight status for a specific stock"""
+        if ticker in self.stock_data:
+            self.stock_data[ticker]["highlight"] = highlight
+            print(f"Updated highlight for {ticker}: {highlight}")
+            return True
+        return False
+
+    def get_stock_detail(self, ticker: str) -> Optional[Dict]:
+        """Get detailed information for a specific stock"""
+        return self.stock_data.get(ticker)
+
     def _get_stock_color(
         self, ticker: str, stock_data: Dict, with_alpha: bool = False
     ) -> str:
@@ -379,3 +375,9 @@ class DataManager:
             return f"rgba({base_color}, {alpha * 0.3})"  # Lighter for fill
         else:
             return f"rgba({base_color}, {alpha})"
+
+    def get_top_stocks(self, limit: int = 20) -> List[Tuple[str, Dict]]:
+        """Get top stocks sorted by current rank"""
+        ranked_stocks = [(ticker, data) for ticker, data in self.stock_data.items()]
+        ranked_stocks.sort(key=lambda x: x[1]["current_rank"])
+        return ranked_stocks[:limit]

@@ -223,7 +223,7 @@ class WebAnalyzer:
                                 pl.col("prev_close").last(),
                                 pl.col("prev_volume").last(),
                             )
-                        )
+                        ).sort("percent_change", descending=True)
                         print(
                             f"df need fullfilled: fullfilled_df:{len(filled_df)} recieved df: {len(df)}"
                         )
@@ -231,9 +231,11 @@ class WebAnalyzer:
                         print(f"df dont't need fullfilled, original length: {len(df)}")
                         filled_df = df
 
+                    # from pl.Dataframe to chart data
                     self.data_manager.update_from_realtime(filled_df)
                     self.last_df = filled_df
 
+                    # read chart data
                     chart_data = self.data_manager.get_chart_data()
                     print(
                         f"Chart data summary: {len(chart_data.get('datasets', []))} datasets, "

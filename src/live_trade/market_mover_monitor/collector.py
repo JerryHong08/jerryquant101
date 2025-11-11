@@ -101,4 +101,6 @@ while True:
     # # print(df.select('timestamp').head())
     # print(df.head())
 
-    time.sleep(5)
+    wait_duration = 5
+    print(f"wait for{wait_duration}")
+    time.sleep(wait_duration)

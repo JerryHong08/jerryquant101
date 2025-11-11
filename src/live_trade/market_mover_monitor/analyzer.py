@@ -68,7 +68,7 @@ def run_cli_mode():
 
 def run_web_mode(**kwargs):
     """New web mode with real-time visualization"""
-    from live_trade.market_mover_monitor.web_analyzer import WebAnalyzer
+    from live_trade.market_mover_monitor.web.web_analyzer import WebAnalyzer
 
     web_analyzer = WebAnalyzer(
         host=kwargs.get("host", "localhost"), port=kwargs.get("port", 5000)

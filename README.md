@@ -241,6 +241,7 @@ For example, most of the long-term like over years 0 volume is because of relist
 ## Roadmap
 
 * features to be add:
+* [ ] redis to redis stream
 * [ ] universal indicator plot
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
 * [ ] Polish **X news search function**.

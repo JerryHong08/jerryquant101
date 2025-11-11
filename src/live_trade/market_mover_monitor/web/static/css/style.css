@@ -815,6 +815,41 @@ body {
     color: #f44336;
 }
 
+.new-highlight {
+    animation: highlightPulse 2s ease-in-out;
+    border: 2px solid #ffa500;
+    box-shadow: 0 0 15px rgba(255, 165, 0, 0.5);
+}
+
+@keyframes highlightPulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 5px rgba(255, 165, 0, 0.3);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 20px rgba(255, 165, 0, 0.8);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 5px rgba(255, 165, 0, 0.3);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.toast.highlight {
+    border-left: 4px solid #ff6b6b;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+}
+
 #log-scale-toggle {
     padding: 6px 12px;
     border: 1px solid #ddd;

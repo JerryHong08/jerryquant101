@@ -12,11 +12,15 @@ class MarketMoverApp {
         this.showHighlights = true;
         this.timeRange = 'all';
         this.selectedStock = null;
-        this.isLogScale = false; // 添加log模式状态
+        this.isLogScale = true;
         
         // Global time clock - the current time reference for all operations
         this.currentTime = null;
         
+        // Notification system
+        this.previousHighlights = new Set(); // Track previous highlights
+        this.notificationSound = null;
+
         this.initializeApp();
     }
     
@@ -25,9 +29,116 @@ class MarketMoverApp {
         this.initializeChart();
         this.initializeEventListeners();
         this.initializeModal();
+        this.initializeNotifications();
         this.updateConnectionStatus('connecting', 'Connecting to server...');
     }
     
+    // Initialize notification system
+    initializeNotifications() {
+        // Request notification permission
+        this.requestNotificationPermission();
+        
+        // Create audio element for notification sound
+        this.notificationSound = new Audio();
+        this.notificationSound.preload = 'auto';
+        
+        // You can use a data URL for a simple beep sound or add an actual sound file
+        // For now, using a simple data URL for a beep sound
+        this.notificationSound.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmYeBzKS1fDNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmYeBzKS1fDNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmYeB...';
+        
+        // Alternatively, you can use Web Audio API for a more controlled sound
+        this.initializeAudioContext();
+    }
+
+    // Request notification permission
+    async requestNotificationPermission() {
+        if ('Notification' in window) {
+            if (Notification.permission === 'default') {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    this.showToast('Notifications enabled for new highlights', 'success');
+                } else if (permission === 'denied') {
+                    this.showToast('Notifications disabled. You can enable them in browser settings.', 'info');
+                }
+            }
+        } else {
+            console.log('This browser does not support notifications');
+        }
+    }
+
+    // Initialize Web Audio API for notification sound
+    initializeAudioContext() {
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+            console.log('Web Audio API not supported');
+        }
+    }
+
+    // Play notification sound using Web Audio API
+    playNotificationSound() {
+        if (this.audioContext) {
+            // Create a simple beep sound
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime); // 800 Hz
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.3, this.audioContext.currentTime + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.3);
+            
+            oscillator.start(this.audioContext.currentTime);
+            oscillator.stop(this.audioContext.currentTime + 0.3);
+        } else {
+            // Fallback to HTML5 audio
+            this.notificationSound.currentTime = 0;
+            this.notificationSound.play().catch(e => {
+                console.log('Could not play notification sound:', e);
+            });
+        }
+    }
+
+    // Show browser notification for new highlight
+    showHighlightNotification(stock) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+            const title = `New Hot Mover: ${stock.label}`;
+            const latestChange = this.getLatestValue(
+                stock.data && stock.data.length > 0 
+                    ? stock.data.map(point => point.y) 
+                    : []
+            );
+            const changeText = latestChange >= 0 ? `+${latestChange.toFixed(2)}%` : `${latestChange.toFixed(2)}%`;
+            
+            const options = {
+                body: `Rank #${stock.rank} - ${changeText}`,
+                icon: '/static/icons/notification-icon.png', // Add your notification icon
+                badge: '/static/icons/badge-icon.png', // Add your badge icon
+                tag: `highlight-${stock.label}`, // Prevent duplicate notifications
+                requireInteraction: false,
+                silent: false
+            };
+
+            const notification = new Notification(title, options);
+
+            // Auto close after 5 seconds
+            setTimeout(() => {
+                notification.close();
+            }, 5000);
+
+            // Handle notification click
+            notification.onclick = () => {
+                window.focus();
+                this.requestStockDetail(stock.label);
+                notification.close();
+            };
+        }
+    }
+
     // WebSocket Connection
     initializeSocket() {
         this.socket = io();
@@ -304,7 +415,7 @@ class MarketMoverApp {
             this.applyTimeRangeFilter();
         });
         
-                // Reset zoom
+        // Reset zoom
         document.getElementById('reset-zoom-btn').addEventListener('click', () => {
             this.chart.resetZoom();
         });
@@ -365,7 +476,8 @@ class MarketMoverApp {
             });
         }
         
-        this.chartData = data;
+        // this.chartData = data;
+        this.chartData = JSON.parse(JSON.stringify(data)); // Deep copy to preserve original data
         
         // Update global time clock with the latest timestamp from data
         this.updateGlobalClock(data);
@@ -477,7 +589,11 @@ class MarketMoverApp {
     
     applyTimeRangeToDatasets(datasets) {
         if (this.timeRange === 'all') {
-            return datasets;
+            // Return a deep copy to avoid modifying original data
+            return datasets.map(dataset => ({
+                ...dataset,
+                data: [...dataset.data] // Ensure we don't modify original data array
+            }));
         }
         
         // Use global clock instead of system time
@@ -498,7 +614,10 @@ class MarketMoverApp {
                 cutoffTime = new Date(referenceTime.getTime() - 60 * 60 * 1000);
                 break;
             default:
-                return datasets;
+                return datasets.map(dataset => ({
+                    ...dataset,
+                    data: [...dataset.data]
+                }));
         }
         
         console.log(`Time range filter: ${this.timeRange}, Reference time: ${referenceTime}, Cutoff: ${cutoffTime}`);
@@ -529,7 +648,15 @@ class MarketMoverApp {
                 });
             }
             
-            this.updateChart(this.chartData);
+            // Always use the original complete data for filtering
+            const originalData = {
+                ...this.chartData,
+                datasets: this.chartData.datasets.map(dataset => ({
+                    ...dataset,
+                    data: [...dataset.data] // Ensure we work with a copy
+                }))
+            };
+            this.updateChart(originalData);
             
             // Ensure visibility states are preserved after filter
             if (this.chart.data.datasets) {
@@ -925,6 +1052,38 @@ class MarketMoverApp {
             .filter(stock => stock.highlight)
             .sort((a, b) => a.rank - b.rank);
         
+        // Detect new highlights
+        const currentHighlights = new Set(highlightedStocks.map(stock => stock.label));
+        const newHighlights = [];
+        
+        currentHighlights.forEach(ticker => {
+            if (!this.previousHighlights.has(ticker)) {
+                const stock = highlightedStocks.find(s => s.label === ticker);
+                if (stock) {
+                    newHighlights.push(stock);
+                }
+            }
+        })
+        
+        // Update previous highlights set
+        this.previousHighlights = new Set(currentHighlights);
+        
+        // Show notifications for new highlights
+        newHighlights.forEach(stock => {
+            this.showHighlightNotification(stock);
+            this.playNotificationSound();
+
+            // Also show toast notification as fallback
+            const latestChange = this.getLatestValue(
+                stock.data && stock.data.length > 0
+                    ? stock.data.map(point => point.y)
+                    : []
+            );
+            const changeText = latestChange >= 0 ? `+${latestChange.toFixed(2)}%` : `${latestChange.toFixed(2)}%`;
+            this.showToast(`🔥 New Hot Mover: ${stock.label} (${changeText})`, 'highlight');
+        });
+
+        
         if (highlightedStocks.length === 0) {
             highlightsList.innerHTML = '<p style="text-align: center; opacity: 0.7; padding: 20px;">No highlighted stocks</p>';
             return;
@@ -982,6 +1141,32 @@ class MarketMoverApp {
             
             highlightsList.appendChild(item);
         });
+    }
+
+    // Enhanced showToast method to support highlight type
+    showToast(message, type = 'info') {
+        const toastContainer = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        
+        // Add special styling for highlight notifications
+        if (type === 'highlight') {
+            toast.style.background = 'linear-gradient(45deg, #ff6b6b, #ffa500)';
+            toast.style.color = 'white';
+            toast.style.fontWeight = 'bold';
+            toast.style.animation = 'pulse 1s ease-in-out 3';
+        }
+        
+        toastContainer.appendChild(toast);
+        
+        // Auto remove after 5 seconds (longer for highlight notifications)
+        const duration = type === 'highlight' ? 8000 : 5000;
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, duration);
     }
     
     // Stock Detail Modal
