@@ -13,7 +13,7 @@ import redis
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
-from live_trade.market_mover_monitor.data_manager import DataManager
+from live_monitor.market_mover_monitor.data_manager import DataManager
 from utils.backtest_utils.backtest_utils import only_common_stocks
 
 

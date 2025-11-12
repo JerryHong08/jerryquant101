@@ -4,7 +4,7 @@
   * [data_fecther](#data_fecther)
   * [cores](#cores)
   * [backtest](#backtest)
-  * [live_trade](#live_trade)
+  * [live_monitor](#live_monitor)
 * [Change Log](#change-log)
 * [Roadmap](#roadmap)
 
@@ -120,7 +120,7 @@ This directory includes **configs, loaders, and plotting tools**.
 
 ![backtest/trades_analyzer.py](./figures/Trades_Analyzer_plotly.png)
 
-### `live_trade`
+### `live_monitor`
 
 ### 1. market_mover_monitor
 
@@ -130,7 +130,7 @@ This directory includes **configs, loaders, and plotting tools**.
 
 First start the web dashboard,
 
-    python src/live_trade/market_mover/start.py web
+    python src/live_monitor/market_mover/start.py web
 
 Open `http://localhost:5000`, then choose the data supply,see below. And you will see Top20 tickers updated continuously.
 
@@ -144,19 +144,19 @@ You can highlight the tickers line, choose the timeframe, see the Hot Movers etc
 
 Using the polygon api collect the real time market snapshot, using html+css+js to monitor the real time market mover to get a early catch on.
 
-    python src/live_trade/market_mover/start.py collector
+    python src/live_monitor/market_mover/start.py collector
 
 1.2.2. `replayer.py`
 
 Replay data that collector have fecthed and saved to `analyzer`.
 
-    python src/live_trade/market_mover/start.py replay --date 20251016 --speed 5.0
+    python src/live_monitor/market_mover/start.py replay --date 20251016 --speed 5.0
 
 1.2.3. `trades_replayer`
 
 Aggregate the trades level flatfile data to `analyzer`.
 
-    python src/live_trade/market_mover_monitor/start.py replay --date 20251016 --speed 5.0 --type trade_replay
+    python src/live_monitor/market_mover_monitor/start.py replay --date 20251016 --speed 5.0 --type trade_replay
 
 **Currently it's only a dashboard, though enough for a hands-on trader, more mathematical analysis and data process to be added.**
 
@@ -234,6 +234,11 @@ For example, most of the long-term like over years 0 volume is because of relist
 2025-10-27
 
 * ✅ updated README.md
+* ✅ add trades_analyzer.py
+
+2025-11-12
+
+* ✅ removed Chinese. From now on, English will be used as the default language for this project.
 * ✅ add trades_analyzer.py
 
 ---
