@@ -8,9 +8,6 @@ def apply_grouped(
     df: pl.DataFrame, func: Callable[[pl.DataFrame, dict], pl.DataFrame], **params
 ) -> pl.DataFrame:
     """
-    按 ticker 分组后，对每个子 DataFrame 应用 func。
-    func 只需要处理单个 ticker 的数据。
-
     ohlcv_data schema
     Schema([
         ('ticker', String),

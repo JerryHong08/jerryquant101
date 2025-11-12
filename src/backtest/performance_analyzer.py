@@ -1,7 +1,3 @@
-"""
-回测性能分析器 - 计算详细的策略表现指标
-"""
-
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
@@ -11,7 +7,7 @@ import polars as pl
 
 class PerformanceAnalyzer:
     """
-    回测性能分析器，计算各种性能指标
+    Backtest performance analyzer for calculating various performance metrics
     """
 
     def __init__(self, initial_capital: float = 100.0):
@@ -24,20 +20,20 @@ class PerformanceAnalyzer:
         benchmark_data: Optional[pl.DataFrame] = None,
     ) -> Dict[str, Any]:
         """
-        计算详细的回测性能指标
+        Calculate detailed backtest performance metrics
 
         Args:
-            portfolio_daily: 每日组合表现DataFrame，包含 [date, portfolio_return, equity_curve]
-            trades: 交易记录DataFrame
-            benchmark_data: 基准数据DataFrame，包含 [date, benchmark_return]
+            portfolio_daily: Daily portfolio performance DataFrame containing [date, portfolio_return, equity_curve]
+            trades: Trading records DataFrame
+            benchmark_data: Benchmark data DataFrame containing [date, benchmark_return]
 
         Returns:
-            性能指标字典
+            Performance metrics dictionary
         """
         if portfolio_daily.is_empty():
             return self._empty_metrics()
 
-        # 基础统计
+        # Basic statistics
         start_date = portfolio_daily["date"].min()
         end_date = portfolio_daily["date"].max()
         period_days = (end_date - start_date).total_seconds() / (24 * 3600)
@@ -47,10 +43,10 @@ class PerformanceAnalyzer:
             portfolio_daily["equity_curve"].tail(1).item() * self.initial_capital
         )
 
-        # 收益率计算
+        # Return calculation
         total_return = (end_value / start_value - 1) * 100
 
-        # 基准收益率
+        # Benchmark return
         benchmark_return = 0.0
         if benchmark_data is not None and not benchmark_data.is_empty():
             benchmark_aligned = portfolio_daily.join(
@@ -61,26 +57,26 @@ class PerformanceAnalyzer:
                 benchmark_end = benchmark_aligned["benchmark_return"].tail(1).item()
                 benchmark_return = (benchmark_end / benchmark_start - 1) * 100
 
-        # 最大回撤
+        # Maximum drawdown
         equity_curve = portfolio_daily["equity_curve"].to_numpy()
         peak = np.maximum.accumulate(equity_curve)
         drawdown = (equity_curve - peak) / peak
         max_drawdown = np.min(drawdown) * 100
 
-        # 最大回撤持续时间
+        # Maximum drawdown duration
         max_dd_duration = self._calculate_max_drawdown_duration(equity_curve)
 
-        # 交易统计
+        # Trading statistics
         trade_stats = self._calculate_trade_stats(trades)
 
         returns = portfolio_daily["portfolio_return"].drop_nulls()
 
         risk_metrics = self._calculate_risk_metrics(returns)
 
-        # trade fees culculate (assume 0.7% per trade)
+        # Trading fees calculation (assume 0.7% per trade)
         total_fees = len(trades) * end_value * 0.007
 
-        # 暴露度 (假设满仓)
+        # Exposure (assume fully invested)
         max_gross_exposure = 100.0
 
         metrics = {
@@ -102,7 +98,7 @@ class PerformanceAnalyzer:
         return metrics
 
     def _calculate_trade_stats(self, trades: pl.DataFrame) -> Dict[str, Any]:
-        """计算交易统计指标"""
+        """Calculate trading statistics"""
         if trades.is_empty():
             return {
                 "Total Trades": 0,
@@ -120,7 +116,7 @@ class PerformanceAnalyzer:
                 "Expectancy": 0.0,
             }
 
-        # 计算交易持续时间
+        # Calculate trade duration
         trades_with_duration = trades.with_columns(
             [
                 ((pl.col("sell_date") - pl.col("buy_date")).dt.total_days()).alias(
@@ -155,7 +151,7 @@ class PerformanceAnalyzer:
         returns = closed_trades["return_pct"].to_numpy()
         durations = closed_trades["duration_days"].to_numpy()
 
-        # 盈亏统计
+        # Win/loss statistics
         winning_trades = returns[returns > 0]
         losing_trades = returns[returns < 0]
 
@@ -166,7 +162,7 @@ class PerformanceAnalyzer:
         avg_winning = np.mean(winning_trades) if len(winning_trades) > 0 else 0
         avg_losing = np.mean(losing_trades) if len(losing_trades) > 0 else 0
 
-        # 持续时间统计
+        # Duration statistics
         winning_durations = durations[returns > 0]
         losing_durations = durations[returns < 0]
 
@@ -181,7 +177,7 @@ class PerformanceAnalyzer:
             else "0 days 00:00:00"
         )
 
-        # 盈亏比和期望值
+        # Profit factor and expectancy
         total_profit = np.sum(winning_trades) if len(winning_trades) > 0 else 0
         total_loss = abs(np.sum(losing_trades)) if len(losing_trades) > 0 else 0
         profit_factor = total_profit / total_loss if total_loss > 0 else float("inf")
@@ -192,7 +188,7 @@ class PerformanceAnalyzer:
             "Total Trades": total_trades,
             "Total Closed Trades": total_closed,
             "Total Open Trades": total_open,
-            "Open Trade PnL": 0.0,  # 假设没有未平仓收益
+            "Open Trade PnL": 0.0,  # Assume no unrealized PnL
             "Win Rate [%]": win_rate,
             "Best Trade [%]": best_trade,
             "Worst Trade [%]": worst_trade,
@@ -205,7 +201,7 @@ class PerformanceAnalyzer:
         }
 
     def _calculate_risk_metrics(self, returns: pl.Series) -> Dict[str, float]:
-        """计算风险指标"""
+        """Calculate risk metrics"""
         if returns.is_empty():
             return {
                 "Sharpe Ratio": 0.0,
@@ -218,11 +214,11 @@ class PerformanceAnalyzer:
 
         annual_vol = np.std(returns_array) * np.sqrt(252)
 
-        # Sharpe比率
+        # Sharpe ratio
         sharpe_ratio = returns_array.mean() * 252 / annual_vol if annual_vol > 0 else 0
 
         annual_return = np.mean(returns_array) * 252
-        # Sortino比率 (下行波动率)
+        # Sortino ratio (downside volatility)
         negative_returns = returns_array[returns_array < 0]
         downside_vol = (
             np.std(negative_returns) * np.sqrt(252)
@@ -231,10 +227,10 @@ class PerformanceAnalyzer:
         )
         sortino_ratio = annual_return / downside_vol if downside_vol > 0 else 0
 
-        # Calmar比率 (需要最大回撤)
-        calmar_ratio = 0.0  # 简化处理，实际需要传入max_drawdown
+        # Calmar ratio (simplified, would need max_drawdown)
+        calmar_ratio = 0.0  # Simplified handling, actually needs max_drawdown
 
-        # Omega比率 (简化计算)
+        # Omega ratio (simplified calculation)
         positive_returns = returns_array[returns_array > 0]
         negative_returns = returns_array[returns_array < 0]
         omega_ratio = (
@@ -251,14 +247,14 @@ class PerformanceAnalyzer:
         }
 
     def _calculate_max_drawdown_duration(self, equity_curve: np.ndarray) -> str:
-        """计算最大回撤持续时间"""
+        """Calculate maximum drawdown duration"""
         peak = np.maximum.accumulate(equity_curve)
         is_drawdown = equity_curve < peak
 
         if not np.any(is_drawdown):
             return "0 days 00:00:00"
 
-        # 找到连续回撤期间
+        # Find consecutive drawdown periods
         drawdown_starts = np.where(np.diff(np.concatenate(([False], is_drawdown))))[0]
         drawdown_ends = np.where(np.diff(np.concatenate((is_drawdown, [False]))))[0]
 
@@ -273,7 +269,7 @@ class PerformanceAnalyzer:
         return f"{max_duration} days 00:00:00"
 
     def _empty_metrics(self) -> Dict[str, Any]:
-        """返回空的性能指标"""
+        """Return empty performance metrics"""
         return {
             "Start": None,
             "End": None,
@@ -308,9 +304,9 @@ class PerformanceAnalyzer:
     def print_performance_summary(
         self, metrics: Dict[str, Any], strategy_name: str = "Strategy"
     ):
-        """打印性能摘要"""
+        """Print performance summary"""
         print(f"\n{'='*60}")
-        print(f"{strategy_name} 回测结果")
+        print(f"{strategy_name} Backtest Results")
         print(f"{'='*60}")
 
         for key, value in metrics.items():

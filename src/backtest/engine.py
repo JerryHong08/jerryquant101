@@ -1,7 +1,3 @@
-"""
-回测引擎 - 统一的回测执行和结果管理
-"""
-
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -16,16 +12,14 @@ from .visualizer import BacktestVisualizer
 
 
 class BacktestEngine:
-    """
-    回测引擎，提供统一的回测执行和结果管理
-    """
 
     def __init__(self, initial_capital: float = 100.0):
         self.initial_capital = initial_capital
         self.performance_analyzer = PerformanceAnalyzer(initial_capital)
         self.visualizer = BacktestVisualizer()
         self.results = {}
-        # 忽略matplotlib字体警告
+
+        # ignore matplotlib font error warnings
         import logging
 
         logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
@@ -37,12 +31,10 @@ class BacktestEngine:
         tickers: List[str] = None,
     ):
         """
-        添加策略到回测引擎
-
         Args:
-            strategy: 策略实例
-            ohlcv_data: OHLCV数据
-            tickers: 股票列表
+            strategy:
+            ohlcv_data:
+            tickers:
         """
         strategy.set_data(ohlcv_data, tickers)
         return strategy
@@ -55,32 +47,30 @@ class BacktestEngine:
         save_results: bool = True,
     ) -> Dict[str, Any]:
         """
-        运行单个策略的回测
-
         Args:
-            strategy: 策略实例
-            benchmark_data: 基准数据
-            use_cached_indicators: 是否使用缓存指标
-            save_results: 是否保存结果
+            strategy:
+            benchmark_data:
+            use_cached_indicators:
+            save_results:
 
         Returns:
-            完整的回测结果
+            complete backtest result
         """
-        print(f"\n开始回测策略: {strategy.name}")
+        print(f"\nstart backtest: {strategy.name}")
         print("=" * 60)
 
-        # 1. 运行策略回测
+        # 1. run backtest
         strategy_results = strategy.run_backtest(use_cached_indicators)
 
-        # 2. 计算性能指标
-        print("计算性能指标...")
+        # 2. calculate metrics
+        print("calculate metrics...")
         performance_metrics = self.performance_analyzer.calculate_performance_metrics(
             portfolio_daily=strategy_results["portfolio_daily"],
             trades=strategy_results["trades"],
             benchmark_data=benchmark_data,
         )
 
-        # 3. 组合完整结果
+        # 3. complete_results
         complete_results = {
             **strategy_results,
             "performance_metrics": performance_metrics,
@@ -91,11 +81,11 @@ class BacktestEngine:
             },
         }
 
-        # 4. 保存结果
+        # 4. save results
         if save_results:
             self.results[strategy.name] = complete_results
 
-        # 5. 打印性能摘要
+        # 5. print metrics
         self.performance_analyzer.print_performance_summary(
             performance_metrics, strategy.name
         )
@@ -109,15 +99,13 @@ class BacktestEngine:
         use_cached_indicators: bool = False,
     ) -> Dict[str, Dict[str, Any]]:
         """
-        运行多个策略的回测并比较
-
         Args:
-            strategies: 策略列表
-            benchmark_data: 基准数据
-            use_cached_indicators: 是否使用缓存指标
+            strategies:
+            benchmark_data:
+            use_cached_indicators:
 
         Returns:
-            所有策略的回测结果
+            all strategy results
         """
         all_results = {}
 
@@ -130,7 +118,6 @@ class BacktestEngine:
             )
             all_results[strategy.name] = results
 
-        # 打印策略比较
         self._print_strategy_comparison(all_results)
 
         return all_results
@@ -145,18 +132,16 @@ class BacktestEngine:
         output_dir: str = "backtest_plots",
     ):
         """
-        绘制回测结果图表
-
         Args:
-            strategy_name: 策略名称
-            plot_equity: 是否绘制资金曲线
-            plot_performance: 是否绘制性能指标
-            plot_monthly: 是否绘制月度收益
-            save_plots: 是否保存图表
-            output_dir: 输出目录
+            strategy_name:
+            plot_equity:
+            plot_performance:
+            plot_monthly:
+            save_plots:
+            output_dir:
         """
         if strategy_name not in self.results:
-            print(f"未找到策略 {strategy_name} 的回测结果")
+            print(f"not found {strategy_name} backtest result")
             return
 
         results = self.results[strategy_name]
@@ -164,7 +149,7 @@ class BacktestEngine:
         if save_plots:
             os.makedirs(output_dir, exist_ok=True)
 
-        # 1. 资金曲线图
+        # 1. equity curve
         if plot_equity:
             save_path = (
                 f"{output_dir}/{strategy_name}_equity_curve.png" if save_plots else None
@@ -176,7 +161,7 @@ class BacktestEngine:
                 save_path=save_path,
             )
 
-        # 2. 月度收益热力图
+        # 2. month return heatmap
         if plot_monthly:
             save_path = (
                 f"{output_dir}/{strategy_name}_monthly_returns.png"
@@ -189,69 +174,22 @@ class BacktestEngine:
                 save_path=save_path,
             )
 
-    def plot_candlestick_with_signals(
-        self,
-        strategy_name: str,
-        ticker: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        save_plot: bool = False,
-        output_dir: str = "backtest_plots",
-    ):
-        """
-        绘制个股K线图和交易信号
-
-        Args:
-            strategy_name: 策略名称
-            ticker: 股票代码
-            start_date: 开始日期
-            end_date: 结束日期
-            save_plot: 是否保存图表
-            output_dir: 输出目录
-        """
-        if strategy_name not in self.results:
-            print(f"未找到策略 {strategy_name} 的回测结果")
-            return
-
-        results = self.results[strategy_name]
-
-        # 获取原始OHLCV数据
-        strategy = None
-        for name, res in self.results.items():
-            if name == strategy_name:
-                # 这里需要从策略实例获取原始数据，简化处理
-                break
-
-        if save_plot:
-            os.makedirs(output_dir, exist_ok=True)
-            save_path = f"{output_dir}/{strategy_name}_{ticker}_candlestick.png"
-        else:
-            save_path = None
-
-        # 注意：这里需要原始OHLCV数据，实际使用时需要传入
-        print(f"请使用 visualizer.plot_candlestick_with_signals() 方法直接绘制")
-        print(f"需要传入原始OHLCV数据")
-
     def get_strategy_results(self, strategy_name: str) -> Optional[Dict[str, Any]]:
-        """获取指定策略的回测结果"""
         return self.results.get(strategy_name)
 
     def get_all_results(self) -> Dict[str, Dict[str, Any]]:
-        """获取所有策略的回测结果"""
         return self.results
 
     def export_results(
         self, strategy_config, strategy_name: str, output_dir: str = "backtest_results"
     ):
         """
-        导出回测结果到文件
-
         Args:
-            strategy_name: 策略名称
-            output_dir: 输出目录
+            strategy_name:
+            output_dir:
         """
         if strategy_name not in self.results:
-            print(f"未找到策略 {strategy_name} 的回测结果")
+            print(f"not found {strategy_name} backtest result")
             return
 
         results = self.results[strategy_name]
@@ -306,14 +244,12 @@ class BacktestEngine:
         trades.write_csv(trades_path)
         print(f"trades exported: {trades_path}")
 
-        # 导出每日组合表现
         portfolio_path = f"{output_dir}/{strategy_name}_portfolio_daily.csv"
         results["portfolio_daily"].with_columns(
             pl.col("date").dt.date().alias("date"),
         ).write_csv(portfolio_path)
         print(f"daily portfolio performance exported: {portfolio_path}")
 
-        # 导出性能指标
         metrics_path = f"{output_dir}/{strategy_name}_metrics.txt"
         with open(metrics_path, "w", encoding="utf-8") as f:
             f.write(f"{strategy_name} backtest performance metrics\n")
@@ -332,15 +268,13 @@ class BacktestEngine:
         print(f"Strategy config exported: {strategy_config_path}")
 
     def _print_strategy_comparison(self, all_results: Dict[str, Dict[str, Any]]):
-        """打印策略比较表格"""
         if len(all_results) < 2:
             return
 
         print("\n" + "=" * 80)
-        print("策略比较")
+        print("Strategies Comparison")
         print("=" * 80)
 
-        # 选择关键指标进行比较
         key_metrics = [
             "Total Return [%]",
             "Max Drawdown [%]",
@@ -349,7 +283,7 @@ class BacktestEngine:
             "Total Trades",
         ]
 
-        print(f"{'策略名称':<20}", end="")
+        print(f"{'Strategy name':<20}", end="")
         for metric in key_metrics:
             print(f"{metric:<15}", end="")
         print()

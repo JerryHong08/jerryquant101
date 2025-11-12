@@ -1,7 +1,3 @@
-"""
-回测可视化模块 - 绘制回测结果图表
-"""
-
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -51,9 +47,8 @@ class BacktestVisualizer:
             if pd.isna(date_obj):
                 return None
 
-            # 如果是字符串
+            # str
             if isinstance(date_obj, str):
-                # 尝试提取日期部分 (去掉时间部分)
                 if "T" in date_obj:
                     return date_obj.split("T")[0]
                 elif " " in date_obj:
@@ -61,11 +56,11 @@ class BacktestVisualizer:
                 else:
                     return date_obj
 
-            # 如果是datetime对象
+            # datetime object
             elif hasattr(date_obj, "strftime"):
                 return date_obj.strftime("%Y-%m-%d")
 
-            # 其他情况
+            # else
             else:
                 date_str = str(date_obj)
                 if "T" in date_str:
@@ -87,14 +82,14 @@ class BacktestVisualizer:
         save_path: Optional[str] = None,
     ):
         """
-        绘制资金曲线图
+        Plot equity curve
 
         Args:
-            portfolio_daily: 每日组合表现DataFrame
-            benchmark_data: 基准数据DataFrame
-            strategy_name: 策略名称
-            show_drawdown: 是否显示回撤
-            save_path: 保存路径
+            portfolio_daily
+            benchmark_data
+            strategy_name
+            show_drawdown
+            save_path
         """
         if show_drawdown:
             fig, (ax1, ax2) = plt.subplots(
@@ -103,11 +98,9 @@ class BacktestVisualizer:
         else:
             fig, ax1 = plt.subplots(1, 1, figsize=self.figsize)
 
-        # 转换为pandas用于绘图
         dates = portfolio_daily["date"].to_pandas()
         equity_curve = portfolio_daily["equity_curve"].to_pandas()
 
-        # 绘制策略曲线
         ax1.plot(
             dates,
             equity_curve,
@@ -116,7 +109,6 @@ class BacktestVisualizer:
             color="blue",
         )
 
-        # 绘制基准曲线
         if benchmark_data is not None:
             benchmark_dates = benchmark_data["date"].to_pandas()
             benchmark_curve = benchmark_data["benchmark_return"].to_pandas()
@@ -134,11 +126,9 @@ class BacktestVisualizer:
         ax1.legend(fontsize=10)
         ax1.grid(True, alpha=0.3)
 
-        # 格式化x轴
         ax1.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         ax1.xaxis.set_major_locator(mdates.MonthLocator(interval=6))
 
-        # 绘制回撤图
         if show_drawdown:
             equity_array = equity_curve.values
             peak = np.maximum.accumulate(equity_array)
@@ -146,8 +136,8 @@ class BacktestVisualizer:
 
             ax2.fill_between(dates, drawdown, 0, color="red", alpha=0.3)
             ax2.plot(dates, drawdown, color="red", linewidth=1)
-            ax2.set_title("withdraw", fontsize=12)
-            ax2.set_ylabel("withdraw (%)", fontsize=10)
+            ax2.set_title("Drawdown", fontsize=12)
+            ax2.set_ylabel("Drawdown (%)", fontsize=10)
             ax2.set_xlabel("Date", fontsize=12)
             ax2.grid(True, alpha=0.3)
             ax2.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
@@ -167,12 +157,12 @@ class BacktestVisualizer:
         save_path: Optional[str] = None,
     ):
         """
-        plot monthly heatmap
+        plot monthly returns heatmap
 
         Args:
-            portfolio_daily, return daily
-            strategy_name,
-            save_path,
+            portfolio_daily: daily portfolio returns
+            strategy_name: strategy name
+            save_path: path to save plot
         """
         try:
 
@@ -207,7 +197,7 @@ class BacktestVisualizer:
                 fmt=".2f",
                 cmap="RdYlGn",
                 center=0,
-                cbar_kws={"label": "Mothly Return (%)"},
+                cbar_kws={"label": "Monthly Return (%)"},
             )
 
             plt.title(
@@ -220,14 +210,13 @@ class BacktestVisualizer:
 
             if save_path:
                 plt.savefig(save_path, dpi=300, bbox_inches="tight")
-                print(f"月度收益热力图已保存到: {save_path}")
+                print(f"Monthly Return Heatmap saved: {save_path}")
 
             self._setup_window()
             plt.show()
 
         except Exception as e:
-            print(f"绘制月度收益热力图时出错: {e}")
-            print("使用简化版本...")
+            print(f"Monthly Return Heatmap error: {e}")
 
     def plot_candlestick_with_signals(
         self,
@@ -242,18 +231,18 @@ class BacktestVisualizer:
         save_path: Optional[str] = None,
     ):
         """
-        plot k line, trade signals and indicators
+        plot candlestick chart with trade signals and indicators
 
         Args:
-            ohlcv_data:
-            trades: Optional
-            ticker:
-            start_date:
-            end_date:
-            indicators:
-            save_path:
+            ohlcv_data: OHLCV price data
+            trades: completed trades
+            ticker: stock ticker symbol
+            start_date: start date for plot
+            end_date: end date for plot
+            indicators: technical indicators data
+            save_path: path to save plot
         """
-        # 过滤数据
+        # Filter data
         ticker_data = ohlcv_data.filter(pl.col("ticker") == ticker)
 
         if start_date:
@@ -267,13 +256,11 @@ class BacktestVisualizer:
             )
 
         if ticker_data.is_empty():
-            print(f"没有找到股票 {ticker} 的数据")
+            print(f"No data found for {ticker} during candlestick plotting")
             return
 
-        # 转换为pandas并重置索引为数值索引
         df = ticker_data.to_pandas().sort_values("timestamps").reset_index(drop=True)
 
-        # 创建数值索引映射到日期
         dates = df["timestamps"].values
         date_labels = [
             d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d) for d in dates
@@ -285,7 +272,7 @@ class BacktestVisualizer:
             2, 1, figsize=(15, 10), height_ratios=[3, 1], sharex=True
         )
 
-        # plot k-line
+        # plot candlestick chart
         if line:
             self._plot_candlesticks_line(ax1, df)
         else:
@@ -310,10 +297,9 @@ class BacktestVisualizer:
         if indicators is not None:
             ticker_indicators = indicators.filter(pl.col("ticker") == ticker)
             if not ticker_indicators.is_empty():
-                print("plot indicators...")
+                print("Plotting indicators...")
                 self._plot_indicators(ax1, ticker_indicators, df)
 
-        # 绘制成交量
         ax2.bar(range(len(df)), df["volume"], color="gray", alpha=0.3)
         ax2.set_ylabel("Volume", fontsize=10)
         ax2.set_xlabel("Date", fontsize=12)
@@ -329,7 +315,7 @@ class BacktestVisualizer:
         ax2.set_xticklabels(tick_labels, rotation=45)
 
         ax1.set_title(
-            f"{ticker} K-Line Chart with Signals", fontsize=14, fontweight="bold"
+            f"{ticker} Candlestick Chart with Signals", fontsize=14, fontweight="bold"
         )
         ax1.set_ylabel("Price", fontsize=12)
         ax1.legend()
@@ -351,15 +337,13 @@ class BacktestVisualizer:
 
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
-            print(f"K线图已保存到: {save_path}")
+            print(f"Candlestick chart saved: {save_path}")
 
             self._setup_window()
 
         plt.show()
 
     def _plot_candlesticks_line(self, ax, df):
-        """绘制紧凑的价格线图 (使用数值索引)"""
-        # 绘制收盘价线图
         ax.plot(
             range(len(df)),
             df["close"],
@@ -369,15 +353,12 @@ class BacktestVisualizer:
         )
 
     def _plot_candlesticks(self, ax, df):
-        """绘制紧凑的K线图 (使用数值索引)"""
         for i in range(len(df)):
             row = df.iloc[i]
             color = "red" if row["close"] > row["open"] else "green"
 
-            # 绘制影线
             ax.plot([i, i], [row["low"], row["high"]], color="black", linewidth=0.5)
 
-            # 绘制实体
             height = abs(row["close"] - row["open"])
             bottom = min(row["close"], row["open"])
             ax.bar(i, height, bottom=bottom, color=color, alpha=0.8, width=0.8)
@@ -385,13 +366,12 @@ class BacktestVisualizer:
     def _plot_trade_signals(
         self, ax, trades: pl.DataFrame, df, open_position: bool = False
     ):
-        """plot trade signal"""
+        """plot trade signals"""
         trades_pd = trades.to_pandas()
 
-        # 为买卖信号创建位置映射
         date_to_index = {str(df.iloc[i]["timestamps"]): i for i in range(len(df))}
 
-        # buy signal
+        # buy signals
         buy_signals_plotted = False
         if "buy_date" in trades_pd.columns and "buy_price" in trades_pd.columns:
             for _, trade in trades_pd.iterrows():
@@ -411,7 +391,7 @@ class BacktestVisualizer:
                             buy_signals_plotted = True
                             break
 
-        # sell signal
+        # sell signals
         sell_signals_plotted = False
         if "sell_date" in trades_pd.columns and "sell_open" in trades_pd.columns:
             for _, trade in trades_pd.iterrows():
@@ -432,15 +412,15 @@ class BacktestVisualizer:
                             break
 
     def _add_interactive_features(self, fig, ax1, ax2, df, trades):
-        """添加交互功能：鼠标悬停显示OHLCV和交易信息"""
-        # 创建交易信息映射
+        """Add interactive features: mouse hover to show OHLCV and trade information"""
+        # Create trade information mapping
         trades_pd = trades.to_pandas() if not trades.is_empty() else pd.DataFrame()
 
         trade_info_map = {}
 
         if not trades_pd.empty:
             for _, trade in trades_pd.iterrows():
-                # 买入信息
+                # Buy information
                 if pd.notna(trade.get("buy_date")) and pd.notna(trade.get("buy_price")):
                     buy_date_str = str(trade["buy_date"])
                     for i in range(len(df)):
@@ -452,7 +432,7 @@ class BacktestVisualizer:
                             }
                             break
 
-                # 卖出信息
+                # Sell information
                 if pd.notna(trade.get("sell_date")) and pd.notna(
                     trade.get("sell_open")
                 ):
@@ -466,7 +446,7 @@ class BacktestVisualizer:
                             }
                             break
 
-        # 创建信息显示框
+        # Create information display box
         info_text = ax1.text(
             0.02,
             0.98,
@@ -479,7 +459,7 @@ class BacktestVisualizer:
 
         def on_mouse_move(event):
             if event.inaxes == ax1:
-                # 获取鼠标位置对应的数据索引
+                # Get data index corresponding to mouse position
                 x_pos = event.xdata
                 if x_pos is not None:
                     index = int(round(x_pos))
@@ -487,7 +467,7 @@ class BacktestVisualizer:
                         row = df.iloc[index]
                         date_str = str(row["timestamps"])
 
-                        # 基础OHLCV信息
+                        # Basic OHLCV information
                         info_lines = [
                             f"Date: {date_str[:10]}",
                             f"Open: {row['open']:.2f}",
@@ -497,7 +477,7 @@ class BacktestVisualizer:
                             f"Volume: {row['volume']:,.0f}",
                         ]
 
-                        # 如果有交易信息，添加交易详情
+                        # If there's trade information, add trade details
                         if index in trade_info_map:
                             trade_info = trade_info_map[index]
                             info_lines.append("")
@@ -514,21 +494,21 @@ class BacktestVisualizer:
 
             fig.canvas.draw_idle()
 
-        # 连接鼠标移动事件
+        # Connect mouse move event
         fig.canvas.mpl_connect("motion_notify_event", on_mouse_move)
 
     def _plot_indicators(self, ax, indicators: pl.DataFrame, df):
         try:
             indicators_pd = indicators.to_pandas()
 
-            # 创建标准化的日期映射
+            # Create standardized date mapping
             # df_dates = [
             #     self._normalize_date_string(df.iloc[i]["timestamps"])
             #     for i in range(len(df))
             # ]
             df_dates = [df.iloc[i]["timestamps"] for i in range(len(df))]
 
-            # 为指标数据创建索引映射
+            # Create index mapping for indicator data
             valid_indices = []
             valid_bbi = []
             valid_upr = []
@@ -556,9 +536,9 @@ class BacktestVisualizer:
                     else:
                         valid_dwn.append(None)
 
-            # 绘制指标 - 确保长度匹配
+            # Plot indicators - ensure length matching
             if len(valid_indices) > 0:
-                # 过滤掉None值
+                # Filter out None values
                 if len(valid_bbi) == len(valid_indices):
                     bbi_clean = [
                         (valid_indices[i], valid_bbi[i])
@@ -613,13 +593,15 @@ class BacktestVisualizer:
                         )
 
                 print(
-                    f"成功绘制技术指标: OHLCV={len(df)}, 指标={len(valid_indices)} 个匹配点"
+                    f"Successfully plotted technical indicators: OHLCV={len(df)}, indicators={len(valid_indices)} matching points"
                 )
             else:
-                print(f"警告: 技术指标与OHLCV数据没有匹配的日期")
+                print(
+                    f"Warning: Technical indicators have no matching dates with OHLCV data"
+                )
 
         except Exception as e:
-            print(f"绘制技术指标时出错: {e}")
+            print(f"Error plotting technical indicators: {e}")
             import traceback
 
             traceback.print_exc()

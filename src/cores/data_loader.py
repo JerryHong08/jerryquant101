@@ -125,13 +125,14 @@ def generate_full_timestamp(start_date, end_date, timeframe, full_hour: bool = F
 
 def resample_ohlcv(lf, timeframe):
     """
-    手动resample美股不同交易时段，不受DST影响，支持盘前盘后交易。
-    基于时间桶的方法而非group_by_dynamic。
+    Reasample OHLCV data from basic timeframe(1min/1day) to aggregate bar.
+    Based on US ET timezone so it won't be affected by DST(Daylight Saving Time).
+    Using bucket method instead of group_by_dynamic for more robust and complicated custom scenarios.
     """
     import re
 
     def parse_timeframe(tf):
-        """解析时间间隔，返回分钟数"""
+        """Parese timeframe, return minutes count"""
         match = re.match(r"(\d+)([mhd])", tf.lower())
         if not match:
             raise ValueError(f"Invalid timeframe: {tf}")
@@ -148,21 +149,21 @@ def resample_ohlcv(lf, timeframe):
             raise ValueError(f"Unsupported unit: {unit}")
 
     def get_session_start(timestamp_col, session_type="regular"):
-        """获取不同交易时段的起始时间"""
+        """get trade session start"""
         if session_type == "regular":
-            # 正常交易时间 9:30
+            # Pre-market 9:30
             return pl.concat_str(
                 [timestamp_col.dt.date().cast(pl.Utf8), pl.lit(" 09:30:00")]
             ).str.strptime(pl.Datetime(time_zone="America/New_York"), strict=True)
 
         elif session_type == "premarket":
-            # 盘前交易 4:00
+            # Intraday 4:00
             return pl.concat_str(
                 [timestamp_col.dt.date().cast(pl.Utf8), pl.lit(" 04:00:00")]
             ).str.strptime(pl.Datetime(time_zone="America/New_York"), strict=True)
 
         elif session_type == "afterhours":
-            # 盘后交易 16:00
+            # Post market 16:00
             return pl.concat_str(
                 [timestamp_col.dt.date().cast(pl.Utf8), pl.lit(" 16:00:00")]
             ).str.strptime(pl.Datetime(time_zone="America/New_York"), strict=True)
@@ -172,7 +173,7 @@ def resample_ohlcv(lf, timeframe):
 
     lf = lf.sort(["ticker", "timestamps"])
 
-    # 交易日（按纽约时间）
+    # add trade date, hour, minute columns
     lf = lf.with_columns(
         [
             pl.col("timestamps").dt.date().alias("trade_date"),
@@ -181,7 +182,7 @@ def resample_ohlcv(lf, timeframe):
         ]
     )
 
-    # 识别交易时段
+    # infer trade session
     lf = lf.with_columns(
         [
             pl.when((pl.col("hour") >= 4) & (pl.col("hour") < 9))
@@ -198,10 +199,10 @@ def resample_ohlcv(lf, timeframe):
             .alias("session")
         ]
     )
-    # 为每个交易时段计算相对于该时段起始的分钟数和桶编号
+
+    # Calculate bar counted since its trade session start
     lf = lf.with_columns(
         [
-            # 盘前时段：从4:00开始计算
             pl.when(pl.col("session") == "premarket")
             .then(
                 (
@@ -213,7 +214,6 @@ def resample_ohlcv(lf, timeframe):
                     .cast(pl.Int64)
                 )
             )
-            # 正常时段：从9:30开始计算
             .when(pl.col("session") == "regular")
             .then(
                 (
@@ -225,7 +225,6 @@ def resample_ohlcv(lf, timeframe):
                     .cast(pl.Int64)
                 )
             )
-            # 盘后时段：从16:00开始计算
             .when(pl.col("session") == "afterhours")
             .then(
                 (
@@ -242,11 +241,10 @@ def resample_ohlcv(lf, timeframe):
         ]
     )
 
-    # 计算桶编号（每个时段独立计算）
     lf = lf.with_columns(
         [(pl.col("minutes_from_session_start") // bar_minutes).alias("bar_id")]
     )
-    # 计算每个桶的起始时间
+
     lf = lf.with_columns(
         [
             pl.when(pl.col("session") == "premarket")
@@ -269,7 +267,6 @@ def resample_ohlcv(lf, timeframe):
         ]
     )
 
-    # 按时段、日期、桶编号分组聚合
     resampled = (
         lf.group_by(["ticker", "trade_date", "session", "bar_id", "bar_start"])
         .agg(
@@ -283,7 +280,7 @@ def resample_ohlcv(lf, timeframe):
             ]
         )
         .sort(["ticker", "trade_date", "bar_start"])
-        .drop(["trade_date", "session", "bar_id"])  # 清理辅助列
+        .drop(["trade_date", "session", "bar_id"])
         .rename({"bar_start": "timestamps"})
     )
 
@@ -291,7 +288,7 @@ def resample_ohlcv(lf, timeframe):
 
 
 def splits_adjust(lf, splits, price_decimals: int = 4):
-    # 获取数据范围
+    """ """
     date_range = lf.select(
         [
             pl.col("timestamps").min().alias("date_min"),
@@ -299,7 +296,6 @@ def splits_adjust(lf, splits, price_decimals: int = 4):
         ]
     ).collect()
 
-    # Check if we have data
     if date_range.height == 0 or date_range[0, 0] is None:
         return lf  # No data to adjust
 
@@ -308,7 +304,6 @@ def splits_adjust(lf, splits, price_decimals: int = 4):
 
     tickers = lf.select(pl.col("ticker").unique()).collect().to_series(0).to_list()
 
-    # If no tickers found, return original data
     if not tickers:
         return lf
 
@@ -335,6 +330,7 @@ def splits_adjust(lf, splits, price_decimals: int = 4):
             ]
         ).select(["ticker", "split_date", "split_ratio"])
 
+        # add split ratio
         splits_with_factor = (
             splits_processed.sort(["ticker", "split_date"], descending=[False, True])
             .with_columns(
@@ -350,11 +346,12 @@ def splits_adjust(lf, splits, price_decimals: int = 4):
             .sort(["ticker", "split_date"])
         )
 
-        print(splits_with_factor.head())
+        print(f"Debug splits with fatcor:\n{splits_with_factor.head()}")
 
-        # 由于 Polars join_asof 需要对齐日期类型，可以先添加辅助列
         lf = (
-            lf.with_columns(pl.col("timestamps").dt.date().alias("date_only"))
+            lf.with_columns(
+                pl.col("timestamps").dt.date().alias("date_only")
+            )  # for join on date timeframe
             .join_asof(
                 splits_with_factor.lazy(),
                 left_on="date_only",
@@ -460,9 +457,8 @@ def splits_figi_alignment(df):
 
 def ohlcv_figi_alignment(lf):
     """
-    增强版的 FIGI 对齐函数，处理同一 group_id 下多个 ticker 的重叠数据
+    Ticker name alignment under the same group_id(generated on figi)
     """
-    # 首先添加 group_id 和 ticker 顺序信息
     lf = lf.join(
         mapped_all_tickers.select(
             [
@@ -478,7 +474,7 @@ def ohlcv_figi_alignment(lf):
         how="left",
     )
 
-    # 找出有多个 ticker 的 group_id 组
+    # filter out multi tickers
     multi_ticker_groups = (
         lf.group_by("group_id")
         .agg(
@@ -491,30 +487,27 @@ def ohlcv_figi_alignment(lf):
         .select("group_id")
     )
 
-    # 分离单 ticker 和多 ticker 的数据
     single_ticker_data = lf.join(
         multi_ticker_groups,
         on="group_id",
-        how="anti",  # 反连接，获取不在多ticker组中的数据
+        how="anti",
     )
 
     multi_ticker_data = lf.join(
         multi_ticker_groups,
         on="group_id",
-        how="semi",  # 半连接，获取在多ticker组中的数据
+        how="semi",
     )
 
-    # 处理多 ticker 组的重叠数据
     def process_multi_ticker_group(group_df):
-        """处理单个 group_id 组内的重叠数据"""
+        """process multi-tickers data under each group_id"""
 
-        # 直接从预排序的 tickers 列表中获取顺序
         first_row = group_df.row(0)
-        ticker_order = first_row[group_df.columns.index("tickers")]  # 获取 tickers 列表
+        ticker_order = first_row[group_df.columns.index("tickers")]
         last_updated_list = group_df.select("all_last_updated_utc").row(0)[0]
         delisted_list = group_df.select("all_delisted_utc").row(0)[0]
 
-        # print(f"Ticker 顺序: {ticker_order}")  # 调试信息
+        print(f"Debug tickers order in multi-tickers group: \n{ticker_order}")
 
         processed_data = []
         last_end_date = None
@@ -525,7 +518,7 @@ def ohlcv_figi_alignment(lf):
             if ticker_data.height == 0:
                 continue
 
-            # 取 cutoff
+            # cutoff
             lu = last_updated_list[i]
             de = delisted_list[i]
 
@@ -537,7 +530,7 @@ def ohlcv_figi_alignment(lf):
                 else None
             )
             if last_end_date is not None:
-                # 移除与前一个 ticker 重叠的数据
+                # cut off the dubbed data conflicted with last name period data.
                 ticker_data = ticker_data.filter(
                     pl.col("timestamps").dt.date() > last_end_date
                 )
@@ -549,22 +542,20 @@ def ohlcv_figi_alignment(lf):
 
             if ticker_data.height > 0:
                 processed_data.append(ticker_data)
-                # 更新最后日期
                 last_end_date = ticker_data.select(
                     pl.col("timestamps").dt.date().max()
                 ).item()
 
-        # 合并所有处理后的数据
+        # concat
         if processed_data:
             combined = pl.concat(processed_data)
-            # 统一使用 latest_ticker
             latest_ticker = group_df.select("latest_ticker").row(0)[0]
             combined = combined.with_columns(pl.lit(latest_ticker).alias("ticker"))
             return combined
         else:
             return pl.DataFrame(schema=group_df.schema)
 
-    # 对每个多 ticker 组应用处理函数
+    # multi ticker data
     multi_ticker_data_collected = multi_ticker_data.collect()
     if multi_ticker_data_collected.height > 0:
         processed_groups = []
@@ -588,7 +579,7 @@ def ohlcv_figi_alignment(lf):
     else:
         processed_multi_ticker_data = pl.DataFrame(schema=lf.collect_schema())
 
-    # 处理单 ticker 数据（简单重命名）
+    # single ticker data
     single_ticker_data_collected = single_ticker_data.collect()
     if single_ticker_data_collected.height > 0:
         processed_single_ticker_data = (
@@ -601,7 +592,7 @@ def ohlcv_figi_alignment(lf):
     else:
         processed_single_ticker_data = pl.DataFrame(schema=lf.schema)
 
-    # 合并所有数据
+    # concat data
     if (
         processed_multi_ticker_data.height > 0
         and processed_single_ticker_data.height > 0
@@ -628,7 +619,7 @@ def ohlcv_figi_alignment(lf):
     else:
         final_data = pl.DataFrame(schema=lf.schema)
 
-    # 清理列
+    # clean columns
     columns_to_keep = [
         col
         for col in final_data.columns
@@ -801,8 +792,8 @@ def stock_load_process(
     )
 
     # TODO: this method need to be optimized,
-    # as currently there's too much low specious volume tickers
-    # so I need to manually filter them out simply but not the best way
+    # as currently there's too much low specious volume tickers,
+    # it's not possible for me to figure out each one's reason of low volume.
     if skip_low_volume:
         skipped = (
             pl.read_csv("low_volume_tickers.csv", truncate_ragged_lines=True)
@@ -1003,19 +994,20 @@ if __name__ == "__main__":
                 # & (pl.col("timestamps").dt.date().is_between(pl.date(2023, 3, 6), pl.date(2023, 3, 11)))
             )
         )
+        print(lf_result)
         # print(lf_result.filter(pl.col("ticker") == ticker_plot).tail())
-        from strategies.indicators.registry import get_indicator
+        # from strategies.indicators.registry import get_indicator
 
-        func = get_indicator("bbiboll")
-        indicators = func(lf_result)
+        # func = get_indicator("bbiboll")
+        # indicators = func(lf_result)
 
-        print(
-            indicators.filter(
-                pl.col("timestamps")
-                .dt.date()
-                .is_between(pl.date(2025, 10, 1), pl.date(2025, 10, 11))
-            )
-        )
+        # print(
+        #     indicators.filter(
+        #         pl.col("timestamps")
+        #         .dt.date()
+        #         .is_between(pl.date(2025, 10, 1), pl.date(2025, 10, 11))
+        #     )
+        # )
 
     from visualizer.plotter import plot_candlestick
 

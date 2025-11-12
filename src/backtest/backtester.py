@@ -1,7 +1,3 @@
-"""
-BBIBOLL策略回测示例 - 使用新的回测框架
-"""
-
 import os
 
 import polars as pl

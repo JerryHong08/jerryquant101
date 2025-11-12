@@ -44,7 +44,6 @@ def generate_backtest_date(
 
         count = 0
         while True:
-            # 检查是否到达限制
             if reverse_limit and current_date < limit_date:
                 break
             if not reverse_limit and count >= reverse_limit_count:
@@ -99,12 +98,12 @@ def load_irx_data(start, end):
 
         return irx
     except Exception as e:
-        print(f"加载IRX数据失败: {e}")
+        print(f"Load IRX data failed: {e}")
         return None
 
 
 def load_spx_benchmark(start, end):
-    """加载SPX基准数据"""
+    """Load SPX benchmark data"""
     try:
         spx = pl.read_parquet("I:SPXday.parquet")
         spx = spx.with_columns(
@@ -126,7 +125,7 @@ def load_spx_benchmark(start, end):
             )
         ).sort("date")
 
-        # 计算基准收益曲线（归一化）
+        # normalization
         spx = spx.with_columns(
             (pl.col("close") / pl.col("close").first()).alias("benchmark_return")
         ).select(["date", "close", "benchmark_return"])

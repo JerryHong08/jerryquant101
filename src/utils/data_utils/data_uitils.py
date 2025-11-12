@@ -35,7 +35,7 @@ def get_mapped_tickers():
     )
 
     # ======================
-    # 3. create bipartite graph edges (ticker <-> figi + type 限制)
+    # 3. create bipartite graph edges (ticker <-> figi + type constrain)
     # ======================
     edges = (
         df.select(["ticker", "type", "composite_figi", "share_class_figi"])
@@ -57,12 +57,12 @@ def get_mapped_tickers():
         # ticker -> figi
         t2f = edges.join(groups, on=["ticker", "type"], how="left")
 
-        # figi -> min(group_id) （按 type 分开，不同 type 不混）
+        # figi -> min(group_id)
         f2g = t2f.group_by(["figi", "type"]).agg(
             pl.col("group_id").min().alias("group_id")
         )
 
-        # 回传 figi -> ticker
+        # figi -> ticker
         new_groups = (
             edges.join(f2g, on=["figi", "type"], how="left")
             .select(["ticker", "type", "group_id"])
@@ -70,7 +70,6 @@ def get_mapped_tickers():
             .agg(pl.col("group_id").min())
         )
 
-        # 合并
         updated = groups.join(
             new_groups, on=["ticker", "type"], how="left", suffix="_new"
         )

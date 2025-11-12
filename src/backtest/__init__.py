@@ -1,9 +1,3 @@
-"""
-量化交易回测框架
-
-提供标准化的策略开发、回测执行和结果分析功能。
-"""
-
 from .engine import BacktestEngine
 from .performance_analyzer import PerformanceAnalyzer
 from .strategy_base import StrategyBase
