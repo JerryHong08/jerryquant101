@@ -15,7 +15,7 @@ from prometheus_client import Counter, Gauge, Summary, start_http_server
 from cores.config import cache_dir
 from utils.backtest_utils.backtest_utils import only_common_stocks
 
-start_http_server(9090)  # 浏览器访问 localhost:9090/metrics
+start_http_server(9090)  # localhost:9090/metrics
 
 PROCESS_LATENCY = Summary(
     "datamanager_process_latency_seconds", "Time spent processing snapshot"
@@ -29,46 +29,6 @@ class DataManager:
         self.max_history_points = max_history_points
         self.stock_data: Dict[str, Dict] = {}
         self.top_20_history: List[List[str]] = []  # Track top 20 changes over time
-
-    def initialize_from_history(self, date: str) -> None:
-        """Load historical data for the given date"""
-        year = date[:4]
-        month = date[4:6]
-        day = date[6:8]
-
-        market_mover_dir = os.path.join(cache_dir, "market_mover", year, month, day)
-
-        if not os.path.exists(market_mover_dir):
-            print(f"No historical data found for {date}")
-            return
-
-        all_files = glob.glob(os.path.join(market_mover_dir, "*_market_snapshot.csv"))
-        all_files.sort()
-
-        print(f"Loading {len(all_files)} historical files...")
-
-        for file_path in all_files:
-            try:
-                df = pl.read_csv(file_path)
-                timestamp = self._extract_timestamp_from_filename(file_path)
-                if timestamp.hour < 4:  # Skip data before pre-market data
-                    print(f"Skipping pre-market data at {timestamp}")
-                    continue
-                filter_date = f"{year}-{month}-{day}"
-                df = (
-                    only_common_stocks(filter_date)
-                    .drop("active", "composite_figi")
-                    .join(df, on="ticker", how="inner")
-                    .sort("percent_change", descending=True)
-                ).filter(
-                    (pl.col("percent_change") > 0)
-                    & (pl.col("accumulated_volume") > 1000)
-                )
-                self._process_snapshot(df, timestamp, is_historical=True)
-            except Exception as e:
-                print(f"Error loading {file_path}: {e}")
-
-        print(f"Loaded historical data for {len(self.stock_data)} stocks")
 
     @PROCESS_LATENCY.time()
     def update_from_realtime(self, df: pl.DataFrame):
@@ -255,6 +215,47 @@ class DataManager:
         # print(f"Removing {len(stocks_to_remove)} old stocks: {stocks_to_remove}")
         for ticker in stocks_to_remove:
             del self.stock_data[ticker]
+
+    # ----------------- for replayer data -----------------------
+    def initialize_from_history(self, date: str) -> None:
+        """Load historical data for the given date"""
+        year = date[:4]
+        month = date[4:6]
+        day = date[6:8]
+
+        market_mover_dir = os.path.join(cache_dir, "market_mover", year, month, day)
+
+        if not os.path.exists(market_mover_dir):
+            print(f"No historical data found for {date}")
+            return
+
+        all_files = glob.glob(os.path.join(market_mover_dir, "*_market_snapshot.csv"))
+        all_files.sort()
+
+        print(f"Loading {len(all_files)} historical files...")
+
+        for file_path in all_files:
+            try:
+                df = pl.read_csv(file_path)
+                timestamp = self._extract_timestamp_from_filename(file_path)
+                if timestamp.hour < 4:  # Skip data before pre-market data
+                    print(f"Skipping pre-market data at {timestamp}")
+                    continue
+                filter_date = f"{year}-{month}-{day}"
+                df = (
+                    only_common_stocks(filter_date)
+                    .drop("active", "composite_figi")
+                    .join(df, on="ticker", how="inner")
+                    .sort("percent_change", descending=True)
+                ).filter(
+                    (pl.col("percent_change") > 0)
+                    & (pl.col("accumulated_volume") > 1000)
+                )
+                self._process_snapshot(df, timestamp, is_historical=True)
+            except Exception as e:
+                print(f"Error loading {file_path}: {e}")
+
+        print(f"Loaded historical data for {len(self.stock_data)} stocks")
 
     def _extract_timestamp_from_filename(self, filename: str) -> datetime:
         """Extract timestamp from filename"""

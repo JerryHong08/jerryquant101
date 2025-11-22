@@ -175,24 +175,26 @@ if __name__ == "__main__":
         "initial_capital": 10000.0,
         "add_risk_free_rate": True,
         "silent": False,
+        # "silent": True,
     }
 
     backtest_dates = generate_backtest_date(
-        start_date="2025-11-07",
+        start_date="2025-11-21",
         period="week",
         reverse=True,
-        reverse_limit="2025-10-24",
+        reverse_limit="2025-11-07",
         # reverse_limit_count=2
     )
 
-    # for backtest_date in backtest_dates:
-    #     strategy_config["silent"] = True
-    #     print(f"info: backtesing: {backtest_date}")
+    for backtest_date in backtest_dates:
+        # strategy_config["silent"] = True
+        print(f"info: backtesing: {backtest_date}")
 
-    #     strategy_config["result_customized_name"] = backtest_date
-    #     strategy_config["end_date"] = backtest_date
+        strategy_config["result_customized_name"] = backtest_date
+        strategy_config["end_date"] = backtest_date
 
-    #     strategy = BBIBOLLStrategy(config=strategy_config)
-    #     run_backtest(strategy, strategy_config=strategy_config)
-    strategy = BBIBOLLStrategy(config=strategy_config)
-    run_backtest(strategy, strategy_config=strategy_config)
+        strategy = BBIBOLLStrategy(config=strategy_config)
+        run_backtest(strategy, strategy_config=strategy_config)
+
+    # strategy = BBIBOLLStrategy(config=strategy_config)
+    # run_backtest(strategy, strategy_config=strategy_config)

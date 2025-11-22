@@ -1,50 +1,48 @@
 #!/bin/bash
 # ===========================
-# 自动化一周数据更新脚本
+# automation update .sh
 # ===========================
 
-set -e  # 出错即停止脚本执行
+set -e
 LOGFILE="logs/weekly_update_$(date +%Y%m%d_%H%M%S).log"
 mkdir -p logs
 
-# 初始化计数器
 current_task=0
 TOTAL_TASKS=8
-TOTAL_DAYS=7
+TOTAL_DAYS=14
 
-# 执行任务的函数
 run_task() {
     local task_name="$1"
-    shift  # 移除第一个参数
-    local command=("$@")  # 剩余参数作为命令
+    shift
+    local command=("$@")
 
     current_task=$((current_task + 1))
     echo "[$current_task/$TOTAL_TASKS] $task_name" | tee -a "$LOGFILE"
     "${command[@]}" | tee -a "$LOGFILE"
 }
 
-echo "===== 开始数据更新：$(date) =====" | tee -a "$LOGFILE"
+echo "===== start data update$(date) =====" | tee -a "$LOGFILE"
 
-# 执行所有任务
-run_task "下载 minute_aggs_v1 数据中..." python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
+# run all task
+run_task "downloading minute_aggs_v1 data..." python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
 
-run_task "下载 day_aggs_v1 数据中..." python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
+run_task "downloading day_aggs_v1 data..." python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
 
-run_task "转换 minute_aggs_v1 为 Parquet..." python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
+run_task "tranform minute_aggs_v1 to Parquet..." python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
 
-run_task "转换 day_aggs_v1 为 Parquet..." python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
+run_task "tranform day_aggs_v1 to Parquet..." python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
 
-run_task "获取最新拆股信息..." python src/data_fetcher/splits_fetch.py
+run_task "tickers splits data fecthing..." python src/data_fetcher/splits_fetch.py
 
-run_task "获取最新股票列表..." python src/data_fetcher/all_tickers_fetch.py
+run_task "tickers list fetching..." python src/data_fetcher/all_tickers_fetch.py
 
-run_task "versatile tickers 更新..." python src/data_fetcher/versatile_tickers_fetch.py
+run_task "versatile tickers updating..." python src/data_fetcher/versatile_tickers_fetch.py
 
-run_task "low_volume_tickers 更新..." python scripts/write_low_volume_ticker_csv.py
+run_task "low_volume_tickers updating..." python scripts/write_low_volume_ticker_csv.py
 
-echo "===== low_volume_tickers 更新完成：$(date) =====" | tee -a "$LOGFILE"
+echo "===== low_volume_tickers updated.$(date) =====" | tee -a "$LOGFILE"
 
-echo "===== 数据更新完成：$(date) =====" | tee -a "$LOGFILE"
+echo "===== data updated.$(date) =====" | tee -a "$LOGFILE"
 
 exit 0
 

@@ -194,6 +194,51 @@ def get_time_range_and_file_types(data_type_path):
     return earliest_date, latest_date, file_types
 
 
+def get_file_n_and_size(data_type_path):
+    """Get number of files and directory size for a data type"""
+    total_files = 0
+    total_size = 0
+    avg_size = 0
+
+    if not os.path.exists(data_type_path):
+        return 0, "0 B"
+
+    # Walk through all subdirectories and files
+    for root, dirs, files in os.walk(data_type_path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            try:
+                file_size = os.path.getsize(file_path)
+                total_size += file_size
+                total_files += 1
+            except (OSError, IOError):
+                # Skip files that can't be accessed
+                continue
+
+    # Format size in human readable format
+    def format_size(size_bytes):
+        """Format bytes into human readable format"""
+        if size_bytes == 0:
+            return "0 B"
+
+        size_names = ["B", "KB", "MB", "GB", "TB", "PB"]
+        i = 0
+        while size_bytes >= 1024 and i < len(size_names) - 1:
+            size_bytes /= 1024.0
+            i += 1
+
+        return f"{size_bytes:.1f} {size_names[i]}"
+
+    if total_files > 0:
+        avg_size = total_size / total_files
+        fomate_avg_size = format_size(avg_size)
+    else:
+        fomate_avg_size = "0 B"
+
+    formatted_size = format_size(total_size)
+    return total_files, formatted_size, fomate_avg_size
+
+
 def metrics(data_dir, sub_directory="raw"):
     """Check asset-class, data-type and time range of quantitative data"""
 
@@ -253,7 +298,7 @@ def metrics(data_dir, sub_directory="raw"):
                 earliest, latest, file_types = get_time_range_and_file_types(
                     data_type_path
                 )
-
+                n_files, path_size, avg_file_size = get_file_n_and_size(data_type_path)
                 if earliest and latest:
                     file_types_str = (
                         ", ".join(sorted(file_types)) if file_types else "unknown"
@@ -263,6 +308,10 @@ def metrics(data_dir, sub_directory="raw"):
                     print(f"        Time range: {earliest} - {latest}")
                 else:
                     print(f"      • {data_type} (no data files found)")
+                if n_files and path_size and avg_file_size:
+                    print(f"        File numbers: {n_files}")
+                    print(f"        Files total size: {path_size}")
+                    print(f"        Avgerage file size: {avg_file_size}")
         else:
             print(f"   ❌ No data types found")
 

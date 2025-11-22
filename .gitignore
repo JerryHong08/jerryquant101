@@ -19,7 +19,6 @@ discard/
 .vscode/
 
 # Data files
-data
 /*.csv
 *.db
 *.sqlite

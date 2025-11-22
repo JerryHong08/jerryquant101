@@ -69,38 +69,15 @@ while True:
 
     # turn into JSON publish to Redis
     payload = df.write_json()
+    # --------redis push---------
     r.publish("market_snapshot", payload)
+
+    # --------redis stream---------
+    STREAM_NAME = "market_snapshot_stream"
+    payload = df.write_json()
+    message_id = r.xadd(STREAM_NAME, {"data": payload}, maxlen=10000)
+
     print(f"Published {len(df)} rows at {datetime.now(ZoneInfo('America/New_York'))}")
-
-    ## debug
-    # df = df.with_columns(
-    #     pl.from_epoch(
-    #         pl.col('timestamp'), time_unit='ms'
-    #     ).dt.convert_time_zone('America/New_York')
-    # )
-    # # Filter only common stocks and sort by percent_change
-    # updated_time = datetime.now(ZoneInfo("America/New_York")).strftime(
-    #     "%Y%m%d%H%M%S"
-    # )
-    # filter_date = (
-    #     f"{updated_time[:4]}-{updated_time[4:6]}-{updated_time[6:8]}"
-    # )
-
-    # try:
-    #     from utils.backtest_utils.backtest_pre_data import only_common_stocks
-    #     df = (
-    #         only_common_stocks(filter_date)
-    #         .drop("active", "composite_figi")
-    #         .join(df, on="ticker", how="inner")
-    #         .sort("percent_change", descending=True)
-    #     )
-    # except Exception as e:
-    #     print(f"Error filtering common stocks: {e}")
-    #     # Fallback: just sort by percent_change
-    #     df = df.sort("percent_change", descending=True)
-    # # print(df.select('timestamp').head())
-    # print(df.head())
-
     wait_duration = 5
     print(f"wait for{wait_duration}")
     time.sleep(wait_duration)

@@ -10,8 +10,8 @@ _INDICATORS: Dict[str, Callable] = {}
 
 def register(name: str, grouped: bool = True):
     """
-    注册指标
-    grouped=True 表示自动按ticker分组后调用
+    register for indicators
+    grouped=True group by ticker
     """
 
     def decorator(func: Callable):

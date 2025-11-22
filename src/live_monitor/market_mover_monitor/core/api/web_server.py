@@ -13,7 +13,7 @@ import redis
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
-from live_monitor.market_mover_monitor.data_manager import DataManager
+from live_monitor.market_mover_monitor.core.api.data_manager import DataManager
 from utils.backtest_utils.backtest_utils import only_common_stocks
 
 
@@ -48,15 +48,15 @@ class WebAnalyzer:
 
         @self.app.route("/")
         def index():
-            return render_template("index.html")
+            return render_template("../frontend/index.html")
 
         @self.app.route("/debug")
         def debug():
-            return render_template("debug.html")
+            return render_template("../frontend/debug.html")
 
         @self.app.route("/simple")
         def simple():
-            return render_template("simple.html")
+            return render_template("../frontend/simple.html")
 
         @self.app.route("/api/stock/<ticker>")
         def get_stock_detail(ticker):

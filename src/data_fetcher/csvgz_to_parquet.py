@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import polars as pl
+import tqdm
 
 from cores.config import data_dir
 
@@ -210,7 +211,6 @@ class CSVGZToParquetConverter:
             print(f"Converting: {csv_gz_path} -> {parquet_path}")
             print(f"Detected data type: {data_type}")
 
-            # Get schema if available
             schema = None
             if (
                 data_type
@@ -218,7 +218,6 @@ class CSVGZToParquetConverter:
                 and isinstance(SCHEMAS[data_type], dict)
             ):
                 schema = SCHEMAS[data_type]
-
             # Read CSV.gz file with Polars
             try:
                 # First, read a small sample to check the actual columns
@@ -228,57 +227,38 @@ class CSVGZToParquetConverter:
 
                 # Adjust schema to match actual columns
                 if schema:
-                    # Only use schema columns that exist in the file
                     adjusted_schema = {}
                     for col in actual_columns:
                         if col in schema:
                             adjusted_schema[col] = schema[col]
                         else:
-                            # Use default type for unknown columns
                             adjusted_schema[col] = pl.String
                     schema = adjusted_schema if adjusted_schema else None
 
-                # Read the file with Polars
-                # df = pl.read_csv(
-                #     csv_gz_path,
-                #     schema_overrides=schema,
-                #     infer_schema_length=10000 if not schema else None,
-                #     try_parse_dates=False,
-                #     null_values=["", "null", "NULL", "N/A", "n/a"],
-                # )
+                    # Use lazy reading and writing for big files in case the RAM is limited
+                    lazy_df = pl.scan_csv(
+                        csv_gz_path,
+                        quote_char='"',
+                        schema_overrides=schema,
+                        # infer_schema_length=10000 if not schema else None,
+                        try_parse_dates=False,
+                        has_header=True,
+                        ignore_errors=True,
+                        # null_values=["", "null", "NULL", "N/A", "n/a"],
+                    )
 
-                # print(f"Read {len(df)} rows with {len(df.columns)} columns")
+                    print(f"Lazy_Dataframe scan_csv successfully.")
 
-                # # Write to Parquet
-                # df.write_parquet(
-                #     parquet_path,
-                #     compression=compression,
-                #     compression_level=compression_level,
-                #     statistics=True,
-                #     use_pyarrow=True,
-                # )
+                    lazy_df.sink_parquet(
+                        parquet_path,
+                        compression=compression,
+                        compression_level=compression_level,
+                        statistics=False,
+                    )
 
-                # Use lazy reading and writing for big files in case the RAM is limited
-                lazy_df = pl.scan_csv(
-                    csv_gz_path,
-                    schema_overrides=schema,
-                    infer_schema_length=10000 if not schema else None,
-                    try_parse_dates=False,
-                    null_values=["", "null", "NULL", "N/A", "n/a"],
-                )
-                # print(f"Read {len(lazy_df)} rows with {len(lazy_df.columns)} columns")
-                lazy_df.sink_parquet(
-                    parquet_path,
-                    compression=compression,
-                    compression_level=compression_level,
-                )
-
-                print(
-                    f"Successfully converted {csv_gz_path} to {parquet_path}, compression_level: {compression_level}"
-                )
-                # print(
-                #     f"Successfully converted {len(lazy_df):,} rows to {parquet_path}, compression_level: {compression_level}"
-                # )
+                    print(
+                        f"Successfully converted {csv_gz_path} to {parquet_path}, compression_level: {compression_level}"
+                    )
 
                 return parquet_path
 

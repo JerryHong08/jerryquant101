@@ -507,7 +507,7 @@ def ohlcv_figi_alignment(lf):
         last_updated_list = group_df.select("all_last_updated_utc").row(0)[0]
         delisted_list = group_df.select("all_delisted_utc").row(0)[0]
 
-        print(f"Debug tickers order in multi-tickers group: \n{ticker_order}")
+        # print(f"Debug tickers order in multi-tickers group: \n{ticker_order}")
 
         processed_data = []
         last_end_date = None
