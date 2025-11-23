@@ -22,7 +22,9 @@ def fetch_splits_and_save(out_dir=splits_dir):
     out_file = os.path.join(out_dir, f"all_splits_{updated_time}.parquet")
 
     if os.path.exists(out_file):
-        print(f"splits incremental already updated. {out_file} already exists.")
+        print(
+            f"splits incremental already incrementally updated. {out_file} already exists."
+        )
         return out_file
 
     try:
@@ -53,11 +55,6 @@ def fetch_splits_and_save(out_dir=splits_dir):
         )
     ):
 
-        # if i < 3:
-        #     print(f'splits {i}: {s}')
-
-        # 添加延迟以避免速率限制
-        # time.sleep(12)  # 100ms 延迟
         split_dict = {
             "id": s.id,
             "execution_date": s.execution_date,
@@ -74,18 +71,10 @@ def fetch_splits_and_save(out_dir=splits_dir):
 
     splits_new = pl.DataFrame(splits)
 
-    # 合并 splits_original 和 splits_new，只保留 splits_new 中 splits_original 没有的行
     # splits_diff = splits_new.filter(~pl.col('id').is_in(splits_original['id'].implode()))
     splits = pl.concat([splits_original, splits_new]).unique()
     splits.write_parquet(out_file, compression="snappy")
-    print(f"Saved {out_file}")
+    print(f"Saved {out_file}. Splits data incremental update done.")
 
 
 fetch_splits_and_save(splits_dir)
-
-# with pl.Config(tbl_rows=100, tbl_cols=10):
-#     last_splits_file = os.path.join(splits_dir, f"all_splits_20250913.parquet")
-#     splits_read = pl.read_parquet(splits_dir)
-#     # 需要将排序后的 DataFrame 赋值回来，否则排序不会生效
-#     splits_read = splits_read.sort("execution_date", descending=True)
-#     print(splits_read.head(100))

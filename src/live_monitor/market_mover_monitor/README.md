@@ -36,4 +36,7 @@ market-monitor-mover/
 │   └── templates/
 ├── scripts/                      # Start scripts
 │   ├── start.py
-└── └── analyzer.py
+│   └── analyzer.py
+└── tests/
+    ├── test_factors.py
+    └── test_transforms.py

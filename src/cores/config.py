@@ -22,6 +22,9 @@ splits_error_file_copy = os.path.join(
 )
 splits_error_file = "src/data_fetcher/data_discrepancy_fixed/splits_error.csv"
 
+# ===================== float shares =====================
+float_shares_dir = os.path.join(data_dir, "raw/us_stocks_sip/float_shares")
+
 # ===================== all_asset_overview with error correction ==============
 all_tickers_dir = os.path.join(data_dir, "raw/us_stocks_sip/us_all_tickers")
 all_indices_dir = os.path.join(data_dir, "raw/us_indices/us_all_indices")

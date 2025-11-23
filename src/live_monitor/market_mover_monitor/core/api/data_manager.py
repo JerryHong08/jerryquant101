@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 import polars as pl
 from prometheus_client import Counter, Gauge, Summary, start_http_server
 
-from cores.config import cache_dir
+from cores.config import cache_dir, float_shares_dir
 from utils.backtest_utils.backtest_utils import only_common_stocks
 
 start_http_server(9090)  # localhost:9090/metrics
@@ -338,7 +338,21 @@ class DataManager:
 
     def get_stock_detail(self, ticker: str) -> Optional[Dict]:
         """Get detailed information for a specific stock"""
-        return self.stock_data.get(ticker)
+        float_shares_file = os.path.join(
+            float_shares_dir,
+            max(
+                [
+                    f
+                    for f in os.listdir(float_shares_dir)
+                    if f.startswith(f"float_shares_") and f.endswith(".parquet")
+                ]
+            ),
+        )
+        ticker_info = pl.read_parquet(float_shares_file).filter(
+            pl.col("symbol") == ticker
+        )
+        return ticker_info
+        # return self.stock_data.get(ticker)
 
     def _get_stock_color(
         self, ticker: str, stock_data: Dict, with_alpha: bool = False
