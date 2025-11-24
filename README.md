@@ -241,12 +241,17 @@ For example, most of the long-term like over years 0 volume is because of relist
 * ✅ removed Chinese. From now on, English will be used as the default language for this project.
 * ✅ add trades_analyzer.py
 
+2025-11-24
+
+* ✅ redis to redis stream
+* ✅ reconstructing MMM
+* ✅ float shares fetcher and MMM add float shares display.
+
 ---
 
 ## Roadmap
 
 * features to be add:
-* [ ] redis to redis stream
 * [ ] universal indicator plot
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
 * [ ] Polish **X news search function**.
@@ -256,7 +261,6 @@ For example, most of the long-term like over years 0 volume is because of relist
 * bugs to be fixed:
 * [ ] backtest engine needed rewrite.
 * [ ] backtest open positions need to be fixed.
-* [ ] market live monitor web version front end polish & stock info needed
 * [ ] Stock dividends
 * [ ] low_volume_tickers.csv, see more detail below in the changelog.
 
