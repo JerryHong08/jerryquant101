@@ -15,7 +15,12 @@ market-monitor-mover/
 │   ├── data/
 │   │   ├── schema.py             # DataFrame schema & validation
 │   │   ├── transforms.py         # data ETL clean process
-│   │   └── aggregator.py         # trade -> snapshot aggregator
+│   │   ├── aggregator.py         # trade -> snapshot aggregator
+│   │   └── providers/            # << 新增
+│   │       ├── news_provider.py
+│   │       ├── fundamentals_provider.py
+│   │       ├── sentiment_provider.py
+│   │       └── __init__.py
 │   ├── engine/
 │   │   ├── factor_base.py        # Abstract Factor Base
 │   │   ├── factor_loader.py      # factor loader

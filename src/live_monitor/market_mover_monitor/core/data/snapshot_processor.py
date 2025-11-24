@@ -21,6 +21,7 @@ class snapshot_processor:
         updated_time = datetime.now(ZoneInfo("America/New_York")).strftime(
             "%Y%m%d%H%M%S"
         )
+
         filter_date = f"{updated_time[:4]}-{updated_time[4:6]}-{updated_time[6:8]}"
         try:
             df = (

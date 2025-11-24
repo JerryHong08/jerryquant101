@@ -5,6 +5,7 @@ Uses Flask + WebSocket for real-time data streaming
 
 import json
 from datetime import datetime
+from pathlib import Path
 from threading import Thread
 from zoneinfo import ZoneInfo
 
@@ -21,7 +22,17 @@ class WebAnalyzer:
     """Main web analyzer class combining Redis listener and WebSocket server"""
 
     def __init__(self, host="localhost", port=5000):
-        self.app = Flask(__name__)
+        current_dir = Path(__file__).parent  # core/api/
+        front_dir = current_dir.parent.parent / "frontend"
+        template_dir = front_dir / "templates"
+        static_dir = front_dir / "static"
+
+        self.app = Flask(
+            __name__,
+            template_folder=str(template_dir),
+            static_folder=str(static_dir),
+            static_url_path="/static",
+        )
         self.app.config["SECRET_KEY"] = "market_mover_secret"
         self.socketio = SocketIO(self.app, cors_allowed_origins="*")
 
@@ -48,15 +59,15 @@ class WebAnalyzer:
 
         @self.app.route("/")
         def index():
-            return render_template("../frontend/index.html")
+            return render_template("index.html")
 
         @self.app.route("/debug")
         def debug():
-            return render_template("../frontend/debug.html")
+            return render_template("debug.html")
 
         @self.app.route("/simple")
         def simple():
-            return render_template("../frontend/simple.html")
+            return render_template("simple.html")
 
         @self.app.route("/api/stock/<ticker>")
         def get_stock_detail(ticker):

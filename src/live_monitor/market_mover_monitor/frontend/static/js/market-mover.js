@@ -1183,9 +1183,11 @@ class MarketMoverApp {
         
         // Update modal content
         document.getElementById('modal-stock-ticker').textContent = ticker;
+        
         document.getElementById('detail-current-price').textContent = 
             '$' + (detail.metadata?.current_price || 0).toFixed(2);
-        document.getElementById('detail-prev-close').textContent = 
+        
+            document.getElementById('detail-prev-close').textContent = 
             '$' + (detail.metadata?.prev_close || 0).toFixed(2);
         
         const latestChange = this.getLatestValue(detail.percent_changes || []);
@@ -1194,6 +1196,7 @@ class MarketMoverApp {
         
         document.getElementById('detail-volume').textContent = 
             this.formatNumber(detail.metadata?.volume || 0);
+
         document.getElementById('detail-current-rank').textContent = 
             '#' + (detail.current_rank || '--');
         
@@ -1213,6 +1216,11 @@ class MarketMoverApp {
         document.getElementById('detail-first-appearance').textContent = 
             detail.first_appearance ? new Date(detail.first_appearance).toLocaleString() : '--';
         
+        document.getElementById('float-shares').textContent = 
+            this.formatNumber(detail.metadata?.float_shares || 0);
+        
+        // console.log('float_shares:',detail.metadata.float_shares)
+        
         // Create mini chart
         this.createMiniChart(detail);
         
@@ -1227,7 +1235,6 @@ class MarketMoverApp {
             this.miniChart.destroy();
         }
         
-        // 确保canvas有正确的尺寸
         ctx.style.height = '200px';
         ctx.style.maxHeight = '200px';
         
@@ -1254,7 +1261,7 @@ class MarketMoverApp {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false, /* 重要：不保持宽高比 */
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         display: false
@@ -1276,7 +1283,6 @@ class MarketMoverApp {
                         }
                     }
                 },
-                // 添加resize事件处理，防止无限增长
                 onResize: (chart, size) => {
                     if (size.height > 200) {
                         chart.canvas.style.height = '200px';

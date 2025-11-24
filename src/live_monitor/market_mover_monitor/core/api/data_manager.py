@@ -13,6 +13,9 @@ import polars as pl
 from prometheus_client import Counter, Gauge, Summary, start_http_server
 
 from cores.config import cache_dir, float_shares_dir
+from live_monitor.market_mover_monitor.core.data.providers.fundamentals import (
+    FloatSharesProvider,
+)
 from utils.backtest_utils.backtest_utils import only_common_stocks
 
 start_http_server(9090)  # localhost:9090/metrics
@@ -147,6 +150,7 @@ class DataManager:
                         "current_price": row.get("current_price", 0.0),
                         "prev_close": row.get("prev_close", 0.0),
                         "volume": row.get("accumulated_volume", 0.0),
+                        "float_shares": 0.0,
                     },
                 }
             else:
@@ -338,21 +342,18 @@ class DataManager:
 
     def get_stock_detail(self, ticker: str) -> Optional[Dict]:
         """Get detailed information for a specific stock"""
-        float_shares_file = os.path.join(
-            float_shares_dir,
-            max(
-                [
-                    f
-                    for f in os.listdir(float_shares_dir)
-                    if f.startswith(f"float_shares_") and f.endswith(".parquet")
-                ]
-            ),
+        provider = FloatSharesProvider()
+        result = provider.fetch_from_local(ticker)
+        print(f"Debug result: {result}")
+        # Update metadata
+        self.stock_data[ticker]["metadata"].update(
+            {"float_shares": d.float_shares for d in result.data}
         )
-        ticker_info = pl.read_parquet(float_shares_file).filter(
-            pl.col("symbol") == ticker
+
+        print(
+            f"Debug stock float shares:{ticker} {self.stock_data[ticker]['metadata']['float_shares']}"
         )
-        return ticker_info
-        # return self.stock_data.get(ticker)
+        return self.stock_data.get(ticker)
 
     def _get_stock_color(
         self, ticker: str, stock_data: Dict, with_alpha: bool = False

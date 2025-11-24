@@ -38,6 +38,7 @@ dependencies = [
     "flask-socketio (>=5.5.1,<6.0.0)",
     "polars (>=1.32.0,<2.0.0)",
     "httpx[socks] (>=0.28.1,<0.29.0)",
+    "pydantic (>=2.12.4,<3.0.0)",
 ]
 
 [tool.poetry]

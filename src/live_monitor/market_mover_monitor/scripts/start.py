@@ -12,9 +12,22 @@ import sys
 
 def start_collector():
     """Start the collector process"""
-    collector_path = os.path.join(os.path.dirname(__file__), "collector.py")
+    # src/live_monitor/market_mover_monitor/scripts/start.py
+    collector_path = os.path.join(
+        os.path.dirname(__file__), "..", "core", "collector", "collector.py"
+    )
+    # src/live_monitor/market_mover_monitor/core/collector/collector.py
     print("🚀 Starting Market Mover Collector...")
     subprocess.run([sys.executable, collector_path])
+
+
+def start_replayer():
+    """Start the replayer process"""
+    replayer_path = os.path.join(
+        os.path.dirname(__file__), "..", "core", "collector", "replayer.py"
+    )
+    print("🚀 Starting Market Mover Replayer...")
+    subprocess.run([sys.executable, replayer_path])
 
 
 def start_analyzer_cli():
