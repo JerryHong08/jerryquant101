@@ -129,16 +129,18 @@ class WebAnalyzer:
                 emit("error", {"message": "No ticker specified"})
                 return
 
-            detail = self.data_manager.get_stock_detail(ticker)
-            if detail:
-                # Convert datetime objects to ISO format strings for JSON serialization
-                serialized_detail = self._serialize_datetime_objects(detail)
-                emit(
-                    "stock_detail_response",
-                    {"ticker": ticker, "detail": serialized_detail},
-                )
-            else:
-                emit("error", {"message": f"No details available for {ticker}"})
+            # detail = self.data_manager.get_stock_detail(ticker)
+            detail, future = self.data_manager.get_stock_detail(ticker)
+            # Convert datetime objects to ISO format strings for JSON serialization
+            serialized_detail = self._serialize_datetime_objects(detail)
+            emit(
+                "stock_detail_response",
+                {"ticker": ticker, "detail": serialized_detail},
+            )
+
+            future.add_done_callback(
+                lambda future: self._handle_async_float_result(ticker, future)
+            )
 
         @self.socketio.on("load_historical_data")
         def handle_load_historical(data):
@@ -168,6 +170,15 @@ class WebAnalyzer:
                     emit(
                         "error", {"message": f"Failed to update highlight for {ticker}"}
                     )
+
+    def _handle_async_float_result(self, ticker, future):
+        result = future.result()
+        if not result:
+            return
+
+        self.socketio.emit(
+            "stock_float_extra_response", {"ticker": ticker, "extra": result}
+        )
 
     def _serialize_datetime_objects(self, obj):
         """Recursively convert datetime objects to ISO format strings"""

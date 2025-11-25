@@ -3,8 +3,11 @@ Data Manager for Market Mover Web Analyzer
 Handles historical data loading and real-time data updates
 """
 
+import asyncio
+import concurrent.futures
 import glob
 import os
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -32,6 +35,7 @@ class DataManager:
         self.max_history_points = max_history_points
         self.stock_data: Dict[str, Dict] = {}
         self.top_20_history: List[List[str]] = []  # Track top 20 changes over time
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
     @PROCESS_LATENCY.time()
     def update_from_realtime(self, df: pl.DataFrame):
@@ -340,20 +344,66 @@ class DataManager:
             return True
         return False
 
-    def get_stock_detail(self, ticker: str) -> Optional[Dict]:
-        """Get detailed information for a specific stock"""
+    def get_stock_detail(self, ticker: str):
+        """get local data firts + return a async future"""
         provider = FloatSharesProvider()
-        result = provider.fetch_from_local(ticker)
-        print(f"Debug result: {result}")
-        # Update metadata
-        self.stock_data[ticker]["metadata"].update(
-            {"float_shares": d.float_shares for d in result.data}
-        )
 
-        print(
-            f"Debug stock float shares:{ticker} {self.stock_data[ticker]['metadata']['float_shares']}"
-        )
-        return self.stock_data.get(ticker)
+        local_float = provider.fetch_from_local(ticker)
+
+        if local_float:
+            self.stock_data[ticker]["metadata"]["float_shares"] = local_float.data[
+                0
+            ].float_shares
+
+        # create a async web fetcher
+        future = self.executor.submit(self._fetch_extra_float_sync, ticker)
+
+        return self.stock_data[ticker], future
+
+    def _fetch_extra_float_sync(self, ticker: str) -> Optional[Dict]:
+        """thread pool wrap func"""
+        try:
+            # create new task in this thread pool
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(self._fetch_extra_float_async(ticker))
+                return result
+            finally:
+                loop.close()
+        except Exception as e:
+            print(f"Error fetching extra float data for {ticker}: {e}")
+            return None
+
+    async def _fetch_extra_float_async(self, ticker: str) -> Optional[Dict]:
+        """fecth web float data"""
+        try:
+            web_data = await FloatSharesProvider.fetch_from_web(ticker)
+            if not web_data or not web_data.data:
+                print(f"Warning: {ticker} no web float data found.")
+                return None
+
+            extra = {
+                "float_sources": [
+                    {
+                        d.source: {
+                            "float": d.float_shares,
+                            "short%": d.short_percent,
+                            "outstanding": d.outstanding_shares,
+                        }
+                    }
+                    for d in web_data.data
+                ]
+            }
+            print(f"Debug extra:\n{ticker}\n{extra}")
+
+            if ticker in self.stock_data:
+                self.stock_data[ticker]["metadata"]["extra"] = extra
+
+            return extra
+        except Exception as e:
+            print(f"Error in _fetch_extra_float_async for {ticker}: {e}")
+            return None
 
     def _get_stock_color(
         self, ticker: str, stock_data: Dict, with_alpha: bool = False

@@ -247,6 +247,11 @@ For example, most of the long-term like over years 0 volume is because of relist
 * ✅ reconstructing MMM
 * ✅ float shares fetcher and MMM add float shares display.
 
+2025-11-26
+
+* ✅ added borrow_fee.
+* ✅ Async fetch and union float shares.
+
 ---
 
 ## Roadmap

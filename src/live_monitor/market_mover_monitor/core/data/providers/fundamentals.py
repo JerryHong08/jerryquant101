@@ -1,5 +1,8 @@
+import asyncio
 import os
+from typing import List, Optional
 
+import httpx
 import polars as pl
 import requests
 from bs4 import BeautifulSoup
@@ -18,21 +21,29 @@ from live_monitor.market_mover_monitor.core.data.transforms import (
 class FloatSharesProvider:
 
     URL = "https://knowthefloat.com/ticker/{ticker}"
+    RETRIES = 2
+    TIMEOUT = 3
 
     @classmethod
-    def fetch_from_web(cls, ticker: str) -> FloatShares:
+    async def fetch_from_web(cls, ticker: str) -> Optional[FloatShares]:
         url = cls.URL.format(ticker=ticker)
+        client = httpx.AsyncClient(timeout=cls.TIMEOUT)
 
-        try:
-            resp = requests.get(url, timeout=5)
-            resp.raise_for_status()
-        except Exception as e:
-            raise RuntimeError(f"Failed to fetch {ticker}: {e}")
+        for attempt in range(cls.RETRIES + 1):
+            try:
+                resp = await client.get(url, timeout=5)
+                resp.raise_for_status()
+                break
+            except Exception as e:
+                if attempt < cls.RETRIES:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                else:
+                    return None
 
         soup = BeautifulSoup(resp.content, "html.parser")
         cards = soup.find_all("div", class_="col-lg-3 col-md-6 col-sm-12")
 
-        results = []
+        results: List[FloatSourceData] = []
         for card in cards:
             img = card.find("img")
             source = img["alt"] if img and "alt" in img.attrs else None
@@ -68,12 +79,14 @@ class FloatSharesProvider:
                 )
             )
 
+        print(f"Debug web results: {results}")
+
         return FloatShares(
             ticker=ticker.upper(),
             data=results,
         )
 
-    def fetch_from_local(cls, ticker: str) -> FloatShares:
+    def fetch_from_local(cls, ticker: str) -> Optional[FloatShares]:
         float_shares_file = os.path.join(
             float_shares_dir,
             max(
@@ -84,25 +97,29 @@ class FloatSharesProvider:
                 ]
             ),
         )
-        float_shares = (
-            pl.read_parquet(float_shares_file)
-            .filter(pl.col("symbol") == ticker)
-            .select("floatShares")
-            .unique()
-            .item()
-        )
-        results = []
 
-        results.append(
-            FloatSourceData(
-                source="local_fmp",
-                float_shares=float_shares,
-                short_percent=None,
-                outstanding_shares=None,
+        if not float_shares_file:
+            return None
+
+        try:
+            float_val = (
+                pl.read_parquet(float_shares_file)
+                .filter(pl.col("symbol") == ticker)
+                .select("floatShares")
+                .unique()
+                .item()
             )
-        )
+        except Exception:
+            return None
 
         return FloatShares(
             ticker=ticker.upper(),
-            data=results,
+            data=[
+                FloatSourceData(
+                    source="local_fmp",
+                    float_shares=float_val,
+                    short_percent=None,
+                    outstanding_shares=None,
+                )
+            ],
         )
