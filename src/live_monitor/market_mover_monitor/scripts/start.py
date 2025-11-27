@@ -37,7 +37,9 @@ def start_analyzer_cli():
     subprocess.run([sys.executable, analyzer_path, "--mode", "cli"])
 
 
-def start_analyzer_web(host="localhost", port=5000, debug=False, load_history=None):
+def start_analyzer_web(
+    host="localhost", port=5000, debug=False, load_history=None, replay=False
+):
     """Start analyzer in web mode"""
     analyzer_path = os.path.join(os.path.dirname(__file__), "analyzer.py")
     cmd = [
@@ -50,6 +52,9 @@ def start_analyzer_web(host="localhost", port=5000, debug=False, load_history=No
         "--port",
         str(port),
     ]
+
+    if replay:
+        cmd.append("--replay")
 
     if debug:
         cmd.append("--debug")
@@ -133,6 +138,7 @@ Typical Workflow:
     web_parser.add_argument("--port", type=int, default=5000, help="Port to bind to")
     web_parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     web_parser.add_argument("--load-history", help="Load historical data (YYYYMMDD)")
+    web_parser.add_argument("--replay", action="store_true", help="Redis replay mode")
 
     # Replayer command
     replay_parser = subparsers.add_parser("replay", help="Start data replayer")
@@ -162,6 +168,7 @@ Typical Workflow:
                 port=args.port,
                 debug=args.debug,
                 load_history=args.load_history,
+                replay=args.replay,
             )
         elif args.command == "replay":
             if args.type == "trade_replay":

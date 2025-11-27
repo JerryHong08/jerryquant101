@@ -70,12 +70,18 @@ while True:
     # turn into JSON publish to Redis
     payload = df.write_json()
     # --------redis push---------
-    r.publish("market_snapshot", payload)
+    # r.publish("market_snapshot", payload)
 
     # --------redis stream---------
-    STREAM_NAME = "market_snapshot_stream"
+    today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+    STREAM_NAME = f"market_snapshot_stream:{today}"
+    assert (
+        ":" in STREAM_NAME
+    ), "STREAM_NAME must include a date suffix! (e.g. market_snapshot_stream:20251127)"
     payload = df.write_json()
     message_id = r.xadd(STREAM_NAME, {"data": payload}, maxlen=10000)
+    if r.ttl(STREAM_NAME) < 0:
+        r.expire(STREAM_NAME, 7 * 24 * 3600)
 
     print(f"Published {len(df)} rows at {datetime.now(ZoneInfo('America/New_York'))}")
     wait_duration = 5

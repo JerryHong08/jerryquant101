@@ -20,7 +20,6 @@ market-monitor-mover/
 │   │       ├── news.py
 │   │       ├── fundamentals.py
 │   │       ├── sentiment.py
-│   │       └── __init__.py
 │   ├── engine/
 │   │   ├── factor_base.py        # Abstract Factor Base
 │   │   ├── factor_loader.py      # factor loader

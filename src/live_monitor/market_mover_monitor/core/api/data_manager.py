@@ -7,13 +7,12 @@ import asyncio
 import concurrent.futures
 import glob
 import os
-import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 import polars as pl
-from prometheus_client import Counter, Gauge, Summary, start_http_server
+from prometheus_client import Summary, start_http_server
 
 from cores.config import cache_dir, float_shares_dir
 from live_monitor.market_mover_monitor.core.data.providers.fundamentals import (
@@ -224,62 +223,6 @@ class DataManager:
         for ticker in stocks_to_remove:
             del self.stock_data[ticker]
 
-    # ----------------- for replayer data -----------------------
-    def initialize_from_history(self, date: str) -> None:
-        """Load historical data for the given date"""
-        year = date[:4]
-        month = date[4:6]
-        day = date[6:8]
-
-        market_mover_dir = os.path.join(cache_dir, "market_mover", year, month, day)
-
-        if not os.path.exists(market_mover_dir):
-            print(f"No historical data found for {date}")
-            return
-
-        all_files = glob.glob(os.path.join(market_mover_dir, "*_market_snapshot.csv"))
-        all_files.sort()
-
-        print(f"Loading {len(all_files)} historical files...")
-
-        for file_path in all_files:
-            try:
-                df = pl.read_csv(file_path)
-                timestamp = self._extract_timestamp_from_filename(file_path)
-                if timestamp.hour < 4:  # Skip data before pre-market data
-                    print(f"Skipping pre-market data at {timestamp}")
-                    continue
-                filter_date = f"{year}-{month}-{day}"
-                df = (
-                    only_common_stocks(filter_date)
-                    .drop("active", "composite_figi")
-                    .join(df, on="ticker", how="inner")
-                    .sort("percent_change", descending=True)
-                ).filter(
-                    (pl.col("percent_change") > 0)
-                    & (pl.col("accumulated_volume") > 1000)
-                )
-                self._process_snapshot(df, timestamp, is_historical=True)
-            except Exception as e:
-                print(f"Error loading {file_path}: {e}")
-
-        print(f"Loaded historical data for {len(self.stock_data)} stocks")
-
-    def _extract_timestamp_from_filename(self, filename: str) -> datetime:
-        """Extract timestamp from filename"""
-        basename = os.path.basename(filename)
-        timestamp_str = basename.split("_")[0]
-
-        year = int(timestamp_str[:4])
-        month = int(timestamp_str[4:6])
-        day = int(timestamp_str[6:8])
-        hour = int(timestamp_str[8:10])
-        minute = int(timestamp_str[10:12])
-        second = int(timestamp_str[12:14])
-
-        dt = datetime(year, month, day, hour, minute, second)
-        return dt.replace(tzinfo=ZoneInfo("America/New_York"))
-
     def get_chart_data(self) -> Dict:
         """Get data formatted for chart visualization"""
         chart_data = {"datasets": [], "timestamps": [], "highlights": []}
@@ -447,3 +390,59 @@ class DataManager:
         ranked_stocks = [(ticker, data) for ticker, data in self.stock_data.items()]
         ranked_stocks.sort(key=lambda x: x[1]["current_rank"])
         return ranked_stocks[:limit]
+
+    # ----------------- for replayer data -----------------------
+    def initialize_from_history(self, date: str) -> None:
+        """Load historical data for the given date"""
+        year = date[:4]
+        month = date[4:6]
+        day = date[6:8]
+
+        market_mover_dir = os.path.join(cache_dir, "market_mover", year, month, day)
+
+        if not os.path.exists(market_mover_dir):
+            print(f"No historical data found for {date}")
+            return
+
+        all_files = glob.glob(os.path.join(market_mover_dir, "*_market_snapshot.csv"))
+        all_files.sort()
+
+        print(f"Loading {len(all_files)} historical files...")
+
+        for file_path in all_files:
+            try:
+                df = pl.read_csv(file_path)
+                timestamp = self._extract_timestamp_from_filename(file_path)
+                if timestamp.hour < 4:  # Skip data before pre-market data
+                    print(f"Skipping pre-market data at {timestamp}")
+                    continue
+                filter_date = f"{year}-{month}-{day}"
+                df = (
+                    only_common_stocks(filter_date)
+                    .drop("active", "composite_figi")
+                    .join(df, on="ticker", how="inner")
+                    .sort("percent_change", descending=True)
+                ).filter(
+                    (pl.col("percent_change") > 0)
+                    & (pl.col("accumulated_volume") > 1000)
+                )
+                self._process_snapshot(df, timestamp, is_historical=True)
+            except Exception as e:
+                print(f"Error loading {file_path}: {e}")
+
+        print(f"Loaded historical data for {len(self.stock_data)} stocks")
+
+    def _extract_timestamp_from_filename(self, filename: str) -> datetime:
+        """Extract timestamp from filename"""
+        basename = os.path.basename(filename)
+        timestamp_str = basename.split("_")[0]
+
+        year = int(timestamp_str[:4])
+        month = int(timestamp_str[4:6])
+        day = int(timestamp_str[6:8])
+        hour = int(timestamp_str[8:10])
+        minute = int(timestamp_str[10:12])
+        second = int(timestamp_str[12:14])
+
+        dt = datetime(year, month, day, hour, minute, second)
+        return dt.replace(tzinfo=ZoneInfo("America/New_York"))

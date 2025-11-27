@@ -26,7 +26,7 @@ class BorrowFeeProvider:
 
     def extract_realtime_borrow_fee(self, ticker: str) -> Optional[Dict]:
         """Extract current borrow fee from chartexchange.com"""
-        url = f"https://chartexchange.com/symbol/nasdaq-{ticker}/borrow-fee/"
+        url = f"https://chartexchange.com/symbol/nasdaq-{ticker.lower()}/borrow-fee/"
         try:
             response = requests.get(url, timeout=5, headers=self.headers)
             response.raise_for_status()
@@ -86,7 +86,7 @@ class BorrowFeeProvider:
         self, ticker: str, save_path: Optional[str] = None
     ) -> Optional[pd.DataFrame]:
         """Download historical borrow fee data as CSV"""
-        url = f"https://chartexchange.com/symbol/nasdaq-{ticker}/borrow-fee/"
+        url = f"https://chartexchange.com/symbol/nasdaq-{ticker.lower()}/borrow-fee/"
         download_info = self._extract_download_params(url)
         if not download_info:
             return None
@@ -134,18 +134,26 @@ class BorrowFeeProvider:
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Market Mover Web Analyzer")
+    parser.add_argument(
+        "--ticker", default="None", help="ticker you want to fetch its borrrow fee"
+    )
+
+    args = parser.parse_args()
+    ticker = args.ticker
+
     provider = BorrowFeeProvider()
 
-    # Test realtime data
-    ticker = "alzn"
-    realtime_data = provider.extract_realtime_borrow_fee(ticker.lower())
+    # realtime data
+    realtime_data = provider.extract_realtime_borrow_fee(ticker)
     print(f"Realtime data: {realtime_data}")
 
-    # Test historical data
-    # historical_url = "https://chartexchange.com/symbol/nasdaq-alzn/borrow-fee/"
-    updated_time = datetime.now().strftime("%Y-%m-%d")()
+    # historical csv file data
+    updated_time = datetime.now().strftime("%Y-%m-%d")
     df = provider.download_historical_borrow_fee(
-        ticker.lower(), f"{ticker}_{updated_time}borrow_fee_data.csv"
+        ticker.lower(), f"{ticker}_{updated_time}_borrow_fee_data.csv"
     )
     if df is not None:
         print(f"Downloaded {len(df)} rows of historical data")

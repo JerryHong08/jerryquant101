@@ -252,6 +252,10 @@ For example, most of the long-term like over years 0 volume is because of relist
 * ✅ added borrow_fee.
 * ✅ Async fetch and union float shares.
 
+2025-11-27
+
+* ✅ MMM Redis to Redis Stream. Backend decoupled to Redis_client.py as data receiver
+
 ---
 
 ## Roadmap

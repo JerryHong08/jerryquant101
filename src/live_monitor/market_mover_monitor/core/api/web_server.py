@@ -7,21 +7,19 @@ import json
 from datetime import datetime
 from pathlib import Path
 from threading import Thread
-from zoneinfo import ZoneInfo
 
 import polars as pl
-import redis
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
 from live_monitor.market_mover_monitor.core.api.data_manager import DataManager
-from utils.backtest_utils.backtest_utils import only_common_stocks
+from live_monitor.market_mover_monitor.core.storage.redis_client import redis_engine
 
 
 class WebAnalyzer:
     """Main web analyzer class combining Redis listener and WebSocket server"""
 
-    def __init__(self, host="localhost", port=5000):
+    def __init__(self, host="localhost", port=5000, replay=False):
         current_dir = Path(__file__).parent  # core/api/
         front_dir = current_dir.parent.parent / "frontend"
         template_dir = front_dir / "templates"
@@ -43,16 +41,43 @@ class WebAnalyzer:
         self.data_manager = DataManager()
         self.last_df = pl.DataFrame()
 
-        # Redis setup
-        self.redis_client = redis.Redis(host="localhost", port=6379, db=0)
-        self.pubsub = self.redis_client.pubsub()
-        self.pubsub.subscribe("market_snapshot")
-
         # Connected clients
         self.connected_clients = set()
 
         self._setup_routes()
         self._setup_socket_events()
+
+        # Create callback function for redis_engine
+        def redis_data_callback(processed_df, original_df):
+            self.last_df = processed_df
+            self.data_manager.update_from_realtime(processed_df)
+
+            chart_data = self.data_manager.get_chart_data()
+            print(
+                f"Chart data summary: {len(chart_data.get('datasets', []))} datasets, "
+                f"{len(chart_data.get('timestamps', []))} timestamps, "
+                f"{len(chart_data.get('highlights', []))} highlights"
+            )
+
+            if chart_data.get("datasets"):
+                sample_dataset = chart_data["datasets"][0]
+                print(
+                    f"Sample dataset: {sample_dataset['label']}, "
+                    f"{len(sample_dataset['data'])} data points, "
+                    f"rank: {sample_dataset.get('rank', 'N/A')}"
+                )
+
+            self.socketio.emit("chart_update", chart_data)
+
+            print(
+                f"Processed snapshot with {len(original_df)} stocks, "
+                f"broadcasting to {len(self.connected_clients)} clients"
+            )
+
+        # Initialize redis engine with callback
+        self.redis_engine = redis_engine(
+            data_callback=redis_data_callback, replay=replay
+        )
 
     def _setup_routes(self):
         """Setup Flask routes"""
@@ -194,102 +219,11 @@ class WebAnalyzer:
         else:
             return obj
 
-    def _redis_listener(self):
-        """Redis message listener running in separate thread"""
-        print("Starting Redis listener...")
-
-        for message in self.pubsub.listen():
-            print(
-                f'received message from redis at {datetime.now(ZoneInfo("America/New_York"))}'
-            )
-            if message["type"] == "message":
-                try:
-                    json_data = message["data"]
-                    df = pl.read_json(json_data)
-
-                    df = df.with_columns(
-                        pl.from_epoch(
-                            pl.col("timestamp"), time_unit="ms"
-                        ).dt.convert_time_zone("America/New_York")
-                    )
-
-                    # Filter only common stocks and sort by percent_change
-                    updated_time = datetime.now(ZoneInfo("America/New_York")).strftime(
-                        "%Y%m%d%H%M%S"
-                    )
-                    filter_date = (
-                        f"{updated_time[:4]}-{updated_time[4:6]}-{updated_time[6:8]}"
-                    )
-                    try:
-                        df = (
-                            only_common_stocks(filter_date)
-                            .drop("active", "composite_figi")
-                            .join(df, on="ticker", how="inner")
-                            .sort("percent_change", descending=True)
-                        )
-                    except Exception as e:
-                        print(f"Error filtering common stocks: {e}")
-                        # Fallback: just sort by percent_change
-                        df = df.sort("percent_change", descending=True)
-
-                    if len(self.last_df) != len(df):
-                        filled_df = (
-                            pl.concat([self.last_df, df], how="vertical")
-                            .sort("timestamp")
-                            .group_by(["ticker"])
-                            .agg(
-                                pl.col("timestamp").last(),
-                                pl.col("current_price").last(),
-                                pl.col("percent_change").last(),
-                                pl.col("accumulated_volume").last(),
-                                pl.col("prev_close").last(),
-                                pl.col("prev_volume").last(),
-                            )
-                        ).sort("percent_change", descending=True)
-                        print(
-                            f"df need fullfilled: fullfilled_df:{len(filled_df)} recieved df: {len(df)}"
-                        )
-                    else:
-                        print(f"df dont't need fullfilled, original length: {len(df)}")
-                        filled_df = df
-
-                    # from pl.Dataframe to chart data
-                    self.data_manager.update_from_realtime(filled_df)
-                    self.last_df = filled_df
-
-                    # read chart data
-                    chart_data = self.data_manager.get_chart_data()
-                    print(
-                        f"Chart data summary: {len(chart_data.get('datasets', []))} datasets, "
-                        f"{len(chart_data.get('timestamps', []))} timestamps, "
-                        f"{len(chart_data.get('highlights', []))} highlights"
-                    )
-
-                    if chart_data.get("datasets"):
-                        sample_dataset = chart_data["datasets"][0]
-                        print(
-                            f"Sample dataset: {sample_dataset['label']}, "
-                            f"{len(sample_dataset['data'])} data points, "
-                            f"rank: {sample_dataset.get('rank', 'N/A')}"
-                        )
-
-                    # Broadcast to all connected clients
-                    self.socketio.emit("chart_update", chart_data)
-
-                    print(
-                        f"Processed snapshot with {len(df)} stocks, "
-                        f"broadcasting to {len(self.connected_clients)} clients"
-                    )
-
-                except Exception as e:
-                    print(f"Error processing Redis message: {e}")
-                    self.socketio.emit(
-                        "error", {"message": f"Data processing error: {str(e)}"}
-                    )
-
     def start_redis_listener(self):
         """Start Redis listener in background thread"""
-        redis_thread = Thread(target=self._redis_listener, daemon=True)
+        redis_thread = Thread(
+            target=self.redis_engine._redis_stream_listener, daemon=True
+        )
         redis_thread.start()
         return redis_thread
 
@@ -321,11 +255,12 @@ def main():
     parser.add_argument(
         "--load-history", help="Load historical data for date (YYYYMMDD)"
     )
+    parser.add_argument("--replay", action="store_true", help="Redis replay mode")
 
     args = parser.parse_args()
 
     # Create and configure web analyzer
-    web_analyzer = WebAnalyzer(host=args.host, port=args.port)
+    web_analyzer = WebAnalyzer(host=args.host, port=args.port, replay=args.replay)
 
     # Load historical data if requested
     if args.load_history:

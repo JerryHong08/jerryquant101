@@ -71,7 +71,9 @@ def run_web_mode(**kwargs):
     from live_monitor.market_mover_monitor.core.api.web_server import WebAnalyzer
 
     web_analyzer = WebAnalyzer(
-        host=kwargs.get("host", "localhost"), port=kwargs.get("port", 5000)
+        host=kwargs.get("host", "localhost"),
+        port=kwargs.get("port", 5000),
+        replay=False,
     )
 
     # Load historical data if specified
@@ -127,6 +129,7 @@ Examples:
     parser.add_argument(
         "--load-history", help="Load historical data for date YYYYMMDD (web mode only)"
     )
+    parser.add_argument("--replay", action="store_true", help="Redis replay mode")
 
     args = parser.parse_args()
 
@@ -140,6 +143,7 @@ Examples:
             port=args.port,
             debug=args.debug,
             load_history=args.load_history,
+            replay=args.replay,
         )
 
 
