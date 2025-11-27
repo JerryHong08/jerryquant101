@@ -1,3 +1,14 @@
+"""
+replayer based on trades_v1 aggregation.
+
+v2 > v3
+the core efficiency comes from it query filter of bucket_id,
+so it only process the current timeframe.
+but it will have missing data in some bucket due to there may not have trades in some bucket timespan.
+can be fixed in the reciever end. and fixed now, so it works.
+and it's very fast and memory save.
+"""
+
 import os
 import time
 from collections import defaultdict
@@ -6,19 +17,11 @@ from datetime import datetime
 import polars as pl
 import redis
 
-from cores.config import data_dir
 from cores.data_loader import stock_load_process
 from utils.data_utils.data_uitils import resolve_date_range
 from utils.data_utils.path_loader import DataPathFetcher
 
 r = redis.Redis(host="localhost", port=6379, db=0)
-
-# v2 > v3
-# the core efficiency comes from it query filter of bucket_id,
-# so it only process the current timeframe.
-# but it will have missing data in some bucket due to there may not have trades in some bucket timespan.
-# can be fixed in the reciever end. and fixed now, so it works.
-# and it's very fast and memory save.
 
 
 def load_previous_data(
@@ -134,14 +137,16 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
             continue
 
         # Process this bucket
-        process_bucket(bucket_df, prev_data_dict, bucket_id, sleep_duration)
+        process_bucket(
+            bucket_df, prev_data_dict, bucket_id, sleep_duration, replay_date
+        )
 
         print(f"latest_trades collect costs: {datetime.now() - process_start_time}")
         # Clear memory
         del bucket_lf, bucket_df
 
 
-def process_bucket(bucket_df, prev_data_dict, bucket_id, sleep_duration):
+def process_bucket(bucket_df, prev_data_dict, bucket_id, sleep_duration, replay_date):
     """
     Process a single bucket of data
     """
@@ -188,7 +193,13 @@ def process_bucket(bucket_df, prev_data_dict, bucket_id, sleep_duration):
     )
 
     payload = snapshot_df.write_json()
-    r.publish("market_snapshot", payload)
+    STREAM_NAME = f"market_snapshot_stream_replay:{replay_date}"
+    assert (
+        ":" in STREAM_NAME
+    ), "STREAM_NAME must include a date suffix! (e.g. market_snapshot_stream:20251127)"
+    message_id = r.xadd(STREAM_NAME, {"data": payload}, maxlen=10000)
+    if r.ttl(STREAM_NAME) < 0:
+        r.expire(STREAM_NAME, 1 * 24 * 3600)
 
     if bucket_id % 10 == 0:
         ts_min = snapshot_df["timestamp"].min()

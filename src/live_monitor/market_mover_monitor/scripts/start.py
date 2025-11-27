@@ -21,57 +21,30 @@ def start_collector():
     subprocess.run([sys.executable, collector_path])
 
 
-def start_replayer():
-    """Start the replayer process"""
-    replayer_path = os.path.join(
-        os.path.dirname(__file__), "..", "core", "collector", "replayer.py"
+def start_analyzer_web(**kwargs):
+    from live_monitor.market_mover_monitor.core.api.web_server import WebAnalyzer
+
+    web_analyzer = WebAnalyzer(
+        host=kwargs.get("host", "localhost"),
+        port=kwargs.get("port", 5000),
+        replay_date=kwargs.get("replay_date"),
+        backtrace=kwargs.get("backtrace", False),
     )
-    print("🚀 Starting Market Mover Replayer...")
-    subprocess.run([sys.executable, replayer_path])
 
+    # Load historical data if specified
+    if kwargs.get("load_history"):
+        print(f"Loading historical data for {kwargs['load_history']}")
+        web_analyzer.data_manager.initialize_from_history(kwargs["load_history"])
 
-def start_analyzer_cli():
-    """Start analyzer in CLI mode"""
-    analyzer_path = os.path.join(os.path.dirname(__file__), "analyzer.py")
-    print("🖥️  Starting Market Mover Analyzer (CLI mode)...")
-    subprocess.run([sys.executable, analyzer_path, "--mode", "cli"])
-
-
-def start_analyzer_web(
-    host="localhost", port=5000, debug=False, load_history=None, replay=False
-):
-    """Start analyzer in web mode"""
-    analyzer_path = os.path.join(os.path.dirname(__file__), "analyzer.py")
-    cmd = [
-        sys.executable,
-        analyzer_path,
-        "--mode",
-        "web",
-        "--host",
-        host,
-        "--port",
-        str(port),
-    ]
-
-    if replay:
-        cmd.append("--replay")
-
-    if debug:
-        cmd.append("--debug")
-
-    if load_history:
-        cmd.extend(["--load-history", load_history])
-
-    print(f"🌐 Starting Market Mover Web Analyzer on http://{host}:{port}")
-    if load_history:
-        print(f"📚 Loading historical data for: {load_history}")
-
-    subprocess.run(cmd)
+    # Start the web server
+    web_analyzer.run(debug=kwargs.get("debug", False))
 
 
 def start_replayer(date, speed=1.0):
     """Start replayer for historical data"""
-    replayer_path = os.path.join(os.path.dirname(__file__), "replayer.py")
+    replayer_path = os.path.join(
+        os.path.dirname(__file__), "..", "core", "collector", "replayer.py"
+    )
     print(f"⏪ Starting Market Mover Replayer for {date} at {speed}x speed...")
     subprocess.run(
         [sys.executable, replayer_path, "--date", date, "--speed", str(speed)]
@@ -81,7 +54,7 @@ def start_replayer(date, speed=1.0):
 def start_trades_replayer(date, speed=1.0):
     """Start trade level replayer for historical data"""
     trades_replayer_path = os.path.join(
-        os.path.dirname(__file__), "trades_replayer_v2.py"
+        os.path.dirname(__file__), "..", "core", "collector", "trades_replayer_v2.py"
     )
     print(
         f"⏪ Starting Market Mover trades_replayer_v2 for {date} at {speed}x speed..."
@@ -114,9 +87,6 @@ Quick Start Examples:
 5. Replay historical data:
    python start.py replay --date 20251003 --speed 10
 
-6. Traditional CLI mode:
-   python start.py cli
-
 Typical Workflow:
 1. Start collector to gather real-time data
 2. Start web analyzer to visualize
@@ -129,16 +99,16 @@ Typical Workflow:
     # Collector command
     subparsers.add_parser("collector", help="Start data collector")
 
-    # CLI analyzer command
-    subparsers.add_parser("cli", help="Start analyzer in CLI mode")
-
     # Web analyzer command
     web_parser = subparsers.add_parser("web", help="Start web analyzer")
     web_parser.add_argument("--host", default="localhost", help="Host to bind to")
     web_parser.add_argument("--port", type=int, default=5000, help="Port to bind to")
     web_parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     web_parser.add_argument("--load-history", help="Load historical data (YYYYMMDD)")
-    web_parser.add_argument("--replay", action="store_true", help="Redis replay mode")
+    web_parser.add_argument("--replay-date", help="receive specific replay date data")
+    web_parser.add_argument(
+        "--backtrace", action="store_true", help="Redis replay toggle"
+    )
 
     # Replayer command
     replay_parser = subparsers.add_parser("replay", help="Start data replayer")
@@ -160,15 +130,14 @@ Typical Workflow:
     try:
         if args.command == "collector":
             start_collector()
-        elif args.command == "cli":
-            start_analyzer_cli()
         elif args.command == "web":
             start_analyzer_web(
                 host=args.host,
                 port=args.port,
                 debug=args.debug,
                 load_history=args.load_history,
-                replay=args.replay,
+                replay_date=args.replay_date,
+                backtrace=args.backtrace,
             )
         elif args.command == "replay":
             if args.type == "trade_replay":

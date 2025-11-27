@@ -1,4 +1,3 @@
-import json
 import os
 import socket
 import time
@@ -8,20 +7,26 @@ from zoneinfo import ZoneInfo
 
 import polars as pl
 import redis
-from flask import Flask, render_template, request
-from flask_socketio import SocketIO, emit
 
 from utils.backtest_utils.backtest_utils import only_common_stocks
 
 
 class redis_engine:
-    def __init__(self, data_callback=None, replay=False):
-        self.replay_mode = replay
+    def __init__(self, data_callback=None, replay_date=None, backtrace=False):
+        self.backtrace_mode = backtrace
+        replay_mode = False
+        if replay_date:  # YYYYMMDD
+            replay_mode = True
 
         # ----------redis stream-----------
         self.redis_client = redis.Redis(host="localhost", port=6379, db=0)
-        today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
-        self.STREAM_NAME = f"market_snapshot_stream:{today}"
+
+        if replay_mode:
+            self.STREAM_NAME = f"market_snapshot_stream_replay:{replay_date}"
+        else:
+            today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+            self.STREAM_NAME = f"market_snapshot_stream:{today}"
+
         self.CONSUMER_GROUP = "market_consumers"
         self.CONSUMER_NAME = f"consumer_{socket.gethostname()}_{os.getpid()}"
 
@@ -40,11 +45,11 @@ class redis_engine:
     # -------------------------------------------------------------------------
     def _redis_stream_listener(self):
         print(f"Starting Redis Stream consumer {self.CONSUMER_NAME}...")
-        print(f"Replay mode: {self.replay_mode}")
+        print(f"backtrace mode: {self.backtrace_mode}")
 
-        # REPLAY HISTORY VIA XRANGE
-        if self.replay_mode:
-            print(">>> Replaying today's historical messages via XRANGE ...")
+        # backtrace HISTORY VIA XRANGE
+        if self.backtrace_mode:
+            print(">>> Backtracing today's historical messages via XRANGE ...")
 
             try:
                 all_history = self.redis_client.xrange(
@@ -56,13 +61,13 @@ class redis_engine:
                     self._process_message(message_id, message_data, ack=False)
 
                 print(
-                    f">>> Replay finished! Processed {len(all_history)} historical messages. Now switching to real-time mode."
+                    f">>> Backtrace finished! Processed {len(all_history)} historical messages. Now switching to real-time mode."
                 )
 
             except Exception as e:
-                print(f"Error during replay: {e}")
+                print(f"Error during backtrace: {e}")
 
-            self.replay_mode = False
+            self.backtrace_mode = False
 
         # REAL-TIME CONSUMPTION
         while True:

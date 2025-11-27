@@ -1,3 +1,7 @@
+"""
+replayer based on market mover monitor collector saved csv file.
+"""
+
 import glob
 import json
 import os
@@ -98,7 +102,14 @@ def read_market_snapshot_with_timing(
             df = df.with_columns(pl.lit(file_timestamp_ms).alias("timestamp"))
 
             payload = df.write_json()
-            r.publish("market_snapshot", payload)
+            STREAM_NAME = f"market_snapshot_stream_replay:{replay_date}"
+            assert (
+                ":" in STREAM_NAME
+            ), "STREAM_NAME must include a date suffix! (e.g. market_snapshot_stream:20251127)"
+            payload = df.write_json()
+            message_id = r.xadd(STREAM_NAME, {"data": payload}, maxlen=10000)
+            if r.ttl(STREAM_NAME) < 0:
+                r.expire(STREAM_NAME, 1 * 24 * 3600)
 
         except Exception as e:
             print(f"Error processing file {file}: {e}")

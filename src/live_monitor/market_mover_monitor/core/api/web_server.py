@@ -19,7 +19,7 @@ from live_monitor.market_mover_monitor.core.storage.redis_client import redis_en
 class WebAnalyzer:
     """Main web analyzer class combining Redis listener and WebSocket server"""
 
-    def __init__(self, host="localhost", port=5000, replay=False):
+    def __init__(self, host="localhost", port=5000, replay_date=None, backtrace=False):
         current_dir = Path(__file__).parent  # core/api/
         front_dir = current_dir.parent.parent / "frontend"
         template_dir = front_dir / "templates"
@@ -76,7 +76,9 @@ class WebAnalyzer:
 
         # Initialize redis engine with callback
         self.redis_engine = redis_engine(
-            data_callback=redis_data_callback, replay=replay
+            data_callback=redis_data_callback,
+            replay_date=replay_date,
+            backtrace=backtrace,
         )
 
     def _setup_routes(self):
@@ -255,12 +257,20 @@ def main():
     parser.add_argument(
         "--load-history", help="Load historical data for date (YYYYMMDD)"
     )
-    parser.add_argument("--replay", action="store_true", help="Redis replay mode")
+    parser.add_argument("--replay-date", help="receive specific replay date data")
+    parser.add_argument(
+        "--backtrace", action="store_true", help="Redis backtrace toggle"
+    )
 
     args = parser.parse_args()
 
     # Create and configure web analyzer
-    web_analyzer = WebAnalyzer(host=args.host, port=args.port, replay=args.replay)
+    web_analyzer = WebAnalyzer(
+        host=args.host,
+        port=args.port,
+        replay_date=args.replay_date,
+        backtrace=args.backtrace,
+    )
 
     # Load historical data if requested
     if args.load_history:

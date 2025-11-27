@@ -162,7 +162,13 @@ def trades_replayer_engine(replay_date: str, speed_multiplier: float = 1.0):
             )
 
             payload = whole_market_snapshot.write_json()
-            r.publish("market_snapshot", payload)
+            STREAM_NAME = f"market_snapshot_stream_replay:{replay_date}"
+            assert (
+                ":" in STREAM_NAME
+            ), "STREAM_NAME must include a date suffix! (e.g. market_snapshot_stream:20251127)"
+            message_id = r.xadd(STREAM_NAME, {"data": payload}, maxlen=10000)
+            if r.ttl(STREAM_NAME) < 0:
+                r.expire(STREAM_NAME, 1 * 24 * 3600)
 
             if bucket_id % 10 == 0:
                 print(
