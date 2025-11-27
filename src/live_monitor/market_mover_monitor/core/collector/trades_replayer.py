@@ -1,12 +1,30 @@
 """
-replayer based on trades_v1 aggregation.
+Replayer based on trades_v1 aggregation.
 
-v2 > v3
-the core efficiency comes from it query filter of bucket_id,
-so it only process the current timeframe.
-but it will have missing data in some bucket due to there may not have trades in some bucket timespan.
-can be fixed in the reciever end. and fixed now, so it works.
-and it's very fast and memory save.
+Current Verison > V3(decrepated)
+
+Core efficiency improvement:
+- Uses bucket_id filter to process only the current time bucket, avoiding
+  redundant computation of historical data
+- Significantly reduces memory footprint and processing time
+- Trade-off: Some buckets may lack data if no trades occurred in that timeframe
+
+Known limitation:
+- Missing snapshots in sparse trading periods (e.g., pre-market, low-volume periods)
+- Solution: Forward-fill missing data at the receiver/consumer level (already implemented)
+
+Current Verison (Incremental):
+Bucket 0: [trades 0-30s]     → snapshot 0
+Bucket 1: [trades 30-60s]    → snapshot 1
+Bucket 2: []                 → ⚠️ no snapshot (fixed by receiver)
+Bucket 3: [trades 90-120s]   → snapshot 3
+
+V3 (Cumulative):
+Bucket 0: [trades 0-30s]           → snapshot 0
+Bucket 1: [trades 0-60s]           → snapshot 1 (reprocesses 0-30s)
+Bucket 2: [trades 0-90s]           → snapshot 2 (reprocesses 0-60s)
+Bucket 3: [trades 0-120s]          → snapshot 3 (reprocesses 0-90s)
+
 """
 
 import os

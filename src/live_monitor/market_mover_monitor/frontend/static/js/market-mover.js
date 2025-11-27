@@ -290,8 +290,7 @@ class MarketMoverApp {
                 }
             };
         } else {
-            // 线性模式下，设置合理的边距
-            const margin = (maxValue - minValue) * 0.1 || 1; // 10%边距，最小1%
+            const margin = (maxValue - minValue) * 0.1 || 1;
             const linearMinValue = minValue - margin;
             const linearMaxValue = maxValue + margin;
 

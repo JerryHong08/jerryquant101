@@ -54,11 +54,9 @@ def start_replayer(date, speed=1.0):
 def start_trades_replayer(date, speed=1.0):
     """Start trade level replayer for historical data"""
     trades_replayer_path = os.path.join(
-        os.path.dirname(__file__), "..", "core", "collector", "trades_replayer_v2.py"
+        os.path.dirname(__file__), "..", "core", "collector", "trades_replayer.py"
     )
-    print(
-        f"⏪ Starting Market Mover trades_replayer_v2 for {date} at {speed}x speed..."
-    )
+    print(f"⏪ Starting Market Mover trades_replayer for {date} at {speed}x speed...")
     subprocess.run(
         [sys.executable, trades_replayer_path, "--date", date, "--speed", str(speed)]
     )
@@ -113,7 +111,7 @@ Typical Workflow:
     # Replayer command
     replay_parser = subparsers.add_parser("replay", help="Start data replayer")
     replay_parser.add_argument(
-        "--date", required=True, help="Date to replay (YYYYMMDD)"
+        "--replay-date", required=True, help="Date to replay (YYYYMMDD)"
     )
     replay_parser.add_argument(
         "--speed", type=float, default=1.0, help="Replay speed multiplier"
@@ -141,9 +139,9 @@ Typical Workflow:
             )
         elif args.command == "replay":
             if args.type == "trade_replay":
-                start_trades_replayer(args.date, args.speed)
+                start_trades_replayer(args.replay_date, args.speed)
             elif args.type == "collector_replay":
-                start_replayer(args.date, args.speed)
+                start_replayer(args.replay_date, args.speed)
 
     except KeyboardInterrupt:
         print("\n👋 Shutting down...")

@@ -14,6 +14,8 @@ from urllib.parse import urljoin
 import pandas as pd
 import requests
 
+from live_monitor.market_mover_monitor.core.data.schema import BorrowFee
+
 
 class BorrowFeeProvider:
     def __init__(self):

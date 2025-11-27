@@ -261,11 +261,10 @@ For example, most of the long-term like over years 0 volume is because of relist
 ## Roadmap
 
 * features to be add:
-* [ ] universal indicator plot
+* [ ] universal indicator plot.
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
 * [ ] Polish **X news search function**.
 * [ ] Polars ETL + numba backtest engine(long-term)
-* [ ] market live monitor replay rewrite to web-embedded with play, pause, play back and speed control.
 
 * bugs to be fixed:
 * [ ] backtest engine needed rewrite.

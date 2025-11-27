@@ -12,7 +12,9 @@ import polars as pl
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
-from live_monitor.market_mover_monitor.core.api.data_manager import DataManager
+from live_monitor.market_mover_monitor.core.analyzer.SnapshotAnalyzer import (
+    SnapshotAnalyzer,
+)
 from live_monitor.market_mover_monitor.core.storage.redis_client import redis_engine
 
 
@@ -38,7 +40,7 @@ class WebAnalyzer:
         self.port = port
 
         # Initialize data manager
-        self.data_manager = DataManager()
+        self.data_manager = SnapshotAnalyzer()
         self.last_df = pl.DataFrame()
 
         # Connected clients

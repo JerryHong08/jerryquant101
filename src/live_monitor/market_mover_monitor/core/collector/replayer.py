@@ -13,6 +13,10 @@ import polars as pl
 import redis
 
 from cores.config import cache_dir
+from live_monitor.market_mover_monitor.core.data.schema import (
+    spot_check_SnapshotMsg_with_pydantic,
+    validate_SnapshotMsg_schema,
+)
 
 r = redis.Redis(host="localhost", port=6379, db=0)
 
@@ -74,6 +78,8 @@ def read_market_snapshot_with_timing(
 
     print(f"Starting replay from {first_file_time}")
 
+    first_file = True
+
     for i, (file, file_timestamp) in enumerate(file_timestamps):
         if i > 0:
             prev_timestamp = file_timestamps[i - 1][1]
@@ -88,25 +94,31 @@ def read_market_snapshot_with_timing(
 
         try:
             df = pl.read_csv(file)
+            file_timestamp_ms = int(file_timestamp.timestamp() * 1000)
 
-            # Update timestamp to match the file's historical time
-            file_timestamp_ms = int(
-                file_timestamp.timestamp() * 1000
-            )  # Convert to milliseconds
-
-            # Remove existing timestamp column if it exists to avoid conflicts
             if "timestamp" in df.columns:
                 df = df.drop("timestamp")
 
-            # Add new timestamp column as numeric milliseconds
             df = df.with_columns(pl.lit(file_timestamp_ms).alias("timestamp"))
 
+            is_valid, error_msg = validate_SnapshotMsg_schema(df)
+            if not is_valid:
+                print(f"❌ Schema validation failed: {error_msg}")
+                continue
+
+            if first_file:
+                if not spot_check_SnapshotMsg_with_pydantic(df, sample_size=5):
+                    print(f"❌ Pydantic validation failed for {file}")
+                    continue
+                first_file = False
+
+            print(f"✓ Validated {len(df)} rows")
+
             payload = df.write_json()
+
             STREAM_NAME = f"market_snapshot_stream_replay:{replay_date}"
-            assert (
-                ":" in STREAM_NAME
-            ), "STREAM_NAME must include a date suffix! (e.g. market_snapshot_stream:20251127)"
-            payload = df.write_json()
+            assert ":" in STREAM_NAME, "STREAM_NAME must include a date suffix!"
+
             message_id = r.xadd(STREAM_NAME, {"data": payload}, maxlen=10000)
             if r.ttl(STREAM_NAME) < 0:
                 r.expire(STREAM_NAME, 1 * 24 * 3600)

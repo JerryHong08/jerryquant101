@@ -44,7 +44,7 @@ class redis_engine:
 
     # -------------------------------------------------------------------------
     def _redis_stream_listener(self):
-        print(f"Starting Redis Stream consumer {self.CONSUMER_NAME}...")
+        print(f"INFO: Starting Redis Stream consumer {self.CONSUMER_NAME}...")
         print(f"backtrace mode: {self.backtrace_mode}")
 
         # backtrace HISTORY VIA XRANGE

@@ -9,7 +9,7 @@ mkdir -p logs
 
 current_task=0
 TOTAL_TASKS=8
-TOTAL_DAYS=14
+TOTAL_DAYS=7
 
 run_task() {
     local task_name="$1"

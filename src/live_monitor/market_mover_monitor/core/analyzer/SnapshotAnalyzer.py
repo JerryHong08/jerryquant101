@@ -7,34 +7,51 @@ import asyncio
 import concurrent.futures
 import glob
 import os
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 import polars as pl
+import redis
 from prometheus_client import Summary, start_http_server
 
-from cores.config import cache_dir, float_shares_dir
+from cores.config import cache_dir
 from live_monitor.market_mover_monitor.core.data.providers.fundamentals import (
     FloatSharesProvider,
+)
+from live_monitor.market_mover_monitor.core.data.transforms import (
+    _parse_transfrom_timetamp,
 )
 from utils.backtest_utils.backtest_utils import only_common_stocks
 
 start_http_server(9090)  # localhost:9090/metrics
 
 PROCESS_LATENCY = Summary(
-    "datamanager_process_latency_seconds", "Time spent processing snapshot"
+    "SnapshotAnalyzer_process_latency_seconds", "Time spent processing snapshot"
 )
 
 
-class DataManager:
+class SnapshotAnalyzer:
     """Manages stock data for real-time visualization"""
 
-    def __init__(self, max_history_points: int = 5000):
+    def __init__(self, max_history_points: int = 5000, replay_date=None):
         self.max_history_points = max_history_points
         self.stock_data: Dict[str, Dict] = {}
         self.top_20_history: List[List[str]] = []  # Track top 20 changes over time
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+
+        replay_mode = False
+        if replay_date:  # YYYYMMDD
+            replay_mode = True
+
+        # ----------redis stream-----------
+        self.r = redis.Redis(host="localhost", port=6379, db=0)
+
+        if replay_mode:
+            self.STREAM_NAME = f"factor_tasks_replay:{replay_date}"
+        else:
+            today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+            self.STREAM_NAME = f"factor_tasks:{today}"
 
     @PROCESS_LATENCY.time()
     def update_from_realtime(self, df: pl.DataFrame):
@@ -45,66 +62,13 @@ class DataManager:
             if hasattr(df, "select") and "timestamp" in df.columns:
                 timestamp_value = df["timestamp"].max()
                 print(
-                    f"DEBUG: timestamp_value type: {type(timestamp_value)}, value: {timestamp_value}"
+                    f"DEBUG: timestamp_value type and value: \n{type(timestamp_value)}, value: {timestamp_value}"
                 )
 
-            # Convert timestamp to datetime
-            if timestamp_value is not None:
-                if isinstance(timestamp_value, (int, float)):
-                    # Handle numeric timestamps (assume milliseconds if > 1e10, else seconds)
-                    if timestamp_value > 1e10:
-                        timestamp = datetime.fromtimestamp(
-                            timestamp_value / 1000, tz=ZoneInfo("America/New_York")
-                        )
-                    else:
-                        timestamp = datetime.fromtimestamp(
-                            timestamp_value, tz=ZoneInfo("America/New_York")
-                        )
-                elif isinstance(timestamp_value, str):
-                    # Parse string timestamp
-                    try:
-                        # Try ISO format first
-                        timestamp = datetime.fromisoformat(
-                            timestamp_value.replace("Z", "+00:00")
-                        )
-                        if timestamp.tzinfo is None:
-                            timestamp = timestamp.replace(
-                                tzinfo=ZoneInfo("America/New_York")
-                            )
-                        else:
-                            timestamp = timestamp.astimezone(
-                                ZoneInfo("America/New_York")
-                            )
-                    except ValueError:
-                        # Try parsing as timestamp
-                        timestamp_float = float(timestamp_value)
-                        if timestamp_float > 1e10:
-                            timestamp = datetime.fromtimestamp(
-                                timestamp_float / 1000, tz=ZoneInfo("America/New_York")
-                            )
-                        else:
-                            timestamp = datetime.fromtimestamp(
-                                timestamp_float, tz=ZoneInfo("America/New_York")
-                            )
-                elif isinstance(timestamp_value, datetime):
-                    # Already a datetime object - this shouldn't happen with DataFrame JSON but handle it
-                    if timestamp_value.tzinfo is None:
-                        timestamp = timestamp_value.replace(
-                            tzinfo=ZoneInfo("America/New_York")
-                        )
-                    else:
-                        timestamp = timestamp_value.astimezone(
-                            ZoneInfo("America/New_York")
-                        )
-                else:
-                    print(f"DEBUG: Unsupported timestamp type: {type(timestamp_value)}")
-                    timestamp = datetime.now(ZoneInfo("America/New_York"))
+            # turn into datetime class type, add timezone info(America/New York)
+            timestamp = _parse_transfrom_timetamp(timestamp_value)
 
-                print(f"DEBUG: Final timestamp: {timestamp}")
-            else:
-                print("DEBUG: No timestamp found, using current time")
-                timestamp = datetime.now(ZoneInfo("America/New_York"))
-
+            print(f"Debug time type and value: \n{type(timestamp), {timestamp}}")
             # Process the snapshot data - pass DataFrame directly
             self._process_snapshot(df, timestamp)
 
@@ -118,16 +82,16 @@ class DataManager:
         self, df: pl.DataFrame, timestamp: datetime, is_historical: bool = False
     ) -> None:
         """Process a single data snapshot"""
-        # Sort by percent_change to get current rankings
         df_sorted = df.sort("percent_change", descending=True)
+
+        # -------- CORE CUT/FILTER -----------
         current_top_20 = df_sorted.head(20)
 
-        # Track top 20 changes
         current_top_20_tickers = current_top_20.select("ticker").to_series().to_list()
         self.top_20_history.append(current_top_20_tickers)
 
         # Keep only recent history to manage memory
-        # print(f"Debug: current {len(self.top_20_history)}")
+        # print(f"Debug: current top_20_history number: {len(self.top_20_history)}")
         if len(self.top_20_history) > self.max_history_points:
             self.top_20_history = self.top_20_history[-self.max_history_points :]
 
@@ -138,6 +102,8 @@ class DataManager:
 
             if ticker not in self.stock_data:
                 # New stock entry
+                self.r.xadd(self.STREAM_NAME, {"ticker": ticker})
+
                 self.stock_data[ticker] = {
                     "timestamps": [],
                     "percent_changes": [],
@@ -171,7 +137,6 @@ class DataManager:
                     if not is_historical and rank_change >= 5:  # Moved up 5+ positions
                         stock_info["highlight"] = True
 
-                # stock_info["alpha"] = self._calculate_alpha(current_rank)
                 stock_info["is_new_entrant"] = False
 
                 # Update metadata
@@ -221,6 +186,8 @@ class DataManager:
 
         # print(f"Removing {len(stocks_to_remove)} old stocks: {stocks_to_remove}")
         for ticker in stocks_to_remove:
+            self.r.xdel(self.STREAM_NAME, {"ticker": ticker})
+
             del self.stock_data[ticker]
 
     def get_chart_data(self) -> Dict:
@@ -385,13 +352,10 @@ class DataManager:
         else:
             return f"rgba({base_color}, {alpha})"
 
-    def get_top_stocks(self, limit: int = 20) -> List[Tuple[str, Dict]]:
-        """Get top stocks sorted by current rank"""
-        ranked_stocks = [(ticker, data) for ticker, data in self.stock_data.items()]
-        ranked_stocks.sort(key=lambda x: x[1]["current_rank"])
-        return ranked_stocks[:limit]
-
-    # ----------------- for replayer data -----------------------
+    # ----------------------------------------------
+    # for replayer data, not used often anymore, there is a more convenient way to
+    # achived that using redis stream XRANGE with a new redis_client version.
+    # will be deprecated.
     def initialize_from_history(self, date: str) -> None:
         """Load historical data for the given date"""
         year = date[:4]
