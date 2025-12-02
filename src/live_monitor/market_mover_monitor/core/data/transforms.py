@@ -81,10 +81,10 @@ def _parse_transfrom_timetamp(timestamp_value) -> datetime:
             else:
                 timestamp = timestamp_value.astimezone(ZoneInfo("America/New_York"))
         else:
-            print(f"DEBUG: Unsupported timestamp type: {type(timestamp_value)}")
+            print(f"WARNING: Unsupported timestamp type: {type(timestamp_value)}")
             timestamp = datetime.now(ZoneInfo("America/New_York"))
 
-        print(f"DEBUG: Final timestamp: {timestamp}")
+        # print(f"DEBUG: Final timestamp: {timestamp}")
     else:
         print(
             "WARNING: No timestamp found, using current time. \nNeed to Check carefully."

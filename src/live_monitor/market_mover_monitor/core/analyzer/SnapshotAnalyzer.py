@@ -47,6 +47,8 @@ class SnapshotAnalyzer:
         # ----------redis stream-----------
         self.r = redis.Redis(host="localhost", port=6379, db=0)
 
+        self.stream_message_ids: Dict[str, str] = {}  # ticker -> message_id
+
         if replay_mode:
             self.STREAM_NAME = f"factor_tasks_replay:{replay_date}"
         else:
@@ -68,7 +70,7 @@ class SnapshotAnalyzer:
             # turn into datetime class type, add timezone info(America/New York)
             timestamp = _parse_transfrom_timetamp(timestamp_value)
 
-            print(f"Debug time type and value: \n{type(timestamp), {timestamp}}")
+            # print(f"Debug time type and value: \n{type(timestamp), {timestamp}}")
             # Process the snapshot data - pass DataFrame directly
             self._process_snapshot(df, timestamp)
 
@@ -102,7 +104,7 @@ class SnapshotAnalyzer:
 
             if ticker not in self.stock_data:
                 # New stock entry
-                self.r.xadd(self.STREAM_NAME, {"ticker": ticker})
+                # self.stream_message_ids[ticker] = self.r.xadd(self.STREAM_NAME, {"action": 'add',"ticker": ticker})
 
                 self.stock_data[ticker] = {
                     "timestamps": [],
@@ -186,7 +188,10 @@ class SnapshotAnalyzer:
 
         # print(f"Removing {len(stocks_to_remove)} old stocks: {stocks_to_remove}")
         for ticker in stocks_to_remove:
-            self.r.xdel(self.STREAM_NAME, {"ticker": ticker})
+            if ticker in self.stream_message_ids:
+                message_id = self.stream_message_ids[ticker]
+                self.r.xdel(self.STREAM_NAME, message_id)
+                del self.stream_message_ids[ticker]
 
             del self.stock_data[ticker]
 
@@ -250,6 +255,16 @@ class SnapshotAnalyzer:
         """Toggle highlight status for a specific stock"""
         if ticker in self.stock_data:
             self.stock_data[ticker]["highlight"] = highlight
+
+            # for test and develop stage
+            if highlight:
+                self.stream_message_ids[ticker] = self.r.xadd(
+                    self.STREAM_NAME, {"action": "add", "ticker": ticker}
+                )
+            if not highlight:
+                self.stream_message_ids[ticker] = self.r.xadd(
+                    self.STREAM_NAME, {"action": "remove", "ticker": ticker}
+                )
             print(f"Updated highlight for {ticker}: {highlight}")
             return True
         return False

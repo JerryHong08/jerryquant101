@@ -261,13 +261,14 @@ For example, most of the long-term like over years 0 volume is because of relist
 ## Roadmap
 
 * features to be add:
+* [ ] add redis/callback for mmm factor engine.
+* [ ] mmm frontend rewrite.
 * [ ] universal indicator plot.
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
 * [ ] Polish **X news search function**.
-* [ ] Polars ETL + numba backtest engine(long-term)
 
 * bugs to be fixed:
-* [ ] backtest engine needed rewrite.
+* [ ] backtest engine needed rewrite(Polars ETL + numba backtest engine(long-term)).
 * [ ] backtest open positions need to be fixed.
 * [ ] Stock dividends
 * [ ] low_volume_tickers.csv, see more detail below in the changelog.

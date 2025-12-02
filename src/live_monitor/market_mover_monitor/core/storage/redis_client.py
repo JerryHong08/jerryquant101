@@ -148,23 +148,23 @@ class redis_engine:
             # Fallback: just sort by percent_change
             df = df.sort("percent_change", descending=True)
 
+        # print(f'DEBUG : self.last_df : \n{self.last_df}')
+        # print(f'DEBUG : df : \n{df}')
         if len(self.last_df) != len(df):
+            # print(f"DEBUG: last df:{len(self.last_df)} recieved df: {len(df)}")
             filled_df = (
                 pl.concat([self.last_df, df], how="vertical")
                 .sort("timestamp")
                 .group_by(["ticker"])
                 .agg(
-                    pl.col("timestamp").last(),
-                    pl.col("current_price").last(),
                     pl.col("percent_change").last(),
                     pl.col("accumulated_volume").last(),
+                    pl.col("current_price").last(),
                     pl.col("prev_close").last(),
+                    pl.col("timestamp").last(),
                     pl.col("prev_volume").last(),
                 )
             ).sort("percent_change", descending=True)
-            print(
-                f"df need fullfilled: fullfilled_df:{len(filled_df)} recieved df: {len(df)}"
-            )
         else:
             print(f"df dont't need fullfilled, original length: {len(df)}")
             filled_df = df

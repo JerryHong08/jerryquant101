@@ -5,5 +5,5 @@ from abc import ABC, abstractmethod
 class FactorBase(ABC):
     @abstractmethod
     def compute(self, snaphsot):
-        """ "return factor score"""
+        """return factor score"""
         pass
