@@ -1,8 +1,16 @@
+import json
+import logging
+import os
 import time
-from typing import List, Optional
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 import polars as pl
 from pydantic import BaseModel, Field, ValidationError
+
+logger = logging.getLogger(__name__)
 
 
 class FloatSourceData(BaseModel):
@@ -92,9 +100,127 @@ def spot_check_SnapshotMsg_with_pydantic(
     return True
 
 
+@dataclass
+class NewsArticle:
+    """NewsArticle Dataclass"""
+
+    symbol: str
+    published_time: datetime
+    title: str
+    text: Optional[str]
+    url: str
+    sources: str
+
+    @classmethod
+    def from_fmp_api_response(cls, data: Dict) -> "NewsArticle":
+        """create NewsArticle from fmp api response"""
+        try:
+            published_time = datetime.strptime(
+                data["publishedDate"], "%Y-%m-%d %H:%M:%S"
+            ).replace(tzinfo=ZoneInfo("America/New_York"))
+        except (KeyError, ValueError) as e:
+            logger.warning(f"data format not matched: {e}, using current running time.")
+            published_time = datetime.now().astimezone(ZoneInfo("America/New_York"))
+
+        return cls(
+            symbol=data.get("symbol", ""),
+            published_time=published_time,
+            title=data.get("title", ""),
+            text=data.get("text", ""),
+            url=data.get("url", ""),
+            sources=data.get("publisher", ""),
+        )
+
+    @classmethod
+    def from_momo_web_response(cls, symbol: str, data: Dict) -> "NewsArticle":
+        """create NewsArticle from momo web response"""
+        try:
+            published_time = datetime.fromtimestamp(data["time"]).astimezone(
+                ZoneInfo("America/New_York")
+            )
+        except (KeyError, ValueError) as e:
+            logger.warning(f"data format not matched: {e}, using current running time.")
+            published_time = datetime.now().astimezone(ZoneInfo("America/New_York"))
+
+        return cls(
+            symbol=symbol,
+            published_time=published_time,
+            title=data.get("title", ""),
+            text="",
+            url=data.get("url", ""),
+            sources=data.get("sources", ""),
+        )
+
+    @classmethod
+    def from_benzinga_api_response(cls, symbol: str, data: Dict) -> "NewsArticle":
+        """create NewsArticle from Benzinga API response"""
+        try:
+            # Benzinga format: "Wed, 03 Dec 2025 08:34:03 -0400"
+            published_time = datetime.strptime(
+                data["created"], "%a, %d %b %Y %H:%M:%S %z"
+            ).astimezone(ZoneInfo("America/New_York"))
+        except (KeyError, ValueError) as e:
+            logger.warning(f"data format not matched: {e}, using current running time.")
+            published_time = datetime.now().astimezone(ZoneInfo("America/New_York"))
+
+        return cls(
+            symbol=symbol,
+            published_time=published_time,
+            title=data.get("title", ""),
+            text=data.get("body", ""),
+            url=data.get("url", ""),
+            sources=data.get("author", ""),
+        )
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "NewsArticle":
+        """Create NewsArticle from a JSON string"""
+        try:
+            data = json.loads(json_str)
+            return cls.from_dict(data)
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON data: {e}")
+            raise
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "NewsArticle":
+        """Create NewsArticle from a dictionary"""
+        try:
+            return cls(
+                symbol=data["symbol"],
+                published_time=datetime.fromisoformat(data["published_date"]),
+                title=data["title"],
+                text=data.get("text", ""),
+                url=data["url"],
+                sources=data["sources"],
+            )
+        except KeyError as e:
+            logger.error(f"Missing field in data: {e}")
+            raise
+        except ValueError as e:
+            logger.error(f"Invalid value in data: {e}")
+            raise
+
+    def to_dict(self) -> Dict:
+        """transform into Dict"""
+        return {
+            "symbol": self.symbol,
+            "published_date": self.published_time.isoformat(),
+            "title": self.title,
+            "text": self.text,
+            "url": self.url,
+            "sources": self.sources,
+        }
+
+
+class NewsFormatter:
+    """News Formatter"""
+
+    def format_json(articles: List[NewsArticle], indent: int = 2) -> str:
+        """format to json"""
+        data = [article.to_dict() for article in articles]
+        return json.dumps(data, indent=indent, ensure_ascii=False)
+
+
 class BorrowFee(BaseModel):
-    pass
-
-
-class NewsData(BaseModel):
     pass

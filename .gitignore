@@ -33,6 +33,7 @@ logs/
 .env
 src/strategies/*
 !src/strategies/indicators/
+momo_token.py
 
 # AI
 claude/

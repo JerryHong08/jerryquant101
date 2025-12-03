@@ -256,16 +256,19 @@ For example, most of the long-term like over years 0 volume is because of relist
 
 * ✅ MMM Redis to Redis Stream. Backend decoupled to Redis_client.py as data receiver
 
+2025-12-03
+
+* ✅ Add momo news fetch.
+* ✅ add redis/callback for mmm factor engine. now works, but only a simple version.
+
 ---
 
 ## Roadmap
 
 * features to be add:
-* [ ] add redis/callback for mmm factor engine.
 * [ ] mmm frontend rewrite.
 * [ ] universal indicator plot.
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
-* [ ] Polish **X news search function**.
 
 * bugs to be fixed:
 * [ ] backtest engine needed rewrite(Polars ETL + numba backtest engine(long-term)).

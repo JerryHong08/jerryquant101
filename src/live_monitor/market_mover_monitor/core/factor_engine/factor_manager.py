@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import socket
 import time
@@ -19,6 +20,9 @@ from live_monitor.market_mover_monitor.core.data.providers.borrow_fee import (
 )
 from live_monitor.market_mover_monitor.core.data.providers.fundamentals import (
     FloatSharesProvider,
+)
+from live_monitor.market_mover_monitor.core.data.providers.news_fetcher import (
+    MoomooStockResolver,
 )
 
 load_dotenv()
@@ -163,6 +167,30 @@ class FactorManager:
                 ctx.borrow_fee_update_time = None
 
             print(f"[ERROR] Borrow fee failed for {ctx.symbol}: {e}")
+
+    def _load_stock_news(self, ctx: TickerContext):
+        news_fetcher = MoomooStockResolver()
+        try:
+            stock_info = news_fetcher.get_stock_info(ctx.symbol)
+            if stock_info:
+                news_result = news_fetcher.get_news(ctx.symbol, pageSize=5)
+                print(f"[DEBUG][Manager] news_result: {news_result}")
+                print(json.dumps(news_result, indent=2, ensure_ascii=False))
+
+                with ctx.lock:
+                    # ctx.news_fetch_time = news_result['news_data']['server_time']
+                    # ctx.news_list = news_result['news_data']['list']
+                    pass
+
+                print(f"[INFO] stock latest news updated: {ctx.symbol}")
+            else:
+                print(f"[ERROR] Could not find {ctx.symbol}")
+
+        except Exception as e:
+            with ctx.lock:
+                pass
+
+            print(f"[ERROR] Latest news updated failed for {ctx.symbol}: {e}")
 
     def add_ticker(self, symbol):
         """Add ticker"""

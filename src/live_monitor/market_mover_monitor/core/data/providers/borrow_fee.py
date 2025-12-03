@@ -138,7 +138,7 @@ class BorrowFeeProvider:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Market Mover Web Analyzer")
+    parser = argparse.ArgumentParser(description="Brorrow Fee Fetcher")
     parser.add_argument(
         "--ticker", default="None", help="ticker you want to fetch its borrrow fee"
     )
