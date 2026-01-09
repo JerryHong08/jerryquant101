@@ -217,7 +217,7 @@ def process_bucket(bucket_df, prev_data_dict, bucket_id, sleep_duration, replay_
     ), "STREAM_NAME must include a date suffix! (e.g. market_snapshot_stream:20251127)"
     message_id = r.xadd(STREAM_NAME, {"data": payload}, maxlen=10000)
     if r.ttl(STREAM_NAME) < 0:
-        r.expire(STREAM_NAME, 1 * 24 * 3600)
+        r.expire(STREAM_NAME, 1 * 19 * 3600)
 
     if bucket_id % 10 == 0:
         ts_min = snapshot_df["timestamp"].min()

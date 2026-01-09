@@ -6,6 +6,7 @@ Handles historical data loading and real-time data updates
 import asyncio
 import concurrent.futures
 import glob
+import logging
 import os
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -13,7 +14,6 @@ from zoneinfo import ZoneInfo
 
 import polars as pl
 import redis
-from prometheus_client import Summary, start_http_server
 
 from cores.config import cache_dir
 from live_monitor.market_mover_monitor.core.data.providers.fundamentals import (
@@ -22,19 +22,25 @@ from live_monitor.market_mover_monitor.core.data.providers.fundamentals import (
 from live_monitor.market_mover_monitor.core.data.transforms import (
     _parse_transfrom_timetamp,
 )
+from live_monitor.market_mover_monitor.core.utils.logger import setup_logger
 from utils.backtest_utils.backtest_utils import only_common_stocks
 
-start_http_server(9090)  # localhost:9090/metrics
-
-PROCESS_LATENCY = Summary(
-    "SnapshotAnalyzer_process_latency_seconds", "Time spent processing snapshot"
-)
+logger = setup_logger(__name__, log_to_file=True, level=logging.DEBUG)
 
 
 class SnapshotAnalyzer:
     """Manages stock data for real-time visualization"""
 
     def __init__(self, max_history_points: int = 5000, replay_date=None):
+        # Start Prometheus server only once per instance
+        try:
+            logger.info("Prometheus metrics server started on port 9090")
+        except OSError as e:
+            if e.errno == 98:
+                logger.warning("Prometheus metrics server already running on port 9090")
+            else:
+                raise
+
         self.max_history_points = max_history_points
         self.stock_data: Dict[str, Dict] = {}
         self.top_20_history: List[List[str]] = []  # Track top 20 changes over time
@@ -50,12 +56,12 @@ class SnapshotAnalyzer:
         self.stream_message_ids: Dict[str, str] = {}  # ticker -> message_id
 
         if replay_mode:
+            logger.info(f"Replay mode activated for date: {replay_date}")
             self.STREAM_NAME = f"factor_tasks_replay:{replay_date}"
         else:
             today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
             self.STREAM_NAME = f"factor_tasks:{today}"
 
-    @PROCESS_LATENCY.time()
     def update_from_realtime(self, df: pl.DataFrame):
         """Update data from real-time DataFrame"""
         try:
@@ -63,9 +69,9 @@ class SnapshotAnalyzer:
             timestamp_value = None
             if hasattr(df, "select") and "timestamp" in df.columns:
                 timestamp_value = df["timestamp"].max()
-                print(
-                    f"DEBUG: timestamp_value type and value: \n{type(timestamp_value)}, value: {timestamp_value}"
-                )
+                # print(
+                #     f"DEBUG: timestamp_value type and value: \n{type(timestamp_value)}, value: {timestamp_value}"
+                # )
 
             # turn into datetime class type, add timezone info(America/New York)
             timestamp = _parse_transfrom_timetamp(timestamp_value)
@@ -108,7 +114,7 @@ class SnapshotAnalyzer:
 
                 self.stock_data[ticker] = {
                     "timestamps": [],
-                    "percent_changes": [],
+                    "percent_changes": [],  # layer1: direct update
                     "current_rank": current_rank,
                     "previous_rank": None,
                     "rank_history": [],
@@ -197,7 +203,8 @@ class SnapshotAnalyzer:
 
     def get_chart_data(self) -> Dict:
         """Get data formatted for chart visualization"""
-        chart_data = {"datasets": [], "timestamps": [], "highlights": []}
+        # chart_data = {"datasets": [], "timestamps": [], "highlights": []}
+        chart_data = {"datasets": [], "highlights": []}
 
         # Get all unique timestamps and sort them
         all_timestamps = set()
@@ -205,7 +212,7 @@ class SnapshotAnalyzer:
             all_timestamps.update(stock_data["timestamps"])
 
         sorted_timestamps = sorted(list(all_timestamps))
-        chart_data["timestamps"] = [ts.isoformat() for ts in sorted_timestamps]
+        # chart_data["timestamps"] = [ts.isoformat() for ts in sorted_timestamps]
 
         # Process each stock
         for ticker, stock_data in self.stock_data.items():
@@ -214,7 +221,7 @@ class SnapshotAnalyzer:
 
             dataset = {
                 "label": ticker,
-                "data": [],
+                "data": [],  # data list include stock series data points, x is timestamp, y is percent change
                 "borderColor": self._get_stock_color(ticker, stock_data),
                 "backgroundColor": self._get_stock_color(
                     ticker, stock_data, with_alpha=False
@@ -245,7 +252,6 @@ class SnapshotAnalyzer:
                         "ticker": ticker,
                         "rank": stock_data["current_rank"],
                         "velocity": stock_data["rank_velocity"],
-                        "is_new": stock_data["is_new_entrant"],
                     }
                 )
 
@@ -367,10 +373,6 @@ class SnapshotAnalyzer:
         else:
             return f"rgba({base_color}, {alpha})"
 
-    # ----------------------------------------------
-    # for replayer data, not used often anymore, there is a more convenient way to
-    # achived that using redis stream XRANGE with a new redis_client version.
-    # will be deprecated.
     def initialize_from_history(self, date: str) -> None:
         """Load historical data for the given date"""
         year = date[:4]

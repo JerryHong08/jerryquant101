@@ -40,6 +40,8 @@ dependencies = [
     "httpx[socks] (>=0.28.1,<0.29.0)",
     "pydantic (>=2.12.4,<3.0.0)",
     "lxml (>=6.0.2,<7.0.0)",
+    "influxdb-client (>=1.49.0,<2.0.0)",
+    "massive (>=2.0.3,<3.0.0)",
 ]
 
 [tool.poetry]

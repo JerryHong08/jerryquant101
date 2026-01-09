@@ -34,13 +34,18 @@ class WebAnalyzer:
             static_url_path="/static",
         )
         self.app.config["SECRET_KEY"] = "market_mover_secret"
-        self.socketio = SocketIO(self.app, cors_allowed_origins="*")
+        # Remove async_mode parameter to avoid early binding
+        self.socketio = SocketIO(
+            self.app,
+            cors_allowed_origins="*",
+            async_mode="threading",  # Explicitly set threading mode
+        )
 
         self.host = host
         self.port = port
 
         # Initialize data manager
-        self.data_manager = SnapshotAnalyzer()
+        self.data_manager = SnapshotAnalyzer(replay_date=replay_date)
         self.last_df = pl.DataFrame()
 
         # Connected clients
@@ -57,7 +62,7 @@ class WebAnalyzer:
             chart_data = self.data_manager.get_chart_data()
             print(
                 f"Chart data summary: {len(chart_data.get('datasets', []))} datasets, "
-                f"{len(chart_data.get('timestamps', []))} timestamps, "
+                # f"{len(chart_data.get('timestamps', []))} timestamps, "
                 f"{len(chart_data.get('highlights', []))} highlights"
             )
 

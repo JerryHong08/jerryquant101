@@ -8,6 +8,7 @@ import requests
 from dotenv import load_dotenv
 
 load_dotenv()
+
 from live_monitor.market_mover_monitor.core.data.schema import (
     NewsArticle,
     NewsFormatter,
@@ -248,7 +249,7 @@ class API_NewsFetchers:
         )
 
     def fetch_news_fmp(
-        self, symbol: str, limit: int = 5, timeout: int = 2
+        self, symbol: str, limit: int = 5, timeout: int = 5
     ) -> List[NewsArticle]:
         """
         Fetch News from FMP API
@@ -407,6 +408,13 @@ if __name__ == "__main__":
         help="Number of news articles to fetch (default: 5)",
     )
 
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=15,
+        help="Request timeout in seconds (default: 15)",
+    )
+
     args = parser.parse_args()
     ticker = args.ticker
     provider = args.provider
@@ -428,7 +436,9 @@ if __name__ == "__main__":
 
         elif provider == "fmp":
             fetcher = API_NewsFetchers()
-            articles = fetcher.fetch_news_fmp(symbol=ticker, limit=args.limit)
+            articles = fetcher.fetch_news_fmp(
+                symbol=ticker, limit=args.limit, timeout=args.timeout
+            )
 
         elif provider == "benzinga":
             fetcher = API_NewsFetchers()

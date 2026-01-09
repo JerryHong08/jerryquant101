@@ -121,7 +121,7 @@ def read_market_snapshot_with_timing(
 
             message_id = r.xadd(STREAM_NAME, {"data": payload}, maxlen=10000)
             if r.ttl(STREAM_NAME) < 0:
-                r.expire(STREAM_NAME, 1 * 24 * 3600)
+                r.expire(STREAM_NAME, 1 * 19 * 3600)
 
         except Exception as e:
             print(f"Error processing file {file}: {e}")

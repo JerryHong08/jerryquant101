@@ -8,7 +8,7 @@ LOGFILE="logs/weekly_update_$(date +%Y%m%d_%H%M%S).log"
 mkdir -p logs
 
 current_task=0
-TOTAL_TASKS=8
+TOTAL_TASKS=9
 TOTAL_DAYS=7
 
 run_task() {
@@ -38,7 +38,9 @@ run_task "tickers list fetching..." python src/data_fetcher/all_tickers_fetch.py
 
 run_task "versatile tickers updating..." python src/data_fetcher/versatile_tickers_fetch.py
 
-run_task "low_volume_tickers updating..." python scripts/write_low_volume_ticker_csv.py
+run_task "float shares updating..." python src/data_fetcher/fmp_fundamental_fetch.py
+
+run_task "low_volume_tickers updating..." python scripts/low_volume_ticker_update.py
 
 echo "===== low_volume_tickers updated.$(date) =====" | tee -a "$LOGFILE"
 

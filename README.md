@@ -261,6 +261,11 @@ For example, most of the long-term like over years 0 volume is because of relist
 * ✅ Add momo news fetch.
 * ✅ add redis/callback for mmm factor engine. now works, but only a simple version.
 
+2025-12-04
+
+* ✅ News Fetcher: momo web, fmp, benzinga.
+* ✅ Add Logger
+
 ---
 
 ## Roadmap

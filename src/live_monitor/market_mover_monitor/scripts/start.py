@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 
-def start_collector():
+def start_collector(limit="market_open"):
     """Start the collector process"""
     # src/live_monitor/market_mover_monitor/scripts/start.py
     collector_path = os.path.join(
@@ -18,26 +18,33 @@ def start_collector():
     )
     # src/live_monitor/market_mover_monitor/core/collector/collector.py
     print("🚀 Starting Market Mover Collector...")
-    subprocess.run([sys.executable, collector_path])
+    subprocess.run([sys.executable, "-u", collector_path, "--limit", limit])
 
 
 def start_analyzer_web(**kwargs):
+    print("🌐 Starting Market Mover Web Analyzer...")  # Move print BEFORE import
     from live_monitor.market_mover_monitor.core.api.web_server import WebAnalyzer
 
-    web_analyzer = WebAnalyzer(
-        host=kwargs.get("host", "localhost"),
-        port=kwargs.get("port", 5000),
-        replay_date=kwargs.get("replay_date"),
-        backtrace=kwargs.get("backtrace", False),
-    )
+    try:
+        web_analyzer = WebAnalyzer(
+            host=kwargs.get("host", "localhost"),
+            port=kwargs.get("port", 5000),
+            replay_date=kwargs.get("replay_date"),
+            backtrace=kwargs.get("backtrace", False),
+        )
 
-    # Load historical data if specified
-    if kwargs.get("load_history"):
-        print(f"Loading historical data for {kwargs['load_history']}")
-        web_analyzer.data_manager.initialize_from_history(kwargs["load_history"])
+        # Load historical data if specified
+        if kwargs.get("load_history"):
+            print(f"Loading historical data for {kwargs['load_history']}")
+            web_analyzer.data_manager.initialize_from_history(kwargs["load_history"])
 
-    # Start the web server
-    web_analyzer.run(debug=kwargs.get("debug", False))
+        # Start the web server
+        web_analyzer.run(debug=kwargs.get("debug", False))
+    except OSError as e:
+        if e.errno == 98:  # Address already in use
+            print(f"❌ Error: Port {kwargs.get('port', 5000)} is already in use")
+            print(f"   Try a different port with: --port <port_number>")
+        raise
 
 
 def start_replayer(date, speed=1.0):
@@ -47,7 +54,7 @@ def start_replayer(date, speed=1.0):
     )
     print(f"⏪ Starting Market Mover Replayer for {date} at {speed}x speed...")
     subprocess.run(
-        [sys.executable, replayer_path, "--date", date, "--speed", str(speed)]
+        [sys.executable, "-u", replayer_path, "--date", date, "--speed", str(speed)]
     )
 
 
@@ -58,7 +65,15 @@ def start_trades_replayer(date, speed=1.0):
     )
     print(f"⏪ Starting Market Mover trades_replayer for {date} at {speed}x speed...")
     subprocess.run(
-        [sys.executable, trades_replayer_path, "--date", date, "--speed", str(speed)]
+        [
+            sys.executable,
+            "-u",
+            trades_replayer_path,
+            "--date",
+            date,
+            "--speed",
+            str(speed),
+        ]
     )
 
 
@@ -95,7 +110,13 @@ Typical Workflow:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Collector command
-    subparsers.add_parser("collector", help="Start data collector")
+    collector_parser = subparsers.add_parser("collector", help="Start data collector")
+    collector_parser.add_argument(
+        "--limit",
+        type=str,
+        default="market_open",
+        help="Limit of collector to stop at certain market event",
+    )
 
     # Web analyzer command
     web_parser = subparsers.add_parser("web", help="Start web analyzer")
@@ -127,7 +148,7 @@ Typical Workflow:
 
     try:
         if args.command == "collector":
-            start_collector()
+            start_collector(limit=args.limit)
         elif args.command == "web":
             start_analyzer_web(
                 host=args.host,

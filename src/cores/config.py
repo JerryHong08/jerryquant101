@@ -6,6 +6,8 @@ import polars as pl
 blackdisk_data_dir = "/mnt/blackdisk/quant_data/polygon_data"
 nftsdisk_data_dir = "data/polygon_data"
 data_dir = blackdisk_data_dir
+lake_data_dir = "/mnt/blackdisk/quant_data/polygon_data/lake"
+raw_data_dir = "/mnt/blackdisk/quant_data/polygon_data/raw"
 
 # ==================== config of config =======================================
 asset_dir_config = {
