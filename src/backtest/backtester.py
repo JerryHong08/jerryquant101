@@ -8,8 +8,8 @@ from cores.config import all_tickers_dir
 from cores.data_loader import stock_load_process
 from utils.backtest_utils.backtest_utils import (
     generate_backtest_date,
+    get_common_stocks,
     load_spx_benchmark,
-    only_common_stocks,
 )
 
 
@@ -17,7 +17,9 @@ def run_backtest(strategy, strategy_config=None):
     """MAIN BACKTEST PROCESSION"""
 
     print("Load data...")
-    tickers = only_common_stocks(filter_date=strategy_config["data_start_date"])
+    tickers = get_common_stocks(
+        filter_date=strategy_config["data_start_date"]
+    ).collect()
 
     try:
         ohlcv_data = (

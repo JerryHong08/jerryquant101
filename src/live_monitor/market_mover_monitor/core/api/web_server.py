@@ -1,27 +1,50 @@
 """
 Web Server for Market Mover Real-time Visualization
 Uses Flask + WebSocket for real-time data streaming
+a prototype version of future bff
 """
 
+import asyncio
+import concurrent.futures
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from threading import Thread
+from typing import Dict, List, Optional
 
 import polars as pl
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
-from live_monitor.market_mover_monitor.core.analyzer.SnapshotAnalyzer import (
+from live_monitor.market_mover_monitor.core.analyzer.overviewchartdataManagement import (
+    ChartDataManager,
+)
+from live_monitor.market_mover_monitor.core.analyzer.snapshotdataAnalyzer import (
     SnapshotAnalyzer,
 )
-from live_monitor.market_mover_monitor.core.storage.redis_client import redis_engine
+from live_monitor.market_mover_monitor.core.analyzer.snapshotdataReceiver import (
+    redis_engine,
+)
+from live_monitor.market_mover_monitor.core.data.providers.fundamentals import (
+    FloatSharesProvider,
+)
+from live_monitor.market_mover_monitor.core.utils.logger import setup_logger
+
+logger = setup_logger(__name__, log_to_file=True, level=logging.DEBUG)
 
 
 class WebAnalyzer:
     """Main web analyzer class combining Redis listener and WebSocket server"""
 
-    def __init__(self, host="localhost", port=5000, replay_date=None, backtrace=False):
+    def __init__(
+        self,
+        host="localhost",
+        port=5000,
+        replay_date=None,
+        replay_id=None,
+        load_history=None,
+    ):
         current_dir = Path(__file__).parent  # core/api/
         front_dir = current_dir.parent.parent / "frontend"
         template_dir = front_dir / "templates"
@@ -41,11 +64,22 @@ class WebAnalyzer:
             async_mode="threading",  # Explicitly set threading mode
         )
 
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
         self.host = host
         self.port = port
 
-        # Initialize data manager
-        self.data_manager = SnapshotAnalyzer(replay_date=replay_date)
+        # Initialize snapshot analyzer (handles data processing, membership, state)
+        self.snapshot_analyzer = SnapshotAnalyzer(
+            replay_date=replay_date,
+            replay_id=replay_id,
+        )
+
+        # Initialize chart data manager (handles visualization data formatting)
+        self.chart_manager = ChartDataManager(
+            replay_date=replay_date,
+            replay_id=replay_id,
+        )
+
         self.last_df = pl.DataFrame()
 
         # Connected clients
@@ -55,14 +89,30 @@ class WebAnalyzer:
         self._setup_socket_events()
 
         # Create callback function for redis_engine
-        def redis_data_callback(processed_df, original_df):
+        def redis_data_callback(processed_df, is_historical=False):
             self.last_df = processed_df
-            self.data_manager.update_from_realtime(processed_df)
 
-            chart_data = self.data_manager.get_chart_data()
+            # Process snapshot through the analyzer
+            result = self.snapshot_analyzer.process_snapshot(
+                processed_df, is_historical
+            )
+
+            # Mark chart data as dirty to trigger refresh
+            self.chart_manager.mark_dirty()
+
+            # Get chart data from chart manager
+            chart_data = self.chart_manager.get_mmm_version_chart_data(
+                force_refresh=True
+            )
+
+            logger.debug(
+                f"Snapshot processed: {result.get('new_subscriptions', [])} new subs, "
+                f"{result.get('total_subscribed', 0)} total, "
+                f"{len(result.get('state_changes', []))} state changes"
+            )
+
             print(
                 f"Chart data summary: {len(chart_data.get('datasets', []))} datasets, "
-                # f"{len(chart_data.get('timestamps', []))} timestamps, "
                 f"{len(chart_data.get('highlights', []))} highlights"
             )
 
@@ -71,21 +121,19 @@ class WebAnalyzer:
                 print(
                     f"Sample dataset: {sample_dataset['label']}, "
                     f"{len(sample_dataset['data'])} data points, "
-                    f"rank: {sample_dataset.get('rank', 'N/A')}"
+                    f"rank: {sample_dataset.get('rank', 'N/A')}, "
+                    f"state: {sample_dataset.get('state', 'N/A')}"
                 )
 
             self.socketio.emit("chart_update", chart_data)
 
-            print(
-                f"Processed snapshot with {len(original_df)} stocks, "
-                f"broadcasting to {len(self.connected_clients)} clients"
-            )
+            print(f"Broadcasting to {len(self.connected_clients)} clients")
 
         # Initialize redis engine with callback
         self.redis_engine = redis_engine(
             data_callback=redis_data_callback,
             replay_date=replay_date,
-            backtrace=backtrace,
+            backtrace=load_history if load_history else False,
         )
 
     def _setup_routes(self):
@@ -106,18 +154,50 @@ class WebAnalyzer:
         @self.app.route("/api/stock/<ticker>")
         def get_stock_detail(ticker):
             """API endpoint to get detailed stock information"""
-            stock_detail = self.data_manager.get_stock_detail(ticker)
-            if stock_detail:
-                return json.dumps(stock_detail, default=str)
+            state = self.chart_manager.get_ticker_latest_state(ticker)
+            history = self.chart_manager.get_ticker_history(ticker, limit=100)
+
+            if state or history:
+                return json.dumps(
+                    {
+                        "ticker": ticker,
+                        "state": state,
+                        "history": [
+                            {
+                                "timestamp": h["timestamp"].isoformat(),
+                                "percent_change": h["percent_change"],
+                                "current_price": h["current_price"],
+                                "rank": h["rank"],
+                            }
+                            for h in history
+                        ],
+                    },
+                    default=str,
+                )
             else:
                 return json.dumps({"error": "Stock not found"}), 404
+
+        @self.app.route("/api/subscribed")
+        def get_subscribed_tickers():
+            """API endpoint to get all subscribed tickers"""
+            tickers = self.snapshot_analyzer.get_subscribed_tickers()
+            return json.dumps({"tickers": tickers, "count": len(tickers)})
+
+        @self.app.route("/api/state-cursors")
+        def get_state_cursors():
+            """API endpoint to get all state cursors (for debugging)"""
+            cursors = self.snapshot_analyzer.get_all_state_cursors()
+            return json.dumps(cursors, default=str)
 
         @self.app.route("/api/initialize/<date>")
         def initialize_historical_data(date):
             """API endpoint to load historical data"""
             try:
-                self.data_manager.initialize_from_history(date)
-                chart_data = self.data_manager.get_chart_data()
+                # Historical data loading via redis_engine
+                self.redis_engine.initialize_from_local_file(date)
+                chart_data = self.chart_manager.get_mmm_version_chart_data(
+                    force_refresh=True
+                )
                 return json.dumps(chart_data, default=str)
             except Exception as e:
                 return json.dumps({"error": str(e)}), 500
@@ -125,17 +205,17 @@ class WebAnalyzer:
         @self.app.route("/api/test-data")
         def test_data():
             """Test endpoint to check current data"""
-            chart_data = self.data_manager.get_chart_data()
+            chart_data = self.chart_manager.get_mmm_version_chart_data()
+            subscribed = self.snapshot_analyzer.get_subscribed_tickers()
             return {
                 "datasets_count": len(chart_data.get("datasets", [])),
-                "timestamps_count": len(chart_data.get("timestamps", [])),
                 "highlights_count": len(chart_data.get("highlights", [])),
+                "subscribed_count": len(subscribed),
                 "sample_dataset": (
                     chart_data.get("datasets", [{}])[0]
                     if chart_data.get("datasets")
                     else None
                 ),
-                "stock_data_count": len(self.data_manager.stock_data),
             }
 
     def _setup_socket_events(self):
@@ -147,7 +227,7 @@ class WebAnalyzer:
             self.connected_clients.add(request.sid)
 
             # Send current chart data to new client
-            chart_data = self.data_manager.get_chart_data()
+            chart_data = self.chart_manager.get_mmm_version_chart_data()
             emit("chart_update", chart_data)
 
         @self.socketio.on("disconnect")
@@ -163,70 +243,41 @@ class WebAnalyzer:
                 emit("error", {"message": "No ticker specified"})
                 return
 
-            # detail = self.data_manager.get_stock_detail(ticker)
-            detail, future = self.data_manager.get_stock_detail(ticker)
-            # Convert datetime objects to ISO format strings for JSON serialization
-            serialized_detail = self._serialize_datetime_objects(detail)
-            emit(
-                "stock_detail_response",
-                {"ticker": ticker, "detail": serialized_detail},
-            )
+            state = self.chart_manager.get_ticker_latest_state(ticker)
+            history = self.chart_manager.get_ticker_history(ticker, limit=100)
 
-            future.add_done_callback(
-                lambda future: self._handle_async_float_result(ticker, future)
-            )
+            if state or history:
+                emit(
+                    "stock_detail",
+                    {
+                        "ticker": ticker,
+                        "state": state,
+                        "history_count": len(history),
+                    },
+                )
+            else:
+                emit("error", {"message": f"Stock {ticker} not found"})
 
         @self.socketio.on("load_historical_data")
         def handle_load_historical(data):
             """Handle request to load historical data"""
             date = data.get("date", datetime.now().strftime("%Y%m%d"))
             try:
-                self.data_manager.initialize_from_history(date)
-                chart_data = self.data_manager.get_chart_data()
+                self.redis_engine.initialize_from_local_file(date)
+                chart_data = self.chart_manager.get_mmm_version_chart_data(
+                    force_refresh=True
+                )
                 emit("historical_data_loaded", chart_data)
             except Exception as e:
                 emit("error", {"message": str(e)})
 
-        @self.socketio.on("toggle_stock_highlight")
-        def handle_toggle_highlight(data):
-            """Handle request to toggle stock highlight status"""
-            ticker = data.get("ticker")
-            highlight = data.get("highlight", False)
-
-            if ticker:
-                # Update the highlight status in data manager
-                success = self.data_manager.toggle_stock_highlight(ticker, highlight)
-                if success:
-                    # Broadcast updated chart data to all clients
-                    chart_data = self.data_manager.get_chart_data()
-                    self.socketio.emit("chart_update", chart_data)
-                else:
-                    emit(
-                        "error", {"message": f"Failed to update highlight for {ticker}"}
-                    )
-
-    def _handle_async_float_result(self, ticker, future):
-        result = future.result()
-        if not result:
-            return
-
-        self.socketio.emit(
-            "stock_float_extra_response", {"ticker": ticker, "extra": result}
-        )
-
-    def _serialize_datetime_objects(self, obj):
-        """Recursively convert datetime objects to ISO format strings"""
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        elif isinstance(obj, dict):
-            return {
-                key: self._serialize_datetime_objects(value)
-                for key, value in obj.items()
-            }
-        elif isinstance(obj, list):
-            return [self._serialize_datetime_objects(item) for item in obj]
-        else:
-            return obj
+        @self.socketio.on("refresh_chart")
+        def handle_refresh_chart():
+            """Handle request to force refresh chart data"""
+            chart_data = self.chart_manager.get_mmm_version_chart_data(
+                force_refresh=True
+            )
+            emit("chart_update", chart_data)
 
     def start_redis_listener(self):
         """Start Redis listener in background thread"""
@@ -252,8 +303,14 @@ class WebAnalyzer:
             allow_unsafe_werkzeug=True,
         )
 
+    def cleanup(self):
+        """Clean up resources on shutdown"""
+        self.snapshot_analyzer.close()
+        self.chart_manager.close()
+        logger.info("WebAnalyzer resources cleaned up")
 
-def main():
+
+if __name__ == "__main__":
     """Main entry point"""
     import argparse
 
@@ -264,9 +321,9 @@ def main():
     parser.add_argument(
         "--load-history", help="Load historical data for date (YYYYMMDD)"
     )
-    parser.add_argument("--replay-date", help="receive specific replay date data")
+    parser.add_argument("--replay-date", help="Receive specific replay date data")
     parser.add_argument(
-        "--backtrace", action="store_true", help="Redis backtrace toggle"
+        "--replay-id", help="Custom replay identifier for InfluxDB tagging"
     )
 
     args = parser.parse_args()
@@ -276,17 +333,12 @@ def main():
         host=args.host,
         port=args.port,
         replay_date=args.replay_date,
-        backtrace=args.backtrace,
+        replay_id=args.replay_id,
+        load_history=args.load_history,
     )
 
-    # Load historical data if requested
-    if args.load_history:
-        print(f"Loading historical data for {args.load_history}")
-        web_analyzer.data_manager.initialize_from_history(args.load_history)
-
-    # Start the server
-    web_analyzer.run(debug=args.debug)
-
-
-if __name__ == "__main__":
-    main()
+    try:
+        # Start the server
+        web_analyzer.run(debug=args.debug)
+    finally:
+        web_analyzer.cleanup()

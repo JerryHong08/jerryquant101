@@ -1,9 +1,84 @@
 import datetime
 import os
+from functools import lru_cache
+from typing import Optional
 
 import polars as pl
 
 from cores.config import all_tickers_dir
+
+# Module-level cache for common stocks (shared across all callers)
+_common_stocks_cache: Optional[pl.LazyFrame] = None
+_common_stocks_cache_date: Optional[str] = None
+
+
+def get_common_stocks(filter_date: str = "2015-01-01") -> pl.LazyFrame:
+    """
+    Get common stocks (CS and ADRC) as a LazyFrame with caching.
+
+    Cache is invalidated when filter_date changes.
+    Returns LazyFrame for optimal query planning when joining.
+
+    Args:
+        filter_date: Filter out stocks delisted before this date (YYYY-MM-DD)
+
+    Returns:
+        LazyFrame with columns: ticker
+    """
+    global _common_stocks_cache, _common_stocks_cache_date
+
+    if _common_stocks_cache is None or _common_stocks_cache_date != filter_date:
+        all_tickers_file = os.path.join(all_tickers_dir, "all_stocks_*.parquet")
+        all_tickers = pl.scan_parquet(all_tickers_file)  # Lazy read
+
+        _common_stocks_cache = all_tickers.filter(
+            (pl.col("type").is_in(["CS", "ADRC"]))
+            & (
+                pl.col("delisted_utc").is_null()
+                | (
+                    pl.col("delisted_utc")
+                    .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%SZ", strict=False)
+                    .dt.date()
+                    > datetime.datetime.strptime(filter_date, "%Y-%m-%d").date()
+                )
+            )
+        ).select(
+            "ticker"
+        )  # Only select what's needed for joins
+        _common_stocks_cache_date = filter_date
+
+    return _common_stocks_cache
+
+
+def get_common_stocks_full(filter_date: str = "2015-01-01") -> pl.DataFrame:
+    """
+    Get common stocks with full details (ticker, active, composite_figi).
+
+    Use this when you need more than just ticker for filtering.
+    Not cached - use get_common_stocks() for cached joins.
+    """
+    all_tickers_file = os.path.join(all_tickers_dir, "all_stocks_*.parquet")
+    all_tickers = pl.read_parquet(all_tickers_file)
+
+    return all_tickers.filter(
+        (pl.col("type").is_in(["CS", "ADRC"]))
+        & (
+            pl.col("delisted_utc").is_null()
+            | (
+                pl.col("delisted_utc")
+                .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%SZ", strict=False)
+                .dt.date()
+                > datetime.datetime.strptime(filter_date, "%Y-%m-%d").date()
+            )
+        )
+    ).select(["ticker", "active", "composite_figi"])
+
+
+def clear_common_stocks_cache():
+    """Clear the common stocks cache (useful for testing or forced refresh)."""
+    global _common_stocks_cache, _common_stocks_cache_date
+    _common_stocks_cache = None
+    _common_stocks_cache_date = None
 
 
 def generate_backtest_date(
@@ -137,41 +212,9 @@ def load_spx_benchmark(start, end):
         return None
 
 
-def only_common_stocks(filter_date: str = "2015-01-01"):
-    all_tickers_file = os.path.join(all_tickers_dir, f"all_stocks_*.parquet")
-    all_tickers = pl.read_parquet(all_tickers_file)
-
-    tickers = all_tickers.filter(
-        (pl.col("type").is_in(["CS", "ADRC"]))
-        & (
-            pl.col("delisted_utc").is_null()
-            | (
-                pl.col("delisted_utc")
-                .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%SZ", strict=False)
-                .dt.date()
-                > datetime.datetime.strptime(filter_date, "%Y-%m-%d").date()
-            )
-        )
-    ).select(pl.col(["ticker", "active", "composite_figi"]))
-
-    # print(f"Using {all_tickers_file}, total {len(tickers)} active tickers")
-
-    return tickers
-
-
 if __name__ == "__main__":
-    selected_tickers = only_common_stocks()
+    # Test the caching function
+    common_stocks = get_common_stocks().collect()
     with pl.Config(tbl_rows=10, tbl_cols=50):
-        print(selected_tickers.shape)
-
-        print(
-            selected_tickers.filter(
-                # (~pl.col("composite_figi").is_unique())
-                # & (pl.col("composite_figi").is_not_null())
-                # & ((pl.col('composite_figi').is_null()) | (pl.col('share_class_figi').is_null()) )
-                # & (pl.col('composite_figi') == 'BBG000VLBCQ1')
-                # & (pl.col('ticker').is_in(['META']))
-                (pl.col("composite_figi") == "BBG00KLHTJY4")
-                # (pl.col('ticker').is_in(['DVLT']))
-            ).sort("composite_figi")
-        )
+        print(f"Total common stocks: {common_stocks.shape}")
+        print(common_stocks.head(10))

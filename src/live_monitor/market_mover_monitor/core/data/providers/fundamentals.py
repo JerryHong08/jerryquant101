@@ -104,7 +104,7 @@ class FloatSharesProvider:
         try:
             float_val = (
                 pl.read_parquet(float_shares_file)
-                .filter(pl.col("symbol") == ticker)
+                .filter(pl.col("symbol") == ticker.upper())
                 .select("floatShares")
                 .unique()
                 .item()

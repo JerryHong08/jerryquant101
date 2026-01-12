@@ -15,7 +15,7 @@ from typing import Optional
 import polars as pl
 
 from cores.data_loader import stock_load_process
-from utils.backtest_utils.backtest_utils import only_common_stocks
+from utils.backtest_utils.backtest_utils import get_common_stocks
 
 
 class LowVolumeTrackerEventStream:
@@ -62,7 +62,7 @@ class LowVolumeTrackerEventStream:
         print(f"\n🔄 Initializing from {start_date} to {end_date}...")
 
         print("⏳ Loading OHLCV data...")
-        tickers = only_common_stocks(filter_date=start_date)
+        tickers = get_common_stocks(filter_date=start_date).collect()
 
         ohlcv_data = stock_load_process(
             tickers=tickers.to_series().to_list(),

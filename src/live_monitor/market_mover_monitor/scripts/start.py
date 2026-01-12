@@ -30,16 +30,17 @@ def start_analyzer_web(**kwargs):
             host=kwargs.get("host", "localhost"),
             port=kwargs.get("port", 5000),
             replay_date=kwargs.get("replay_date"),
-            backtrace=kwargs.get("backtrace", False),
+            load_history=kwargs.get("load_history", False),
         )
 
         # Load historical data if specified
-        if kwargs.get("load_history"):
-            print(f"Loading historical data for {kwargs['load_history']}")
-            web_analyzer.data_manager.initialize_from_history(kwargs["load_history"])
+        # if kwargs.get("load_history"):
+        #     print(f"Loading historical data for {kwargs['load_history']}")
+        #     web_analyzer.data_manager.initialize_from_history(kwargs["load_history"])
 
         # Start the web server
         web_analyzer.run(debug=kwargs.get("debug", False))
+
     except OSError as e:
         if e.errno == 98:  # Address already in use
             print(f"❌ Error: Port {kwargs.get('port', 5000)} is already in use")
