@@ -31,7 +31,7 @@ class redis_engine:
 
         if replay_mode:
             self.STREAM_NAME = f"market_snapshot_stream_replay:{replay_date}"
-            self.HSET_NAME = f"state_cursor_replay:{replay_date}"
+            self.HSET_NAME = f"state_cursor:{replay_date}"
         else:
             today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
             self.STREAM_NAME = f"market_snapshot_stream:{today}"
@@ -54,21 +54,25 @@ class redis_engine:
 
     # -------------------------------------------------------------------------
     def _redis_stream_listener(self):
-        print(f"INFO: Starting Redis Stream consumer {self.CONSUMER_NAME}...")
-        print(f"backtrace mode: {self.backtrace_mode}")
+        logger.info(
+            f"_redis_stream_listener - Starting Redis Stream consumer {self.CONSUMER_NAME}..."
+        )
+        logger.info(f"_redis_stream_listener - backtrace mode: {self.backtrace_mode}")
 
         # backtrace HISTORY VIA XRANGE
         if self.backtrace_mode:
-            print(">>> Backtracing today's historical messages via XRANGE ...")
+            logger.info(
+                "_redis_stream_listener - Backtracing today's historical messages via XRANGE ..."
+            )
 
             try:
                 self.initialize_from_local_file(self.backtrace_mode)
                 logger.info(
-                    "Finished loading historical data from local files.\n"
-                    "Start to listen to real-time data..."
+                    "_redis_stream_listener - Finished loading historical data from local files.\n"
+                    "_redis_stream_listener - Start to listen to real-time data..."
                 )
             except Exception as e:
-                print(f"Error during backtrace: {e}")
+                logger.error(f"_redis_stream_listener - Error during backtrace: {e}")
 
             self.backtrace_mode = False
 
@@ -90,19 +94,21 @@ class redis_engine:
                         for message_id, message_data in message_list:
                             self._process_message(message_id, message_data, ack=True)
                 else:
-                    print("No new messages, waiting...")
+                    logger.info("_redis_stream_listener - No new messages, waiting...")
 
             except KeyboardInterrupt:
-                print("Stopping Redis Stream listener...")
+                logger.info(
+                    "_redis_stream_listener - Stopping Redis Stream listener..."
+                )
                 break
             except Exception as e:
-                print(f"Redis Stream error: {e}")
+                logger.error(f"_redis_stream_listener - Redis Stream error: {e}")
                 import traceback
 
                 traceback.print_exc()
                 time.sleep(5)
 
-        print("Redis Stream listener stopped")
+        logger.info("_redis_stream_listener - Redis Stream listener stopped")
 
     def _process_message(self, message_id, message_data, ack=True):
         try:
@@ -122,7 +128,9 @@ class redis_engine:
                 )
 
         except Exception as e:
-            print(f"Error processing message {message_id}: {e}")
+            logger.error(
+                f" _process_message - Error processing message {message_id}: {e}"
+            )
             import traceback
 
             traceback.print_exc()
@@ -139,6 +147,7 @@ class redis_engine:
         """Clean up old msg to limit the Stream length"""
         self.redis_client.xtrim(self.STREAM_NAME, maxlen=max_messages)
 
+    # this function is used for replay test/development stage state reload
     def initialize_from_local_file(self, date: str) -> None:
         """Load historical data for the given date.
 
@@ -155,14 +164,18 @@ class redis_engine:
         market_mover_dir = os.path.join(cache_dir, "market_mover", year, month, day)
 
         if not os.path.exists(market_mover_dir):
-            print(f"No historical data found for {date}")
+            logger.info(
+                f"initialize_from_local_file - No historical data found for {date}"
+            )
             return
 
         all_files = glob.glob(os.path.join(market_mover_dir, "*_market_snapshot.csv"))
         all_files.sort()
 
         if not all_files:
-            print(f"No snapshot files found in {market_mover_dir}")
+            logger.warning(
+                f"initialize_from_local_file - No snapshot files found in {market_mover_dir}"
+            )
             return
 
         # Check Redis HSET for existing state cursors (for recovery/reload)
@@ -171,13 +184,15 @@ class redis_engine:
         if min_cursor_ts:
             # Filter files to only load those after the min cursor timestamp
             files_to_load = self._filter_files_after_timestamp(all_files, min_cursor_ts)
-            print(
-                f"Recovery mode: Found cursor at {min_cursor_ts}, "
-                f"loading {len(files_to_load)}/{len(all_files)} files after cursor..."
+            logger.info(
+                f"initialize_from_local_file - Recovery mode: Found cursor at {min_cursor_ts}, "
+                f"initialize_from_local_file - loading {len(files_to_load)}/{len(all_files)} files after cursor..."
             )
         else:
             files_to_load = all_files
-            print(f"Fresh load: Loading all {len(files_to_load)} historical files...")
+            logger.info(
+                f"initialize_from_local_file - Fresh load: Loading all {len(files_to_load)} historical files..."
+            )
 
         for file_path in files_to_load:
             try:
@@ -190,7 +205,9 @@ class redis_engine:
                 if self.data_callback:
                     self.data_callback(filtered_df, is_historical=True)
             except Exception as e:
-                print(f"Error loading {file_path}: {e}")
+                logger.error(
+                    f"initialize_from_local_file - Error loading {file_path}: {e}"
+                )
 
     def _get_min_state_cursor(self, date: str) -> Optional[datetime]:
         """
@@ -206,7 +223,9 @@ class redis_engine:
             cursors = self.redis_client.hgetall(hset_name)
 
             if not cursors:
-                logger.info(f"No state cursors found in {hset_name}")
+                logger.info(
+                    f"_get_min_state_cursor - No state cursors found in {hset_name}"
+                )
                 return None
 
             # Parse ISO format timestamps and find minimum
@@ -225,83 +244,113 @@ class redis_engine:
                         min_ticker = ticker
                 except (ValueError, TypeError) as e:
                     logger.warning(
-                        f"Invalid cursor timestamp for {ticker}: {cursor_ts}"
+                        f"_get_min_state_cursor - Invalid cursor timestamp for {ticker}: {cursor_ts}"
                     )
                     continue
 
             if min_ts:
                 logger.info(
-                    f"Found minimum state cursor:{min_ticker} at {min_ts.isoformat()}"
+                    f"_get_min_state_cursor - Found minimum state cursor:{min_ticker} at {min_ts.isoformat()}"
                 )
             return min_ts
 
         except Exception as e:
-            logger.error(f"Error reading state cursors: {e}")
+            logger.error(f"_get_min_state_cursor - Error reading state cursors: {e}")
             return None
 
     def _filter_files_after_timestamp(
         self, files: List[str], min_ts: datetime
     ) -> List[str]:
         """
-        Filter files to only include those with timestamps after min_ts.
+        Filter files to only include those AFTER the cursor file.
+
+        Since filename timestamp (collector fetch time) > snapshot timestamp (exchange time),
+        we find the first file after cursor (the one already processed), skip it,
+        and return the rest.
+
         Supports filename formats:
         - YYYYMMDDHHMMSS_market_snapshot.csv (14 digits)
         - HHMMSS_market_snapshot.csv (6 digits, legacy)
+
+        Returns:
+            Files starting from the second file after cursor (skipping the already-processed one)
         """
-        filtered = []
+        # Build list of (file_path, file_datetime) tuples
+        file_with_timestamps = []
 
         for file_path in files:
             try:
-                # Extract timestamp from filename
                 filename = os.path.basename(file_path)
-                time_part = filename.split("_")[0]  # Get timestamp part
+                time_part = filename.split("_")[0]
 
                 if len(time_part) == 14 and time_part.isdigit():
                     # Parse YYYYMMDDHHMMSS format
-                    file_year = int(time_part[0:4])
-                    file_month = int(time_part[4:6])
-                    file_day = int(time_part[6:8])
-                    file_hour = int(time_part[8:10])
-                    file_min = int(time_part[10:12])
-                    file_sec = int(time_part[12:14])
-
-                    # Create datetime with timezone for comparison
                     file_dt = datetime(
-                        file_year,
-                        file_month,
-                        file_day,
-                        file_hour,
-                        file_min,
-                        file_sec,
-                        tzinfo=min_ts.tzinfo,  # Use same timezone as cursor
+                        int(time_part[0:4]),  # year
+                        int(time_part[4:6]),  # month
+                        int(time_part[6:8]),  # day
+                        int(time_part[8:10]),  # hour
+                        int(time_part[10:12]),  # min
+                        int(time_part[12:14]),  # sec
+                        tzinfo=min_ts.tzinfo,
                     )
-
-                    # Include files at or after the cursor
-                    if file_dt >= min_ts:
-                        filtered.append(file_path)
+                    file_with_timestamps.append((file_path, file_dt))
 
                 elif len(time_part) == 6 and time_part.isdigit():
                     # Legacy format: Parse HHMMSS (same date as min_ts)
-                    file_hour = int(time_part[0:2])
-                    file_min = int(time_part[2:4])
-                    file_sec = int(time_part[4:6])
-
                     file_dt = min_ts.replace(
-                        hour=file_hour, minute=file_min, second=file_sec, microsecond=0
+                        hour=int(time_part[0:2]),
+                        minute=int(time_part[2:4]),
+                        second=int(time_part[4:6]),
+                        microsecond=0,
                     )
-
-                    if file_dt >= min_ts:
-                        filtered.append(file_path)
+                    file_with_timestamps.append((file_path, file_dt))
                 else:
-                    # If we can't parse the timestamp, include the file to be safe
                     logger.warning(
-                        f"Could not parse timestamp from filename: {filename}"
+                        f"_filter_files_after_timestamp - Could not parse timestamp from filename: {filename}"
                     )
-                    filtered.append(file_path)
+                    # Include unparseable files at the end with None timestamp
+                    file_with_timestamps.append((file_path, None))
 
             except Exception as e:
-                logger.warning(f"Error parsing file timestamp {file_path}: {e}")
-                filtered.append(file_path)
+                logger.warning(
+                    f"_filter_files_after_timestamp - Error parsing file timestamp {file_path}: {e}"
+                )
+                file_with_timestamps.append((file_path, None))
+
+        # Sort by timestamp (None values go to end)
+        file_with_timestamps.sort(key=lambda x: (x[1] is None, x[1]))
+
+        # Find the first file AFTER the cursor (this is the one already processed)
+        first_after_cursor_idx = None
+        for i, (file_path, file_dt) in enumerate(file_with_timestamps):
+            if file_dt is not None and file_dt > min_ts:
+                first_after_cursor_idx = i
+                break
+
+        if first_after_cursor_idx is None:
+            # No file found after cursor, return empty
+            logger.info(
+                "_filter_files_after_timestamp - No files found after cursor timestamp"
+            )
+            return []
+
+        # Skip the first file after cursor (already processed), return the rest
+        # Start from index first_after_cursor_idx + 1
+        start_idx = first_after_cursor_idx + 1
+
+        if start_idx >= len(file_with_timestamps):
+            logger.info(
+                "_filter_files_after_timestamp - Only one file after cursor, nothing new to process"
+            )
+            return []
+
+        filtered = [fp for fp, _ in file_with_timestamps[start_idx:]]
+
+        logger.info(
+            f"_filter_files_after_timestamp - Skipping already-processed file: {os.path.basename(file_with_timestamps[first_after_cursor_idx][0])}, "
+            f"_filter_files_after_timestamp - returning {len(filtered)} files to process"
+        )
 
         return filtered
 
@@ -333,7 +382,7 @@ class redis_engine:
                 .collect()
             )
         except Exception as e:
-            print(f"Error filtering common stocks: {e}")
+            logger.error(f"data_process - Error filtering common stocks: {e}")
             cs_tickers_df = lf.sort("percent_change", descending=True).collect()
 
         # Fill missing data if needed
@@ -354,7 +403,9 @@ class redis_engine:
                 .collect()
             )
         else:
-            logger.debug(f"df doesn't need fill, original length: {len(cs_tickers_df)}")
+            logger.debug(
+                f"data_process - df doesn't need fill, original length: {len(cs_tickers_df)}"
+            )
             filled_df = cs_tickers_df
 
         return filled_df
@@ -370,4 +421,4 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("Shutting down...")
+        logger.info("main - Shutting down...")

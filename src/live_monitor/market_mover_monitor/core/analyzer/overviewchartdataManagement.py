@@ -55,7 +55,8 @@ class ChartDataManager:
         else:
             date_suffix = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
 
-        self.ZSET_NAME = f"movers_subscribed:{date_suffix}"
+        self.STREAM_NAME = f"market_snapshot_processed:{date_suffix}"
+        self.SUBSCRIBED_SET_NAME = f"movers_subscribed_set:{date_suffix}"
         self.HSET_NAME = f"state_cursor:{date_suffix}"
 
         # ------- InfluxDB Configuration -------
@@ -87,15 +88,75 @@ class ChartDataManager:
         """Mark chart data as needing refresh."""
         self._chart_data_dirty = True
 
+    def _get_intraday_time_range(self) -> tuple:
+        """
+        Get the intraday time range for InfluxDB queries.
+
+        In replay mode: returns the replay date's start and end of day
+        In live mode: returns today's start to now
+
+        Returns:
+            Tuple of (range_start, range_end) as InfluxDB time strings
+        """
+        if self.replay_date:
+            # Replay mode: use specific date
+            year = self.replay_date[:4]
+            month = self.replay_date[4:6]
+            day = self.replay_date[6:8]
+            range_start = f"{year}-{month}-{day}T00:00:00Z"
+            range_end = f"{year}-{month}-{day}T23:59:59Z"
+        else:
+            # Live mode: use today
+            today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+            range_start = f"{today}T00:00:00-05:00"
+            range_end = "now()"
+
+        return range_start, range_end
+
     def get_subscribed_tickers(self) -> List[str]:
-        """Get all subscribed tickers from Redis ZSET."""
-        return self.redis_client.zrange(self.ZSET_NAME, 0, -1)
+        """Get all subscribed tickers from Redis Set."""
+        return list(self.redis_client.smembers(self.SUBSCRIBED_SET_NAME))
+
+    def get_top_n_tickers(self, n: int = 20) -> List[str]:
+        """
+        Get top N tickers by rank from the last snapshot in Redis Stream.
+        Reads the most recent message and returns tickers with rank <= n.
+        """
+        import json
+
+        # Read the last entry from stream
+        entries = self.redis_client.xrevrange(self.STREAM_NAME, count=1)
+
+        if not entries:
+            return []
+
+        # Parse the latest message
+        entry_id, fields = entries[0]
+        data_json = fields.get("data")
+        if not data_json:
+            return []
+
+        try:
+            tickers_data = json.loads(data_json)
+        except json.JSONDecodeError:
+            return []
+
+        # Filter tickers with rank <= n and sort by rank
+        current_membership = [
+            (item["symbol"], item["rank"])
+            for item in tickers_data
+            if item.get("rank", 999) <= n
+        ]
+        current_membership.sort(key=lambda x: x[1])
+        return [ticker for ticker, rank in current_membership]
 
     def get_ticker_latest_state(self, ticker: str) -> Optional[Dict]:
         """Query the latest state for a ticker from InfluxDB movers_state."""
+        range_start, range_end = self._get_intraday_time_range()
+
         query = f"""
         from(bucket: "{self.bucket}")
-            |> range(start: -1d)
+            |> range(start: {range_start}, stop: {range_end})
             |> filter(fn: (r) => r["_measurement"] == "movers_state")
             |> filter(fn: (r) => r["symbol"] == "{ticker}")
             |> filter(fn: (r) => r["run_mode"] == "{self.run_mode}")
@@ -127,19 +188,28 @@ class ChartDataManager:
     ) -> List[Dict]:
         """
         Query historical snapshot data for a ticker from InfluxDB.
+        Uses intraday time range (single day focus).
         """
-        range_start = "-1d" if since is None else since.isoformat()
+        if since is not None:
+            range_start = since.isoformat()
+            range_end = (
+                "now()"
+                if not self.replay_date
+                else f"{self.replay_date[:4]}-{self.replay_date[4:6]}-{self.replay_date[6:8]}T23:59:59Z"
+            )
+        else:
+            range_start, range_end = self._get_intraday_time_range()
 
         query = f"""
         from(bucket: "{self.bucket}")
-            |> range(start: {range_start})
+            |> range(start: {range_start}, stop: {range_end})
             |> filter(fn: (r) => r["_measurement"] == "market_snapshot")
             |> filter(fn: (r) => r["symbol"] == "{ticker}")
             |> filter(fn: (r) => r["run_mode"] == "{self.run_mode}")
             |> filter(fn: (r) => r["replay_id"] == "{self.replay_id}")
             |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-            |> limit(n: {limit})
         """
+        # |> limit(n: {limit})
 
         try:
             tables = self._query_api.query(query, org=self.org)
@@ -149,11 +219,9 @@ class ChartDataManager:
                     results.append(
                         {
                             "timestamp": record.get_time(),
-                            "percent_change": record.values.get("percent_change", 0.0),
-                            "current_price": record.values.get("current_price", 0.0),
-                            "accumulated_volume": record.values.get(
-                                "accumulated_volume", 0
-                            ),
+                            "percent_change": record.values.get("changePercent", 0.0),
+                            "current_price": record.values.get("price", 0.0),
+                            "accumulated_volume": record.values.get("volume", 0),
                             "rank": record.values.get("rank", 0),
                         }
                     )
@@ -162,10 +230,16 @@ class ChartDataManager:
             logger.error(f"Error querying history for {ticker}: {e}")
             return []
 
-    def get_mmm_version_chart_data(self, force_refresh: bool = False) -> Dict:
+    def get_mmm_version_chart_data(
+        self, force_refresh: bool = False, top_n: int = 20
+    ) -> Dict:
         """
         Get data formatted for MMM chart visualization.
         Reads from InfluxDB and formats for frontend consumption.
+
+        Args:
+            force_refresh: Force refresh even if cache is valid
+            top_n: Number of top tickers to display (default: 20)
 
         Returns:
             Dict with 'datasets' and 'highlights' for Chart.js
@@ -180,7 +254,8 @@ class ChartDataManager:
 
         chart_data = {"datasets": [], "highlights": []}
 
-        subscribed_tickers = self.get_subscribed_tickers()
+        # Get top N tickers by current percent_change (not all subscribed)
+        subscribed_tickers = self.get_top_n_tickers(n=top_n)
 
         for ticker in subscribed_tickers:
             # Get latest state

@@ -3,7 +3,7 @@ Data Manager for Market Mover Web Analyzer
 Handles snapshot processing, membership management, and state tracking.
 
 Architecture:
-- Redis ZSET: stores all subscribed tickers (ever appeared in top 20) with their first appearance time as score
+- Redis Stream: stores all snapshot events with rank, price, volume metrics
 - Redis HSET: stores state_cursor (last_state_updated_time per ticker) for recovery/replay
 - InfluxDB market_snapshot: stores all subscribed tickers' historical snapshot data
 - InfluxDB movers_state: stores state change events for each ticker
@@ -11,7 +11,8 @@ Architecture:
 
 import logging
 import os
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
@@ -31,7 +32,7 @@ logger = setup_logger(__name__, log_to_file=True, level=logging.DEBUG)
 class SnapshotAnalyzer:
     """
     Manages stock snapshot data processing with decoupled responsibilities:
-    - Rank computation and membership management (Redis ZSET)
+    - Rank computation and membership management (Redis Stream + Set)
     - Historical data storage (InfluxDB market_snapshot)
     - State tracking and cursor management (Redis HSET + InfluxDB movers_state)
     """
@@ -69,17 +70,31 @@ class SnapshotAnalyzer:
         else:
             date_suffix = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
 
-        # ZSET: stores subscribed tickers with first_appearance_ts as score
-        self.ZSET_NAME = f"movers_subscribed:{date_suffix}"
+        self.date_suffix = date_suffix
+        # Stream: stores processed snapshot events with metrics (output stream)
+        self.STREAM_NAME = f"market_snapshot_processed:{date_suffix}"
         # HSET: stores state_cursor (last_state_updated_time per ticker)
         self.HSET_NAME = f"state_cursor:{date_suffix}"
+        # Set: tracks all tickers that have ever been in top 20 (for subscription)
+        self.SUBSCRIBED_SET_NAME = f"movers_subscribed_set:{date_suffix}"
 
         # In-memory state cache for state change detection
         self._ticker_states: Dict[str, Dict] = {}
 
+        # Volume tracking for relative volume calculation
+        # Structure: {ticker: [(timestamp, accumulated_volume), ...]}
+        # Stores recent volume data points for last 5 minutes
+        self._volume_history: Dict[str, List[Tuple[datetime, float]]] = defaultdict(
+            list
+        )
+
+        # Reload state and volume history from InfluxDB
+        self._reload_states_from_influx()
+        self._reload_volume_history_from_influx()
+
         logger.info(
             f"SnapshotAnalyzer initialized: mode={self.run_mode}, "
-            f"replay_id={self.replay_id}, ZSET={self.ZSET_NAME}, HSET={self.HSET_NAME}"
+            f"replay_id={self.replay_id}, STREAM={self.STREAM_NAME}, HSET={self.HSET_NAME}"
         )
 
     @staticmethod
@@ -102,9 +117,10 @@ class SnapshotAnalyzer:
 
         Flow:
         1. Parse timestamp and compute competition ranks
-        2. Update ZSET membership for top N tickers
-        3. Write all subscribed tickers' data to InfluxDB
-        4. For each ticker, check state changes and update cursor
+        2. Compute derived metrics (change, relativeVolume, etc.)
+        3. Update subscription set for top N tickers
+        4. Write to Redis Stream and InfluxDB for all subscribed tickers
+        5. For each ticker, check state changes and update cursor
 
         Returns:
             Dict with processing summary (for logging/debugging)
@@ -115,17 +131,20 @@ class SnapshotAnalyzer:
         # Step 1: Compute ranks (competition ranking)
         ranked_df = self._compute_ranks(df)
 
-        # Step 2: Update membership - add new top N tickers to subscription
-        current_top_n = ranked_df.head(self.TOP_N)
-        new_subscriptions = self._update_membership(current_top_n, timestamp)
+        # Step 2: Compute derived metrics
+        enriched_df = self._compute_derived_metrics(ranked_df, timestamp)
 
-        # Step 3: Get all subscribed tickers and write their data to InfluxDB
+        # Step 3: Update subscription set - add new top N tickers
+        current_top_n = enriched_df.head(self.TOP_N)
+        new_subscriptions = self._update_subscription_set(current_top_n, timestamp)
+
+        # Step 4: Get all subscribed tickers and write their data
         all_subscribed = self._get_all_subscribed_tickers()
-        self._write_snapshot_to_influx(ranked_df, all_subscribed, timestamp)
+        self._write_to_stream_and_influx(enriched_df, all_subscribed, timestamp)
 
-        # Step 4: Update states and track changes
+        # Step 5: Update states and track changes
         state_changes = self._process_state_updates(
-            ranked_df, all_subscribed, timestamp, is_historical
+            enriched_df, all_subscribed, timestamp, is_historical
         )
 
         return {
@@ -136,7 +155,7 @@ class SnapshotAnalyzer:
         }
 
     def get_subscribed_tickers(self) -> List[str]:
-        """Get all currently subscribed tickers from Redis ZSET."""
+        """Get all currently subscribed tickers from Redis Set."""
         return self._get_all_subscribed_tickers()
 
     def get_state_cursor(self, ticker: str) -> Optional[str]:
@@ -177,24 +196,139 @@ class SnapshotAnalyzer:
         )
 
     # =========================================================================
-    # MEMBERSHIP MANAGEMENT (Redis ZSET)
+    # DERIVED METRICS COMPUTATION
     # =========================================================================
 
-    def _update_membership(
+    def _compute_derived_metrics(
+        self, ranked_df: pl.DataFrame, timestamp: datetime
+    ) -> pl.DataFrame:
+        """
+        Compute derived metrics for each ticker:
+        - change: current_price - prev_close
+        - relativeVolumeDaily: accumulated_volume / prev_volume (if prev_volume exists)
+        - relativeVolume5min: current_5min_volume / avg_5min_volume
+        """
+        # Compute change = current_price - prev_close
+        df = ranked_df.with_columns(
+            (pl.col("current_price") - pl.col("prev_close")).alias("change")
+        )
+
+        # Compute relativeVolumeDaily if prev_volume exists
+        if "prev_volume" in df.columns:
+            df = df.with_columns(
+                pl.when(pl.col("prev_volume") > 0)
+                .then(pl.col("accumulated_volume") / pl.col("prev_volume"))
+                .otherwise(0.0)
+                .alias("relativeVolumeDaily")
+            )
+        else:
+            df = df.with_columns(pl.lit(0.0).alias("relativeVolumeDaily"))
+
+        # Compute relativeVolume5min - needs row-by-row processing
+        relative_5min_values = []
+        for row in df.iter_rows(named=True):
+            ticker = row["ticker"]
+            accumulated_volume = row.get("accumulated_volume", 0.0)
+            rel_5min = self._compute_relative_volume_5min(
+                ticker, timestamp, accumulated_volume
+            )
+            relative_5min_values.append(rel_5min)
+
+        df = df.with_columns(pl.Series("relativeVolume5min", relative_5min_values))
+
+        return df
+
+    def _compute_relative_volume_5min(
+        self, ticker: str, timestamp: datetime, accumulated_volume: float
+    ) -> float:
+        """
+        Compute 5-minute relative volume:
+        relativeVolume5min = last_1min_volume / last_5min_avg_volume
+
+        - last_1min_volume: volume traded in the last 1 minute
+        - last_5min_avg_volume: average volume per minute over the last 5 minutes
+        """
+        # Add current data point to history
+        self._volume_history[ticker].append((timestamp, accumulated_volume))
+
+        # Keep only data points from the last 6 minutes (for buffer)
+        cutoff_time = timestamp - timedelta(minutes=6)
+        self._volume_history[ticker] = [
+            (ts, vol) for ts, vol in self._volume_history[ticker] if ts >= cutoff_time
+        ]
+
+        history = self._volume_history[ticker]
+        if len(history) < 2:
+            # Not enough data yet, return 1.0 (neutral)
+            return 1.0
+
+        # Calculate last 1 minute volume
+        one_min_ago = timestamp - timedelta(minutes=1)
+        volume_1min_ago = None
+        for ts, vol in reversed(history):
+            if ts <= one_min_ago:
+                volume_1min_ago = vol
+                break
+
+        if volume_1min_ago is None:
+            # Use earliest available data point
+            volume_1min_ago = history[0][1]
+
+        last_1min_volume = max(0.0, accumulated_volume - volume_1min_ago)
+
+        # Calculate last 5 minute average volume (per minute)
+        five_min_ago = timestamp - timedelta(minutes=5)
+        volume_5min_ago = None
+        for ts, vol in history:
+            if ts <= five_min_ago:
+                volume_5min_ago = vol
+            else:
+                break
+
+        if volume_5min_ago is None:
+            # Use earliest available data point
+            volume_5min_ago = history[0][1]
+            # Calculate time span from earliest point
+            earliest_ts = history[0][0]
+            time_span_minutes = max(
+                1.0, (timestamp - earliest_ts).total_seconds() / 60.0
+            )
+        else:
+            time_span_minutes = 5.0
+
+        last_5min_total_volume = max(0.0, accumulated_volume - volume_5min_ago)
+        last_5min_avg_volume = last_5min_total_volume / time_span_minutes
+
+        if ticker == "IVP":
+            logger.debug(
+                f"Ticker: {ticker}, last_1min_volume: {last_1min_volume}, last_5min_avg_volume: {last_5min_avg_volume}"
+            )
+
+        if last_5min_avg_volume > 0:
+            return last_1min_volume / last_5min_avg_volume
+
+        # Not enough data yet, return 1.0 (neutral)
+        return 1.0
+
+    # =========================================================================
+    # SUBSCRIPTION MANAGEMENT (Redis Set)
+    # =========================================================================
+
+    def _update_subscription_set(
         self, current_top_n: pl.DataFrame, timestamp: datetime
     ) -> List[str]:
         """
-        Update Redis ZSET with new top N tickers.
-        Score = first appearance timestamp (epoch seconds).
+        Update Redis Set for subscription tracking.
+        Tickers that enter top N are added to the set (never removed).
+
         Returns list of newly subscribed tickers.
         """
         new_subscriptions = []
-        ts_epoch = timestamp.timestamp()
 
         for row in current_top_n.iter_rows(named=True):
             ticker = row["ticker"]
-            # NX: only add if not exists (preserves first appearance time)
-            added = self.r.zadd(self.ZSET_NAME, {ticker: ts_epoch}, nx=True)
+            # SADD returns 1 if member was added, 0 if already existed
+            added = self.r.sadd(self.SUBSCRIBED_SET_NAME, ticker)
             if added:
                 new_subscriptions.append(ticker)
                 logger.debug(f"New subscription: {ticker} at {timestamp.isoformat()}")
@@ -205,62 +339,140 @@ class SnapshotAnalyzer:
         return new_subscriptions
 
     def _get_all_subscribed_tickers(self) -> List[str]:
-        """Get all tickers from Redis ZSET (sorted by first appearance time)."""
-        # ZRANGE returns members sorted by score (first appearance time)
-        return self.r.zrange(self.ZSET_NAME, 0, -1)
+        """Get all subscribed tickers from Redis Set."""
+        return list(self.r.smembers(self.SUBSCRIBED_SET_NAME))
 
-    def get_ticker_first_appearance(self, ticker: str) -> Optional[datetime]:
-        """Get the first appearance time for a ticker."""
-        score = self.r.zscore(self.ZSET_NAME, ticker)
-        if score is not None:
-            return datetime.fromtimestamp(score, tz=ZoneInfo("America/New_York"))
-        return None
+    def get_top_n_tickers(self, n: int = 20) -> List[str]:
+        """
+        Get top N tickers by rank from the last snapshot in Redis Stream.
+        Reads the most recent message and returns tickers with rank <= n.
+        """
+        import json
+
+        # Read the last entry from stream
+        entries = self.r.xrevrange(self.STREAM_NAME, count=1)
+
+        if not entries:
+            return []
+
+        # Parse the latest message
+        entry_id, fields = entries[0]
+        data_json = fields.get("data")
+        if not data_json:
+            return []
+
+        try:
+            tickers_data = json.loads(data_json)
+        except json.JSONDecodeError:
+            return []
+
+        # Filter tickers with rank <= n and sort by rank
+        current_membership = [
+            (item["symbol"], item["rank"])
+            for item in tickers_data
+            if item.get("rank", 999) <= n
+        ]
+        current_membership.sort(key=lambda x: x[1])
+        return [ticker for ticker, rank in current_membership]
 
     # =========================================================================
-    # INFLUXDB SNAPSHOT STORAGE
+    # REDIS STREAM & INFLUXDB STORAGE
     # =========================================================================
 
-    def _write_snapshot_to_influx(
+    def _write_to_stream_and_influx(
         self,
-        ranked_df: pl.DataFrame,
+        enriched_df: pl.DataFrame,
         subscribed_tickers: List[str],
         timestamp: datetime,
     ) -> None:
         """
-        Write snapshot data for all subscribed tickers to InfluxDB.
+        Write snapshot data to both Redis Stream and InfluxDB.
 
-        Measurement: market_snapshot
+        Redis Stream: market_snapshot_processed:{date_suffix}
+        - Single message per snapshot containing all subscribed tickers as JSON
+
+        InfluxDB Measurement: market_snapshot
         Tags: symbol, run_mode, replay_id
-        Fields: percent_change, current_price, accumulated_volume, rank
+        Fields: rank, price, change, changePercent, volume,
+                relativeVolume5min, relativeVolumeDaily
         Time: snapshot timestamp
         """
         # Create lookup dict from DataFrame for O(1) access
-        df_dict = {row["ticker"]: row for row in ranked_df.iter_rows(named=True)}
+        df_dict = {row["ticker"]: row for row in enriched_df.iter_rows(named=True)}
 
-        points = []
+        influx_points = []
+        timestamp_iso = timestamp.isoformat()
+
+        # Build stream data for all subscribed tickers
+        stream_tickers_data = []
+
         for ticker in subscribed_tickers:
             row = df_dict.get(ticker)
             if row is None:
                 # Ticker not in current snapshot (may have dropped out of top movers)
                 continue
 
+            rank = int(row.get("competition_rank", 0))
+            price = float(row.get("current_price", 0.0))
+            change = float(row.get("change", 0.0))
+            change_percent = float(row.get("percent_change", 0.0))
+            volume = float(row.get("accumulated_volume", 0))
+            relative_volume_5min = float(row.get("relativeVolume5min", 1.0))
+            relative_volume_daily = float(row.get("relativeVolumeDaily", 0.0))
+
+            # Add to stream data list
+            stream_tickers_data.append(
+                {
+                    "symbol": ticker,
+                    "rank": rank,
+                    "price": price,
+                    "change": change,
+                    "changePercent": change_percent,
+                    "volume": volume,
+                    "relativeVolume5min": relative_volume_5min,
+                    "relativeVolumeDaily": relative_volume_daily,
+                }
+            )
+
+            # Build InfluxDB point
             point = (
                 influxdb_client.Point("market_snapshot")
                 .tag("symbol", ticker)
                 .tag("run_mode", self.run_mode)
                 .tag("replay_id", self.replay_id)
-                .field("percent_change", float(row.get("percent_change", 0.0)))
-                .field("current_price", float(row.get("current_price", 0.0)))
-                .field("accumulated_volume", float(row.get("accumulated_volume", 0)))
+                .field("rank", rank)
+                .field("price", price)
+                .field("change", change)
+                .field("changePercent", change_percent)
+                .field("volume", volume)
+                .field("relativeVolume5min", relative_volume_5min)
+                .field("relativeVolumeDaily", relative_volume_daily)
                 .field("prev_close", float(row.get("prev_close", 0.0)))
-                .field("rank", int(row.get("competition_rank", 0)))
                 .time(timestamp)
             )
-            points.append(point)
+            influx_points.append(point)
 
-        if points:
-            self._write_api.write(bucket=self.bucket, org=self.org, record=points)
-            logger.debug(f"Wrote {len(points)} points to InfluxDB market_snapshot")
+        # Write single stream message with all tickers' data as JSON
+        if stream_tickers_data:
+            import json
+
+            stream_message = {
+                "timestamp": timestamp_iso,
+                "data": json.dumps(stream_tickers_data),
+            }
+            self.r.xadd(self.STREAM_NAME, stream_message, maxlen=100)
+
+        if influx_points:
+            self._write_api.write(
+                bucket=self.bucket, org=self.org, record=influx_points
+            )
+            logger.debug(
+                f"Wrote {len(influx_points)} points to Redis Stream and InfluxDB"
+            )
+
+        # Set 19-hour expiration on the stream if not already set
+        if self.r.ttl(self.STREAM_NAME) < 0:
+            self.r.expire(self.STREAM_NAME, 19 * 3600)
 
     # =========================================================================
     # STATE ENGINE
@@ -296,9 +508,6 @@ class SnapshotAnalyzer:
                 # Write state to InfluxDB
                 self._write_state_to_influx(ticker, current_state, timestamp)
 
-                # Update cursor in Redis HSET
-                self._update_state_cursor(ticker, timestamp)
-
                 # Update in-memory cache
                 self._ticker_states[ticker] = current_state
 
@@ -311,10 +520,17 @@ class SnapshotAnalyzer:
                     }
                 )
 
-                if not is_historical:
-                    logger.info(
-                        f"State change: {ticker} -> {current_state.get('state')}"
-                    )
+                # if not is_historical:
+                #     logger.info(
+                #         f"State change: {ticker} -> {current_state.get('state')}"
+                #     )
+
+            # Update cursor in Redis HSET no matter state changed or not
+            self._update_state_cursor(ticker, timestamp)
+
+        logger.debug(
+            f"Updated state cursor: {timestamp.isoformat()} for {len(subscribed_tickers)} tickers"
+        )
 
         return state_changes
 
@@ -413,9 +629,9 @@ class SnapshotAnalyzer:
         )
 
         self._write_api.write(bucket=self.bucket, org=self.org, record=point)
-        logger.debug(
-            f"Wrote state change {state.get('state', 'unknown')} for {ticker} to InfluxDB movers_state"
-        )
+        # logger.debug(
+        #     f"Wrote state change {state.get('state', 'unknown')} for {ticker} to InfluxDB movers_state"
+        # )
 
     def _update_state_cursor(self, ticker: str, timestamp: datetime) -> None:
         """
@@ -424,11 +640,167 @@ class SnapshotAnalyzer:
         """
         cursor_value = timestamp.isoformat()
         self.r.hset(self.HSET_NAME, ticker, cursor_value)
-        logger.debug(f"Updated state cursor: {ticker} = {cursor_value}")
+        # logger.debug(f"Updated state cursor: {ticker} = {cursor_value}")
 
     # =========================================================================
     # RECOVERY / REPLAY SUPPORT
     # =========================================================================
+
+    def _reload_states_from_influx(self) -> None:
+        """
+        Reload ticker states from InfluxDB movers_state on initialization.
+        Queries the latest state for each subscribed ticker.
+
+        In replay mode, uses cursor timestamps from Redis HSET to determine time range.
+        In live mode, uses -1d as time range.
+        """
+        subscribed = self._get_all_subscribed_tickers()
+        if not subscribed:
+            logger.info("No subscribed tickers to reload states for")
+            return
+
+        # Get cursor-based time range for replay mode
+        range_start, range_end = self._get_reload_time_range()
+
+        logger.info(
+            f"Reloading states for {len(subscribed)} subscribed tickers from InfluxDB "
+            f"(range: {range_start} to {range_end})..."
+        )
+
+        for ticker in subscribed:
+            query = f"""
+            from(bucket: "{self.bucket}")
+                |> range(start: {range_start}, stop: {range_end})
+                |> filter(fn: (r) => r["_measurement"] == "movers_state")
+                |> filter(fn: (r) => r["symbol"] == "{ticker}")
+                |> filter(fn: (r) => r["run_mode"] == "{self.run_mode}")
+                |> filter(fn: (r) => r["replay_id"] == "{self.replay_id}")
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                |> sort(columns: ["_time"], desc: true)
+                |> limit(n: 1)
+            """
+            try:
+                tables = self._query_api.query(query, org=self.org)
+                for table in tables:
+                    for record in table.records:
+                        self._ticker_states[ticker] = {
+                            "state": record.values.get("state", "unknown"),
+                            "rank": int(record.values.get("rank", 999)),
+                            "percent_change": float(
+                                record.values.get("percent_change", 0.0)
+                            ),
+                            "rank_velocity": int(record.values.get("rank_velocity", 0)),
+                            "timestamp": record.get_time(),
+                        }
+                        break  # Only need the latest
+            except Exception as e:
+                logger.error(f"Error reloading state for {ticker}: {e}")
+
+        logger.info(f"Reloaded states for {len(self._ticker_states)} tickers")
+
+    def _reload_volume_history_from_influx(self) -> None:
+        """
+        Reload volume history from InfluxDB market_snapshot on initialization.
+        Queries the last 6 minutes of volume data for each subscribed ticker.
+
+        In replay mode, uses cursor timestamps from Redis HSET to determine time range.
+        In live mode, uses -6m as time range.
+        """
+        subscribed = self._get_all_subscribed_tickers()
+        if not subscribed:
+            logger.info("No subscribed tickers to reload volume history for")
+            return
+
+        # Get cursor-based time range for replay mode (need 6 min before cursor)
+        range_start, range_end = self._get_reload_time_range(lookback_minutes=6)
+
+        logger.info(
+            f"Reloading volume history for {len(subscribed)} subscribed tickers from InfluxDB "
+            f"(range: {range_start} to {range_end})..."
+        )
+
+        for ticker in subscribed:
+            query = f"""
+            from(bucket: "{self.bucket}")
+                |> range(start: {range_start}, stop: {range_end})
+                |> filter(fn: (r) => r["_measurement"] == "market_snapshot")
+                |> filter(fn: (r) => r["symbol"] == "{ticker}")
+                |> filter(fn: (r) => r["run_mode"] == "{self.run_mode}")
+                |> filter(fn: (r) => r["replay_id"] == "{self.replay_id}")
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                |> sort(columns: ["_time"], desc: false)
+            """
+            try:
+                tables = self._query_api.query(query, org=self.org)
+                for table in tables:
+                    for record in table.records:
+                        ts = record.get_time()
+                        volume = record.values.get(
+                            "accumulated_volume"
+                        ) or record.values.get("volume", 0)
+                        if volume is not None:
+                            self._volume_history[ticker].append((ts, float(volume)))
+            except Exception as e:
+                logger.error(f"Error reloading volume history for {ticker}: {e}")
+
+        tickers_with_history = sum(1 for v in self._volume_history.values() if v)
+        logger.info(f"Reloaded volume history for {tickers_with_history} tickers")
+
+    def _get_reload_time_range(self, lookback_minutes: int = 0) -> Tuple[str, str]:
+        """
+        Get the time range for reloading data from InfluxDB.
+
+        In replay mode:
+            - Gets min cursor timestamp from Redis HSET
+            - Returns range from (cursor - lookback_minutes) to cursor
+        In live mode:
+            - Returns relative range based on lookback_minutes or default
+
+        Args:
+            lookback_minutes: Minutes to look back from cursor (for volume history)
+
+        Returns:
+            Tuple of (range_start, range_end) as InfluxDB time strings
+        """
+        if self.run_mode == "replay":
+            # Get cursor timestamps from Redis HSET
+            cursors = self.get_all_state_cursors()
+
+            if cursors:
+                # Find the minimum (earliest) cursor timestamp
+                min_ts = None
+                for ticker, cursor_ts in cursors.items():
+                    try:
+                        ts = datetime.fromisoformat(cursor_ts)
+                        if min_ts is None or ts < min_ts:
+                            min_ts = ts
+                    except (ValueError, TypeError):
+                        continue
+
+                if min_ts:
+                    # Calculate range based on cursor
+                    if lookback_minutes > 0:
+                        range_start = (
+                            min_ts - timedelta(minutes=lookback_minutes)
+                        ).isoformat()
+                    else:
+                        # For state reload, start from beginning of replay date
+                        range_start = f"{self.replay_date[:4]}-{self.replay_date[4:6]}-{self.replay_date[6:8]}T00:00:00Z"
+
+                    range_end = min_ts.isoformat()
+                    return range_start, range_end
+
+            # No cursors found in replay mode, use full day range
+            range_start = f"{self.replay_date[:4]}-{self.replay_date[4:6]}-{self.replay_date[6:8]}T00:00:00Z"
+            range_end = "now()"
+            return range_start, range_end
+
+        else:
+            # Live mode: use relative time ranges
+            if lookback_minutes > 0:
+                return f"-{lookback_minutes}m", "now()"
+            else:
+                return "-1d", "now()"
 
     def recover_states_from_cursors(self) -> Dict[str, List]:
         """
