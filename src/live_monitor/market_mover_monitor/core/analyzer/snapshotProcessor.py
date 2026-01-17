@@ -56,7 +56,12 @@ class SnapshotProcessor:
         replay_date: Optional[str] = None,
         replay_id: Optional[str] = None,
         load_history: Optional[str] = None,
+        on_snapshot_processed: Optional[callable] = None,
     ):
+        # Callback invoked after each snapshot is processed and written to InfluxDB
+        # Signature: on_snapshot_processed(result: Dict, is_historical: bool)
+        self._on_snapshot_processed = on_snapshot_processed
+
         replay_mode = bool(replay_date)
         self.run_mode = "replay" if replay_mode else "live"
         self.replay_id = self._derive_replay_id(replay_date, replay_id)
@@ -399,11 +404,18 @@ class SnapshotProcessor:
         # Update last_df for data filling
         self.last_df = prepared_df
 
-        return {
+        result = {
             "timestamp": timestamp.isoformat(),
             "new_subscriptions": new_subscriptions,
             "total_subscribed": len(all_subscribed),
         }
+
+        # Invoke callback after InfluxDB write is complete
+        # This ensures chart queries will see the latest data
+        if self._on_snapshot_processed:
+            self._on_snapshot_processed(result, is_historical)
+
+        return result
 
     def _prepare_data(self, df: pl.DataFrame) -> pl.DataFrame:
         """Filter common stocks and fill missing data."""

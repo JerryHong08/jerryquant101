@@ -76,21 +76,43 @@ class WebAnalyzer:
         self.STATE_STREAM_NAME = f"movers_state:{self.date_suffix}"
         self.SNAPSHOT_STREAM_NAME = f"market_snapshot_processed:{self.date_suffix}"
 
-        # Initialize snapshot processor (handles data receiving, processing, storage)
+        # Initialize chart data manager first (needed by callback)
+        self.chart_manager = ChartDataManager(
+            replay_date=replay_date,
+            replay_id=replay_id,
+        )
+
+        # Create callback for snapshot processor
+        # This ensures chart data is refreshed and emitted synchronously after InfluxDB write
+        def on_snapshot_processed(result: Dict, is_historical: bool):
+            """Callback invoked after each snapshot is processed and written to InfluxDB."""
+            # Mark chart data as dirty to trigger refresh
+            self.chart_manager.mark_dirty()
+
+            # Get chart data - InfluxDB write is already complete at this point
+            chart_data = self.chart_manager.get_mmm_version_chart_data(
+                force_refresh=True
+            )
+
+            logger.debug(
+                f"on_snapshot_processed - Snapshot processed: "
+                f"{result.get('new_subscriptions', [])} new subs, "
+                f"{result.get('total_subscribed', 0)} total"
+            )
+
+            # Emit to all connected WebSocket clients
+            self.socketio.emit("chart_update", chart_data)
+
+        # Initialize snapshot processor with callback
         self.snapshot_processor = SnapshotProcessor(
             replay_date=replay_date,
             replay_id=replay_id,
             load_history=load_history,
+            on_snapshot_processed=on_snapshot_processed,
         )
 
         # Initialize state machine (handles state computation and notifications)
         self.state_machine = StateMachine(
-            replay_date=replay_date,
-            replay_id=replay_id,
-        )
-
-        # Initialize chart data manager (handles visualization data formatting)
-        self.chart_manager = ChartDataManager(
             replay_date=replay_date,
             replay_id=replay_id,
         )
@@ -269,80 +291,29 @@ class WebAnalyzer:
 
                 time.sleep(5)
 
-    def _start_snapshot_stream_listener(self):
-        """Listen to processed snapshot stream for chart updates."""
-        logger.info(
-            "_start_snapshot_stream_listener - Starting snapshot stream listener..."
-        )
-
-        # Create consumer group for BFF
-        try:
-            self.r.xgroup_create(
-                self.SNAPSHOT_STREAM_NAME,
-                "bff_snapshot_consumers",
-                id="0",
-                mkstream=True,
-            )
-        except redis.exceptions.ResponseError as e:
-            if "BUSYGROUP" not in str(e):
-                raise
-
-        consumer_name = f"bff_snapshot_{datetime.now().timestamp()}"
-
-        while True:
-            try:
-                messages = self.r.xreadgroup(
-                    "bff_snapshot_consumers",
-                    consumer_name,
-                    {self.SNAPSHOT_STREAM_NAME: ">"},
-                    count=1,
-                    block=2000,
-                )
-
-                if messages:
-                    for stream_name, message_list in messages:
-                        for message_id, message_data in message_list:
-                            # Refresh chart data on new snapshot
-                            self.chart_manager.mark_dirty()
-                            chart_data = self.chart_manager.get_mmm_version_chart_data(
-                                force_refresh=True
-                            )
-                            self.socketio.emit("chart_update", chart_data)
-
-                            # Acknowledge the message
-                            self.r.xack(
-                                self.SNAPSHOT_STREAM_NAME,
-                                "bff_snapshot_consumers",
-                                message_id,
-                            )
-
-            except Exception as e:
-                logger.error(f"_start_snapshot_stream_listener - Error: {e}")
-                import time
-
-                time.sleep(5)
+    # NOTE: _start_snapshot_stream_listener removed - replaced by callback approach
+    # The callback in SnapshotProcessor ensures chart data is queried only after
+    # InfluxDB writes are complete, preventing the timestamp lag issue.
 
     def run(self, debug=False):
         """Run the web server"""
         print(f"Starting Market Mover Web Analyzer on {self.host}:{self.port}")
 
         # Start snapshot processor (receives and processes data)
+        # Chart updates are now handled via callback in the processor thread
         self.snapshot_processor.start()
 
         # Start state machine (computes states and writes to state stream)
         self.state_machine.start()
 
-        # Start state stream listener (broadcasts to WebSocket clients)
+        # Start state stream listener (broadcasts state changes to WebSocket clients)
         state_listener_thread = Thread(
             target=self._start_state_stream_listener, daemon=True
         )
         state_listener_thread.start()
 
-        # Start snapshot stream listener (updates charts on new data)
-        snapshot_listener_thread = Thread(
-            target=self._start_snapshot_stream_listener, daemon=True
-        )
-        snapshot_listener_thread.start()
+        # Note: Snapshot stream listener removed - chart updates now use callback
+        # This ensures InfluxDB writes are complete before chart data is queried
 
         # Run Flask-SocketIO server
         self.socketio.run(
