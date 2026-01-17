@@ -4,7 +4,6 @@ Uses Flask + WebSocket for real-time data streaming
 a prototype version of future bff
 """
 
-import asyncio
 import concurrent.futures
 import json
 import logging
@@ -14,17 +13,18 @@ from threading import Thread
 from typing import Dict, List, Optional
 
 import polars as pl
+import redis
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
 from live_monitor.market_mover_monitor.core.analyzer.overviewchartdataManagement import (
     ChartDataManager,
 )
-from live_monitor.market_mover_monitor.core.analyzer.snapshotdataAnalyzer import (
-    SnapshotAnalyzer,
+from live_monitor.market_mover_monitor.core.analyzer.snapshotProcessor import (
+    SnapshotProcessor,
 )
-from live_monitor.market_mover_monitor.core.analyzer.snapshotdataReceiver import (
-    redis_engine,
+from live_monitor.market_mover_monitor.core.analyzer.stateMachine import (
+    StateMachine,
 )
 from live_monitor.market_mover_monitor.core.data.providers.fundamentals import (
     FloatSharesProvider,
@@ -35,7 +35,7 @@ logger = setup_logger(__name__, log_to_file=True, level=logging.DEBUG)
 
 
 class WebAnalyzer:
-    """Main web analyzer class combining Redis listener and WebSocket server"""
+    """Main web analyzer class combining snapshot processor, state machine, and WebSocket server"""
 
     def __init__(
         self,
@@ -68,8 +68,23 @@ class WebAnalyzer:
         self.host = host
         self.port = port
 
-        # Initialize snapshot analyzer (handles data processing, membership, state)
-        self.snapshot_analyzer = SnapshotAnalyzer(
+        # Initialize Redis for listening to state changes
+        self.r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+        self.date_suffix = (
+            replay_date if replay_date else datetime.now().strftime("%Y%m%d")
+        )
+        self.STATE_STREAM_NAME = f"movers_state:{self.date_suffix}"
+        self.SNAPSHOT_STREAM_NAME = f"market_snapshot_processed:{self.date_suffix}"
+
+        # Initialize snapshot processor (handles data receiving, processing, storage)
+        self.snapshot_processor = SnapshotProcessor(
+            replay_date=replay_date,
+            replay_id=replay_id,
+            load_history=load_history,
+        )
+
+        # Initialize state machine (handles state computation and notifications)
+        self.state_machine = StateMachine(
             replay_date=replay_date,
             replay_id=replay_id,
         )
@@ -80,61 +95,11 @@ class WebAnalyzer:
             replay_id=replay_id,
         )
 
-        self.last_df = pl.DataFrame()
-
         # Connected clients
         self.connected_clients = set()
 
         self._setup_routes()
         self._setup_socket_events()
-
-        # Create callback function for redis_engine
-        def redis_data_callback(processed_df, is_historical=False):
-            self.last_df = processed_df
-
-            # Process snapshot through the analyzer
-            result = self.snapshot_analyzer.process_snapshot(
-                processed_df, is_historical
-            )
-
-            # Mark chart data as dirty to trigger refresh
-            self.chart_manager.mark_dirty()
-
-            # Get chart data from chart manager
-            chart_data = self.chart_manager.get_mmm_version_chart_data(
-                force_refresh=True
-            )
-
-            logger.debug(
-                f"Snapshot processed: {result.get('new_subscriptions', [])} new subs, "
-                f"{result.get('total_subscribed', 0)} total, "
-                f"{len(result.get('state_changes', []))} state changes"
-            )
-
-            print(
-                f"Chart data summary: {len(chart_data.get('datasets', []))} datasets, "
-                f"{len(chart_data.get('highlights', []))} highlights"
-            )
-
-            if chart_data.get("datasets"):
-                sample_dataset = chart_data["datasets"][0]
-                print(
-                    f"Sample dataset: {sample_dataset['label']}, "
-                    f"{len(sample_dataset['data'])} data points, "
-                    f"rank: {sample_dataset.get('rank', 'N/A')}, "
-                    f"state: {sample_dataset.get('state', 'N/A')}"
-                )
-
-            self.socketio.emit("chart_update", chart_data)
-
-            print(f"Broadcasting to {len(self.connected_clients)} clients")
-
-        # Initialize redis engine with callback
-        self.redis_engine = redis_engine(
-            data_callback=redis_data_callback,
-            replay_date=replay_date,
-            backtrace=load_history if load_history else False,
-        )
 
     def _setup_routes(self):
         """Setup Flask routes"""
@@ -180,33 +145,26 @@ class WebAnalyzer:
         @self.app.route("/api/subscribed")
         def get_subscribed_tickers():
             """API endpoint to get all subscribed tickers"""
-            tickers = self.snapshot_analyzer.get_subscribed_tickers()
+            tickers = self.snapshot_processor.get_subscribed_tickers()
             return json.dumps({"tickers": tickers, "count": len(tickers)})
 
         @self.app.route("/api/state-cursors")
         def get_state_cursors():
             """API endpoint to get all state cursors (for debugging)"""
-            cursors = self.snapshot_analyzer.get_all_state_cursors()
+            cursors = self.state_machine.get_all_state_cursors()
             return json.dumps(cursors, default=str)
 
-        @self.app.route("/api/initialize/<date>")
-        def initialize_historical_data(date):
-            """API endpoint to load historical data"""
-            try:
-                # Historical data loading via redis_engine
-                self.redis_engine.initialize_from_local_file(date)
-                chart_data = self.chart_manager.get_mmm_version_chart_data(
-                    force_refresh=True
-                )
-                return json.dumps(chart_data, default=str)
-            except Exception as e:
-                return json.dumps({"error": str(e)}), 500
+        @self.app.route("/api/ticker-states")
+        def get_ticker_states():
+            """API endpoint to get all current ticker states (for debugging)"""
+            states = self.state_machine.get_all_ticker_states()
+            return json.dumps(states, default=str)
 
         @self.app.route("/api/test-data")
         def test_data():
             """Test endpoint to check current data"""
             chart_data = self.chart_manager.get_mmm_version_chart_data()
-            subscribed = self.snapshot_analyzer.get_subscribed_tickers()
+            subscribed = self.snapshot_processor.get_subscribed_tickers()
             return {
                 "datasets_count": len(chart_data.get("datasets", [])),
                 "highlights_count": len(chart_data.get("highlights", [])),
@@ -258,19 +216,6 @@ class WebAnalyzer:
             else:
                 emit("error", {"message": f"Stock {ticker} not found"})
 
-        @self.socketio.on("load_historical_data")
-        def handle_load_historical(data):
-            """Handle request to load historical data"""
-            date = data.get("date", datetime.now().strftime("%Y%m%d"))
-            try:
-                self.redis_engine.initialize_from_local_file(date)
-                chart_data = self.chart_manager.get_mmm_version_chart_data(
-                    force_refresh=True
-                )
-                emit("historical_data_loaded", chart_data)
-            except Exception as e:
-                emit("error", {"message": str(e)})
-
         @self.socketio.on("refresh_chart")
         def handle_refresh_chart():
             """Handle request to force refresh chart data"""
@@ -279,20 +224,125 @@ class WebAnalyzer:
             )
             emit("chart_update", chart_data)
 
-    def start_redis_listener(self):
-        """Start Redis listener in background thread"""
-        redis_thread = Thread(
-            target=self.redis_engine._redis_stream_listener, daemon=True
+    def _start_state_stream_listener(self):
+        """Listen to state stream and broadcast state changes to WebSocket clients."""
+        logger.info("_start_state_stream_listener - Starting state stream listener...")
+
+        # Create consumer group for BFF
+        try:
+            self.r.xgroup_create(
+                self.STATE_STREAM_NAME, "bff_consumers", id="0", mkstream=True
+            )
+        except redis.exceptions.ResponseError as e:
+            if "BUSYGROUP" not in str(e):
+                raise
+
+        consumer_name = f"bff_{datetime.now().timestamp()}"
+
+        while True:
+            try:
+                messages = self.r.xreadgroup(
+                    "bff_consumers",
+                    consumer_name,
+                    {self.STATE_STREAM_NAME: ">"},
+                    count=10,
+                    block=1000,
+                )
+
+                if messages:
+                    for stream_name, message_list in messages:
+                        for message_id, message_data in message_list:
+                            # Log state change received
+                            logger.info(
+                                f"_start_state_stream_listener - State change received: "
+                                f"{message_data.get('symbol')} {message_data.get('from')} -> {message_data.get('to')}"
+                            )
+
+                            # Acknowledge the message
+                            self.r.xack(
+                                self.STATE_STREAM_NAME, "bff_consumers", message_id
+                            )
+
+            except Exception as e:
+                logger.error(f"_start_state_stream_listener - Error: {e}")
+                import time
+
+                time.sleep(5)
+
+    def _start_snapshot_stream_listener(self):
+        """Listen to processed snapshot stream for chart updates."""
+        logger.info(
+            "_start_snapshot_stream_listener - Starting snapshot stream listener..."
         )
-        redis_thread.start()
-        return redis_thread
+
+        # Create consumer group for BFF
+        try:
+            self.r.xgroup_create(
+                self.SNAPSHOT_STREAM_NAME,
+                "bff_snapshot_consumers",
+                id="0",
+                mkstream=True,
+            )
+        except redis.exceptions.ResponseError as e:
+            if "BUSYGROUP" not in str(e):
+                raise
+
+        consumer_name = f"bff_snapshot_{datetime.now().timestamp()}"
+
+        while True:
+            try:
+                messages = self.r.xreadgroup(
+                    "bff_snapshot_consumers",
+                    consumer_name,
+                    {self.SNAPSHOT_STREAM_NAME: ">"},
+                    count=1,
+                    block=2000,
+                )
+
+                if messages:
+                    for stream_name, message_list in messages:
+                        for message_id, message_data in message_list:
+                            # Refresh chart data on new snapshot
+                            self.chart_manager.mark_dirty()
+                            chart_data = self.chart_manager.get_mmm_version_chart_data(
+                                force_refresh=True
+                            )
+                            self.socketio.emit("chart_update", chart_data)
+
+                            # Acknowledge the message
+                            self.r.xack(
+                                self.SNAPSHOT_STREAM_NAME,
+                                "bff_snapshot_consumers",
+                                message_id,
+                            )
+
+            except Exception as e:
+                logger.error(f"_start_snapshot_stream_listener - Error: {e}")
+                import time
+
+                time.sleep(5)
 
     def run(self, debug=False):
         """Run the web server"""
         print(f"Starting Market Mover Web Analyzer on {self.host}:{self.port}")
 
-        # Start Redis listener
-        self.start_redis_listener()
+        # Start snapshot processor (receives and processes data)
+        self.snapshot_processor.start()
+
+        # Start state machine (computes states and writes to state stream)
+        self.state_machine.start()
+
+        # Start state stream listener (broadcasts to WebSocket clients)
+        state_listener_thread = Thread(
+            target=self._start_state_stream_listener, daemon=True
+        )
+        state_listener_thread.start()
+
+        # Start snapshot stream listener (updates charts on new data)
+        snapshot_listener_thread = Thread(
+            target=self._start_snapshot_stream_listener, daemon=True
+        )
+        snapshot_listener_thread.start()
 
         # Run Flask-SocketIO server
         self.socketio.run(
@@ -305,7 +355,8 @@ class WebAnalyzer:
 
     def cleanup(self):
         """Clean up resources on shutdown"""
-        self.snapshot_analyzer.close()
+        self.snapshot_processor.close()
+        self.state_machine.close()
         self.chart_manager.close()
         logger.info("WebAnalyzer resources cleaned up")
 

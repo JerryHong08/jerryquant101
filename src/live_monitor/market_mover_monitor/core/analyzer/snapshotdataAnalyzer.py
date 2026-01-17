@@ -65,7 +65,7 @@ class SnapshotAnalyzer:
         self.r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
         if replay_mode:
-            logger.info(f"Replay mode activated for date: {replay_date}")
+            logger.info(f"__init__ - Replay mode activated for date: {replay_date}")
             date_suffix = replay_date
         else:
             date_suffix = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
@@ -93,8 +93,8 @@ class SnapshotAnalyzer:
         self._reload_volume_history_from_influx()
 
         logger.info(
-            f"SnapshotAnalyzer initialized: mode={self.run_mode}, "
-            f"replay_id={self.replay_id}, STREAM={self.STREAM_NAME}, HSET={self.HSET_NAME}"
+            f"__init__ - SnapshotAnalyzer initialized: mode={self.run_mode}, "
+            f"__init__ - replay_id={self.replay_id}, STREAM={self.STREAM_NAME}, HSET={self.HSET_NAME}"
         )
 
     @staticmethod
@@ -301,7 +301,7 @@ class SnapshotAnalyzer:
 
         if ticker == "IVP":
             logger.debug(
-                f"Ticker: {ticker}, last_1min_volume: {last_1min_volume}, last_5min_avg_volume: {last_5min_avg_volume}"
+                f"_compute_relative_volume_5min - Ticker: {ticker}, last_1min_volume: {last_1min_volume}, last_5min_avg_volume: {last_5min_avg_volume}"
             )
 
         if last_5min_avg_volume > 0:
@@ -331,10 +331,14 @@ class SnapshotAnalyzer:
             added = self.r.sadd(self.SUBSCRIBED_SET_NAME, ticker)
             if added:
                 new_subscriptions.append(ticker)
-                logger.debug(f"New subscription: {ticker} at {timestamp.isoformat()}")
+                logger.debug(
+                    f"_update_subscription_set - New subscription: {ticker} at {timestamp.isoformat()}"
+                )
 
         if new_subscriptions:
-            logger.info(f"New subscriptions: {new_subscriptions}")
+            logger.info(
+                f"_update_subscription_set - New subscriptions: {new_subscriptions}"
+            )
 
         return new_subscriptions
 
@@ -467,7 +471,7 @@ class SnapshotAnalyzer:
                 bucket=self.bucket, org=self.org, record=influx_points
             )
             logger.debug(
-                f"Wrote {len(influx_points)} points to Redis Stream and InfluxDB"
+                f"_write_to_stream_and_influx - Wrote {len(influx_points)} points to Redis Stream and InfluxDB"
             )
 
         # Set 19-hour expiration on the stream if not already set
@@ -522,14 +526,14 @@ class SnapshotAnalyzer:
 
                 # if not is_historical:
                 #     logger.info(
-                #         f"State change: {ticker} -> {current_state.get('state')}"
+                #         f"_process_state_updates - State change: {ticker} -> {current_state.get('state')}"
                 #     )
 
             # Update cursor in Redis HSET no matter state changed or not
             self._update_state_cursor(ticker, timestamp)
 
         logger.debug(
-            f"Updated state cursor: {timestamp.isoformat()} for {len(subscribed_tickers)} tickers"
+            f"_process_state_updates - Updated state cursor: {timestamp.isoformat()} for {len(subscribed_tickers)} tickers"
         )
 
         return state_changes
@@ -630,7 +634,7 @@ class SnapshotAnalyzer:
 
         self._write_api.write(bucket=self.bucket, org=self.org, record=point)
         # logger.debug(
-        #     f"Wrote state change {state.get('state', 'unknown')} for {ticker} to InfluxDB movers_state"
+        #     f"_write_state_to_influx - Wrote state change {state.get('state', 'unknown')} for {ticker} to InfluxDB movers_state"
         # )
 
     def _update_state_cursor(self, ticker: str, timestamp: datetime) -> None:
@@ -656,7 +660,9 @@ class SnapshotAnalyzer:
         """
         subscribed = self._get_all_subscribed_tickers()
         if not subscribed:
-            logger.info("No subscribed tickers to reload states for")
+            logger.info(
+                "_reload_states_from_influx - No subscribed tickers to reload states for"
+            )
             return
 
         # Get cursor-based time range for replay mode
@@ -694,9 +700,13 @@ class SnapshotAnalyzer:
                         }
                         break  # Only need the latest
             except Exception as e:
-                logger.error(f"Error reloading state for {ticker}: {e}")
+                logger.error(
+                    f"_reload_states_from_influx - Error reloading state for {ticker}: {e}"
+                )
 
-        logger.info(f"Reloaded states for {len(self._ticker_states)} tickers")
+        logger.info(
+            f"_reload_states_from_influx - Reloaded states for {len(self._ticker_states)} tickers"
+        )
 
     def _reload_volume_history_from_influx(self) -> None:
         """
@@ -741,10 +751,14 @@ class SnapshotAnalyzer:
                         if volume is not None:
                             self._volume_history[ticker].append((ts, float(volume)))
             except Exception as e:
-                logger.error(f"Error reloading volume history for {ticker}: {e}")
+                logger.error(
+                    f"_reload_volume_history_from_influx - Error reloading volume history for {ticker}: {e}"
+                )
 
         tickers_with_history = sum(1 for v in self._volume_history.values() if v)
-        logger.info(f"Reloaded volume history for {tickers_with_history} tickers")
+        logger.info(
+            f"_reload_volume_history_from_influx - Reloaded volume history for {tickers_with_history} tickers"
+        )
 
     def _get_reload_time_range(self, lookback_minutes: int = 0) -> Tuple[str, str]:
         """
@@ -816,7 +830,7 @@ class SnapshotAnalyzer:
             points = self._query_snapshots_since(ticker, cursor_ts)
             recovered[ticker] = points
             logger.info(
-                f"Recovered {len(points)} snapshots for {ticker} since {cursor_ts}"
+                f"recover_states_from_cursors - Recovered {len(points)} snapshots for {ticker} since {cursor_ts}"
             )
 
         return recovered
@@ -853,7 +867,9 @@ class SnapshotAnalyzer:
                     )
             return results
         except Exception as e:
-            logger.error(f"Error querying snapshots for {ticker}: {e}")
+            logger.error(
+                f"_query_snapshots_since - Error querying snapshots for {ticker}: {e}"
+            )
             return []
 
     # =========================================================================
@@ -864,4 +880,4 @@ class SnapshotAnalyzer:
         """Clean up resources."""
         if self._influx_client:
             self._influx_client.close()
-        logger.info("SnapshotAnalyzer closed")
+        logger.info("close - SnapshotAnalyzer closed")

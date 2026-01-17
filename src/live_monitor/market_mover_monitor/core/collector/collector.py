@@ -167,6 +167,7 @@ class MarketsnapshotCollector:
                                     "prev_close": prev_close,
                                     "timestamp": item.get("updated", 0),
                                     "prev_volume": item["prevDay"].get("v", 0),
+                                    # "vwap": float(item.get("min", {}).get("vw", 0)),
                                 }
                             )
 
