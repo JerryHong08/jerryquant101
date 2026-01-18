@@ -42,7 +42,7 @@ class WebAnalyzer:
         host="localhost",
         port=5000,
         replay_date=None,
-        replay_id=None,
+        suffix_id=None,
         load_history=None,
     ):
         current_dir = Path(__file__).parent  # core/api/
@@ -79,7 +79,7 @@ class WebAnalyzer:
         # Initialize chart data manager first (needed by callback)
         self.chart_manager = ChartDataManager(
             replay_date=replay_date,
-            replay_id=replay_id,
+            suffix_id=suffix_id,
         )
 
         # Create callback for snapshot processor
@@ -106,7 +106,7 @@ class WebAnalyzer:
         # Initialize snapshot processor with callback
         self.snapshot_processor = SnapshotProcessor(
             replay_date=replay_date,
-            replay_id=replay_id,
+            suffix_id=suffix_id,
             load_history=load_history,
             on_snapshot_processed=on_snapshot_processed,
         )
@@ -114,7 +114,7 @@ class WebAnalyzer:
         # Initialize state machine (handles state computation and notifications)
         self.state_machine = StateMachine(
             replay_date=replay_date,
-            replay_id=replay_id,
+            suffix_id=suffix_id,
         )
 
         # Connected clients
@@ -345,7 +345,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--replay-date", help="Receive specific replay date data")
     parser.add_argument(
-        "--replay-id", help="Custom replay identifier for InfluxDB tagging"
+        "--suffix-id", help="Custom replay identifier for InfluxDB tagging"
     )
 
     args = parser.parse_args()
@@ -355,7 +355,7 @@ if __name__ == "__main__":
         host=args.host,
         port=args.port,
         replay_date=args.replay_date,
-        replay_id=args.replay_id,
+        suffix_id=args.suffix_id,
         load_history=args.load_history,
     )
 

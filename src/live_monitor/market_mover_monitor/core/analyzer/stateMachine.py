@@ -48,12 +48,16 @@ class StateMachine:
     def __init__(
         self,
         replay_date: Optional[str] = None,
-        replay_id: Optional[str] = None,
+        suffix_id: Optional[str] = None,
     ):
-        replay_mode = bool(replay_date)
-        self.run_mode = "replay" if replay_mode else "live"
-        self.replay_id = self._derive_replay_id(replay_date, replay_id)
-        self.replay_date = replay_date
+
+        self.run_mode = "replay" if replay_date else "live"
+        self.db_date = (
+            replay_date
+            if replay_date
+            else datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+        )
+        self.db_id = self._derive_db_id(self.db_date, suffix_id)
 
         # ---------- InfluxDB Configuration ----------
         token = os.environ.get("INFLUXDB_TOKEN")
@@ -70,22 +74,14 @@ class StateMachine:
         # ---------- Redis Configuration ----------
         self.r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
-        if replay_mode:
-            logger.info(f"__init__ - Replay mode activated for date: {replay_date}")
-            date_suffix = replay_date
-        else:
-            date_suffix = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
-
-        self.date_suffix = date_suffix
-
         # Input stream (from SnapshotProcessor)
-        self.INPUT_STREAM_NAME = f"market_snapshot_processed:{date_suffix}"
+        self.INPUT_STREAM_NAME = f"market_snapshot_processed:{self.db_date}"
 
         # Output stream (for BFF notification)
-        self.OUTPUT_STREAM_NAME = f"movers_state:{date_suffix}"
+        self.OUTPUT_STREAM_NAME = f"movers_state:{self.db_date}"
 
         # HSET for cursor tracking
-        self.CURSOR_HSET_NAME = f"state_cursor:{date_suffix}"
+        self.CURSOR_HSET_NAME = f"state_cursor:{self.db_date}"
 
         # Consumer group config
         self.CONSUMER_GROUP = "state_consumers"
@@ -109,18 +105,18 @@ class StateMachine:
 
         logger.info(
             f"__init__ - StateMachine initialized: mode={self.run_mode}, "
-            f"replay_id={self.replay_id}, INPUT={self.INPUT_STREAM_NAME}, "
+            f"db_id={self.db_id}, INPUT={self.INPUT_STREAM_NAME}, "
             f"OUTPUT={self.OUTPUT_STREAM_NAME}"
         )
 
     @staticmethod
-    def _derive_replay_id(replay_date: Optional[str], override: Optional[str]) -> str:
-        if replay_date and override:
-            return f"{replay_date}_{override}"
+    def _derive_db_id(db_date: Optional[str], override: Optional[str]) -> str:
+        if db_date and override:
+            return f"{db_date}_{override}"
         if override:
             return override
-        if replay_date:
-            return replay_date
+        if db_date:
+            return db_date
         return "na"
 
     # =========================================================================
@@ -337,7 +333,7 @@ class StateMachine:
         Write state change event to InfluxDB.
 
         Measurement: movers_state
-        Tags: symbol, run_mode, replay_id
+        Tags: symbol, run_mode, db_id
         Fields: state, rank, percent_change, rank_velocity
         Time: state_change timestamp
         """
@@ -345,7 +341,7 @@ class StateMachine:
             influxdb_client.Point("movers_state")
             .tag("symbol", symbol)
             .tag("run_mode", self.run_mode)
-            .tag("replay_id", self.replay_id)
+            .tag("db_id", self.db_id)
             .field("state", state.get("state", "unknown"))
             .field("rank", int(state.get("rank", 0)))
             .field("percent_change", float(state.get("percent_change", 0.0)))
@@ -480,7 +476,7 @@ class StateMachine:
                 |> filter(fn: (r) => r["_measurement"] == "movers_state")
                 |> filter(fn: (r) => r["symbol"] == "{ticker}")
                 |> filter(fn: (r) => r["run_mode"] == "{self.run_mode}")
-                |> filter(fn: (r) => r["replay_id"] == "{self.replay_id}")
+                |> filter(fn: (r) => r["db_id"] == "{self.db_id}")
                 |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
                 |> sort(columns: ["_time"], desc: true)
                 |> limit(n: 1)
@@ -522,11 +518,13 @@ class StateMachine:
                         continue
 
                 if min_ts:
-                    range_start = f"{self.replay_date[:4]}-{self.replay_date[4:6]}-{self.replay_date[6:8]}T00:00:00Z"
+                    range_start = f"{self.db_date[:4]}-{self.db_date[4:6]}-{self.db_date[6:8]}T00:00:00Z"
                     range_end = min_ts.isoformat()
                     return range_start, range_end
 
-            range_start = f"{self.replay_date[:4]}-{self.replay_date[4:6]}-{self.replay_date[6:8]}T00:00:00Z"
+            range_start = (
+                f"{self.db_date[:4]}-{self.db_date[4:6]}-{self.db_date[6:8]}T00:00:00Z"
+            )
             range_end = "now()"
             return range_start, range_end
         else:

@@ -54,7 +54,7 @@ class SnapshotProcessor:
     def __init__(
         self,
         replay_date: Optional[str] = None,
-        replay_id: Optional[str] = None,
+        suffix_id: Optional[str] = None,
         load_history: Optional[str] = None,
         on_snapshot_processed: Optional[callable] = None,
     ):
@@ -62,10 +62,14 @@ class SnapshotProcessor:
         # Signature: on_snapshot_processed(result: Dict, is_historical: bool)
         self._on_snapshot_processed = on_snapshot_processed
 
-        replay_mode = bool(replay_date)
-        self.run_mode = "replay" if replay_mode else "live"
-        self.replay_id = self._derive_replay_id(replay_date, replay_id)
-        self.replay_date = replay_date
+        self.run_mode = "replay" if replay_date else "live"
+        self.db_date = (
+            replay_date
+            if replay_date
+            else datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+        )
+        self.db_id = self._derive_db_id(self.db_date, suffix_id)
+
         self.load_history = load_history
 
         # ---------- InfluxDB Configuration ----------
@@ -83,27 +87,19 @@ class SnapshotProcessor:
         # ---------- Redis Configuration ----------
         self.r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
-        if replay_mode:
-            logger.info(f"__init__ - Replay mode activated for date: {replay_date}")
-            date_suffix = replay_date
-        else:
-            date_suffix = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
-
-        self.date_suffix = date_suffix
-
         # Input stream (from collector)
-        self.INPUT_STREAM_NAME = f"market_snapshot_stream:{date_suffix}"
-        if replay_mode:
-            self.INPUT_STREAM_NAME = f"market_snapshot_stream_replay:{replay_date}"
+        self.INPUT_STREAM_NAME = f"market_snapshot_stream:{self.db_date}"
+        if self.run_mode == "replay":
+            self.INPUT_STREAM_NAME = f"market_snapshot_stream_replay:{self.db_date}"
 
         # Output stream (for BFF and StateMachine)
-        self.OUTPUT_STREAM_NAME = f"market_snapshot_processed:{date_suffix}"
+        self.OUTPUT_STREAM_NAME = f"market_snapshot_processed:{self.db_date}"
 
         # Set: tracks all tickers that have ever been in top 20 (for subscription)
-        self.SUBSCRIBED_SET_NAME = f"movers_subscribed_set:{date_suffix}"
+        self.SUBSCRIBED_SET_NAME = f"movers_subscribed_set:{self.db_date}"
 
         # HSET for cursor recovery (used by _filter_files_after_timestamp)
-        self.CURSOR_HSET_NAME = f"state_cursor:{date_suffix}"
+        self.CURSOR_HSET_NAME = f"state_cursor:{self.db_date}"
 
         # Consumer group config
         self.CONSUMER_GROUP = "market_consumers"
@@ -132,17 +128,17 @@ class SnapshotProcessor:
 
         logger.info(
             f"__init__ - SnapshotProcessor initialized: mode={self.run_mode}, "
-            f"replay_id={self.replay_id}, INPUT={self.INPUT_STREAM_NAME}, OUTPUT={self.OUTPUT_STREAM_NAME}"
+            f"db_id={self.db_id}, INPUT={self.INPUT_STREAM_NAME}, OUTPUT={self.OUTPUT_STREAM_NAME}"
         )
 
     @staticmethod
-    def _derive_replay_id(replay_date: Optional[str], override: Optional[str]) -> str:
-        if replay_date and override:
-            return f"{replay_date}_{override}"
+    def _derive_db_id(db_date: Optional[str], override: Optional[str]) -> str:
+        if db_date and override:
+            return f"{db_date}_{override}"
         if override:
             return override
-        if replay_date:
-            return replay_date
+        if db_date:
+            return db_date
         return "na"
 
     # =========================================================================
@@ -678,7 +674,7 @@ class SnapshotProcessor:
                 influxdb_client.Point("market_snapshot")
                 .tag("symbol", ticker)
                 .tag("run_mode", self.run_mode)
-                .tag("replay_id", self.replay_id)
+                .tag("db_id", self.db_id)
                 .field("rank", rank)
                 .field("price", price)
                 .field("change", change)
@@ -737,7 +733,7 @@ class SnapshotProcessor:
                 |> filter(fn: (r) => r["_measurement"] == "market_snapshot")
                 |> filter(fn: (r) => r["symbol"] == "{ticker}")
                 |> filter(fn: (r) => r["run_mode"] == "{self.run_mode}")
-                |> filter(fn: (r) => r["replay_id"] == "{self.replay_id}")
+                |> filter(fn: (r) => r["db_id"] == "{self.db_id}")
                 |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
                 |> sort(columns: ["_time"], desc: false)
             """
@@ -780,11 +776,13 @@ class SnapshotProcessor:
                             min_ts - timedelta(minutes=lookback_minutes)
                         ).isoformat()
                     else:
-                        range_start = f"{self.replay_date[:4]}-{self.replay_date[4:6]}-{self.replay_date[6:8]}T00:00:00Z"
+                        range_start = f"{self.db_date[:4]}-{self.db_date[4:6]}-{self.db_date[6:8]}T00:00:00Z"
                     range_end = min_ts.isoformat()
                     return range_start, range_end
 
-            range_start = f"{self.replay_date[:4]}-{self.replay_date[4:6]}-{self.replay_date[6:8]}T00:00:00Z"
+            range_start = (
+                f"{self.db_date[:4]}-{self.db_date[4:6]}-{self.db_date[6:8]}T00:00:00Z"
+            )
             range_end = "now()"
             return range_start, range_end
         else:

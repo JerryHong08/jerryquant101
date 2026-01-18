@@ -42,12 +42,15 @@ class SnapshotAnalyzer:
     def __init__(
         self,
         replay_date: Optional[str] = None,
-        replay_id: Optional[str] = None,
+        suffix_id: Optional[str] = None,
     ):
-        replay_mode = bool(replay_date)
-        self.run_mode = "replay" if replay_mode else "live"
-        self.replay_id = self._derive_replay_id(replay_date, replay_id)
-        self.replay_date = replay_date
+        self.run_mode = "replay" if replay_date else "live"
+        self.db_date = (
+            replay_date
+            if replay_date
+            else datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+        )
+        self.db_id = self._derive_db_id(self.db_date, suffix_id)
 
         # ---------- InfluxDB Configuration ----------
         token = os.environ.get("INFLUXDB_TOKEN")
@@ -64,19 +67,12 @@ class SnapshotAnalyzer:
         # ---------- Redis Configuration ----------
         self.r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
-        if replay_mode:
-            logger.info(f"__init__ - Replay mode activated for date: {replay_date}")
-            date_suffix = replay_date
-        else:
-            date_suffix = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
-
-        self.date_suffix = date_suffix
         # Stream: stores processed snapshot events with metrics (output stream)
-        self.STREAM_NAME = f"market_snapshot_processed:{date_suffix}"
+        self.STREAM_NAME = f"market_snapshot_processed:{self.db_date}"
         # HSET: stores state_cursor (last_state_updated_time per ticker)
-        self.HSET_NAME = f"state_cursor:{date_suffix}"
+        self.HSET_NAME = f"state_cursor:{self.db_date}"
         # Set: tracks all tickers that have ever been in top 20 (for subscription)
-        self.SUBSCRIBED_SET_NAME = f"movers_subscribed_set:{date_suffix}"
+        self.SUBSCRIBED_SET_NAME = f"movers_subscribed_set:{self.db_date}"
 
         # In-memory state cache for state change detection
         self._ticker_states: Dict[str, Dict] = {}
@@ -94,17 +90,17 @@ class SnapshotAnalyzer:
 
         logger.info(
             f"__init__ - SnapshotAnalyzer initialized: mode={self.run_mode}, "
-            f"__init__ - replay_id={self.replay_id}, STREAM={self.STREAM_NAME}, HSET={self.HSET_NAME}"
+            f"__init__ - db_id={self.db_id}, STREAM={self.STREAM_NAME}, HSET={self.HSET_NAME}"
         )
 
     @staticmethod
-    def _derive_replay_id(replay_date: Optional[str], override: Optional[str]) -> str:
-        if replay_date and override:
-            return f"{replay_date}_{override}"
+    def _derive_db_id(db_date: Optional[str], override: Optional[str]) -> str:
+        if db_date and override:
+            return f"{db_date}_{override}"
         if override:
             return override
-        if replay_date:
-            return replay_date
+        if db_date:
+            return db_date
         return "na"
 
     # =========================================================================
@@ -396,7 +392,7 @@ class SnapshotAnalyzer:
         - Single message per snapshot containing all subscribed tickers as JSON
 
         InfluxDB Measurement: market_snapshot
-        Tags: symbol, run_mode, replay_id
+        Tags: symbol, run_mode, db_id
         Fields: rank, price, change, changePercent, volume,
                 relativeVolume5min, relativeVolumeDaily
         Time: snapshot timestamp
@@ -443,7 +439,7 @@ class SnapshotAnalyzer:
                 influxdb_client.Point("market_snapshot")
                 .tag("symbol", ticker)
                 .tag("run_mode", self.run_mode)
-                .tag("replay_id", self.replay_id)
+                .tag("db_id", self.db_id)
                 .field("rank", rank)
                 .field("price", price)
                 .field("change", change)
@@ -616,7 +612,7 @@ class SnapshotAnalyzer:
         Write state change event to InfluxDB.
 
         Measurement: movers_state
-        Tags: symbol, run_mode, replay_id
+        Tags: symbol, run_mode, db_id
         Fields: state, rank, percent_change, rank_velocity
         Time: state_change timestamp
         """
@@ -624,7 +620,7 @@ class SnapshotAnalyzer:
             influxdb_client.Point("movers_state")
             .tag("symbol", ticker)
             .tag("run_mode", self.run_mode)
-            .tag("replay_id", self.replay_id)
+            .tag("db_id", self.db_id)
             .field("state", state.get("state", "unknown"))
             .field("rank", int(state.get("rank", 0)))
             .field("percent_change", float(state.get("percent_change", 0.0)))
@@ -680,7 +676,7 @@ class SnapshotAnalyzer:
                 |> filter(fn: (r) => r["_measurement"] == "movers_state")
                 |> filter(fn: (r) => r["symbol"] == "{ticker}")
                 |> filter(fn: (r) => r["run_mode"] == "{self.run_mode}")
-                |> filter(fn: (r) => r["replay_id"] == "{self.replay_id}")
+                |> filter(fn: (r) => r["db_id"] == "{self.db_id}")
                 |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
                 |> sort(columns: ["_time"], desc: true)
                 |> limit(n: 1)
@@ -736,7 +732,7 @@ class SnapshotAnalyzer:
                 |> filter(fn: (r) => r["_measurement"] == "market_snapshot")
                 |> filter(fn: (r) => r["symbol"] == "{ticker}")
                 |> filter(fn: (r) => r["run_mode"] == "{self.run_mode}")
-                |> filter(fn: (r) => r["replay_id"] == "{self.replay_id}")
+                |> filter(fn: (r) => r["db_id"] == "{self.db_id}")
                 |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
                 |> sort(columns: ["_time"], desc: false)
             """
@@ -799,13 +795,15 @@ class SnapshotAnalyzer:
                         ).isoformat()
                     else:
                         # For state reload, start from beginning of replay date
-                        range_start = f"{self.replay_date[:4]}-{self.replay_date[4:6]}-{self.replay_date[6:8]}T00:00:00Z"
+                        range_start = f"{self.db_date[:4]}-{self.db_date[4:6]}-{self.db_date[6:8]}T00:00:00Z"
 
                     range_end = min_ts.isoformat()
                     return range_start, range_end
 
             # No cursors found in replay mode, use full day range
-            range_start = f"{self.replay_date[:4]}-{self.replay_date[4:6]}-{self.replay_date[6:8]}T00:00:00Z"
+            range_start = (
+                f"{self.db_date[:4]}-{self.db_date[4:6]}-{self.db_date[6:8]}T00:00:00Z"
+            )
             range_end = "now()"
             return range_start, range_end
 
@@ -845,7 +843,7 @@ class SnapshotAnalyzer:
             |> filter(fn: (r) => r["_measurement"] == "market_snapshot")
             |> filter(fn: (r) => r["symbol"] == "{ticker}")
             |> filter(fn: (r) => r["run_mode"] == "{self.run_mode}")
-            |> filter(fn: (r) => r["replay_id"] == "{self.replay_id}")
+            |> filter(fn: (r) => r["db_id"] == "{self.db_id}")
             |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
         """
 

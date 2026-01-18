@@ -35,29 +35,28 @@ class ChartDataManager:
     }
 
     def __init__(
-        self, replay_date: Optional[str] = None, replay_id: Optional[str] = None
+        self, replay_date: Optional[str] = None, suffix_id: Optional[str] = None
     ):
         self._chart_data_dirty = True
         self._cached_chart_data = None
         self._last_query_time = None
 
-        self.replay_date = replay_date
         self.run_mode = "replay" if replay_date else "live"
-        self.replay_id = self._derive_replay_id(replay_date, replay_id)
+        self.db_date = (
+            replay_date
+            if replay_date
+            else datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+        )
+        self.db_id = self._derive_db_id(self.db_date, suffix_id)
 
         # ------- Redis Configuration -------
         self.redis_client = redis.Redis(
             host="localhost", port=6379, db=0, decode_responses=True
         )
 
-        if replay_date:
-            date_suffix = replay_date
-        else:
-            date_suffix = datetime.now(ZoneInfo("America/New_York")).strftime("%Y%m%d")
-
-        self.STREAM_NAME = f"market_snapshot_processed:{date_suffix}"
-        self.SUBSCRIBED_SET_NAME = f"movers_subscribed_set:{date_suffix}"
-        self.HSET_NAME = f"state_cursor:{date_suffix}"
+        self.STREAM_NAME = f"market_snapshot_processed:{self.db_date}"
+        self.SUBSCRIBED_SET_NAME = f"movers_subscribed_set:{self.db_date}"
+        self.HSET_NAME = f"state_cursor:{self.db_date}"
 
         # ------- InfluxDB Configuration -------
         token = os.environ.get("INFLUXDB_TOKEN")
@@ -71,17 +70,17 @@ class ChartDataManager:
         self._query_api = self._influx_client.query_api()
 
         logger.info(
-            f"ChartDataManager initialized: mode={self.run_mode}, replay_id={self.replay_id}"
+            f"ChartDataManager initialized: mode={self.run_mode}, db_id={self.db_id}"
         )
 
     @staticmethod
-    def _derive_replay_id(replay_date: Optional[str], override: Optional[str]) -> str:
-        if replay_date and override:
-            return f"{replay_date}_{override}"
+    def _derive_db_id(db_date: Optional[str], override: Optional[str]) -> str:
+        if db_date and override:
+            return f"{db_date}_{override}"
         if override:
             return override
-        if replay_date:
-            return replay_date
+        if db_date:
+            return db_date
         return "na"
 
     def mark_dirty(self):
@@ -98,11 +97,11 @@ class ChartDataManager:
         Returns:
             Tuple of (range_start, range_end) as InfluxDB time strings
         """
-        if self.replay_date:
+        if self.run_mode == "replay":
             # Replay mode: use specific date
-            year = self.replay_date[:4]
-            month = self.replay_date[4:6]
-            day = self.replay_date[6:8]
+            year = self.db_date[:4]
+            month = self.db_date[4:6]
+            day = self.db_date[6:8]
             range_start = f"{year}-{month}-{day}T00:00:00Z"
             range_end = f"{year}-{month}-{day}T23:59:59Z"
         else:
@@ -160,7 +159,7 @@ class ChartDataManager:
             |> filter(fn: (r) => r["_measurement"] == "movers_state")
             |> filter(fn: (r) => r["symbol"] == "{ticker}")
             |> filter(fn: (r) => r["run_mode"] == "{self.run_mode}")
-            |> filter(fn: (r) => r["replay_id"] == "{self.replay_id}")
+            |> filter(fn: (r) => r["db_id"] == "{self.db_id}")
             |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
             |> sort(columns: ["_time"], desc: true)
             |> limit(n: 1)
@@ -194,8 +193,8 @@ class ChartDataManager:
             range_start = since.isoformat()
             range_end = (
                 "now()"
-                if not self.replay_date
-                else f"{self.replay_date[:4]}-{self.replay_date[4:6]}-{self.replay_date[6:8]}T23:59:59Z"
+                if not self.run_mode == "replay"
+                else f"{self.db_date[:4]}-{self.db_date[4:6]}-{self.db_date[6:8]}T23:59:59Z"
             )
         else:
             range_start, range_end = self._get_intraday_time_range()
@@ -206,7 +205,7 @@ class ChartDataManager:
             |> filter(fn: (r) => r["_measurement"] == "market_snapshot")
             |> filter(fn: (r) => r["symbol"] == "{ticker}")
             |> filter(fn: (r) => r["run_mode"] == "{self.run_mode}")
-            |> filter(fn: (r) => r["replay_id"] == "{self.replay_id}")
+            |> filter(fn: (r) => r["db_id"] == "{self.db_id}")
             |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
         """
         # |> limit(n: {limit})
