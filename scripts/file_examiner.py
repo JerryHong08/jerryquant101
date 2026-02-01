@@ -9,10 +9,10 @@ import polars as pl
 from cores.config import data_dir
 
 print(data_dir)
-#  /mnt/blackdisk/quant_data/polygon_data
+#  data_dir/quant_data/polygon_data
 
 
-#  /mnt/blackdisk/quant_data/polygon_data/raw
+#  data_dir/quant_data/polygon_data/raw
 # > tree -L 2
 # .
 # ├── global_crypto
@@ -39,7 +39,7 @@ print(data_dir)
 #       └── stocks_error.csv
 
 
-#  /mnt/blackdisk/quant_data/polygon_data/lake
+#  data_dir/quant_data/polygon_data/lake
 # > tree -L 2
 # .
 # ├── us_options_opra

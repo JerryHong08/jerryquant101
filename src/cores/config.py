@@ -1,13 +1,41 @@
 import os
+from pathlib import Path
 
 import polars as pl
+import yaml
 
 # ===================== data root =============================================
 blackdisk_data_dir = "/mnt/blackdisk/quant_data/polygon_data"
 oldman_data_dir = "/home/oldman/quant_data/polygon_data"
 
+
+def _get_data_dir_from_config() -> str:
+    """
+    Get data_dir based on machine role from machine_config.yaml.
+    Falls back to blackdisk_data_dir if config is not found.
+    """
+    config_path = Path(__file__).resolve().parents[2] / "machine_config.yaml"
+
+    if not config_path.exists():
+        return blackdisk_data_dir
+
+    try:
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+
+        # Get role from environment variable or config
+        role = os.environ.get("MACHINE_ROLE", config["machine"]["role"])
+
+        if role == "server":
+            return config["server"]["data_dir"]
+        else:
+            return config["client"]["data_dir"]
+    except Exception:
+        return blackdisk_data_dir
+
+
 # =====================================================================
-data_dir = blackdisk_data_dir
+data_dir = _get_data_dir_from_config()
 lake_data_dir = os.path.join(data_dir, "lake")
 raw_data_dir = os.path.join(data_dir, "raw")
 cache_dir = os.path.join(data_dir, "processed")
