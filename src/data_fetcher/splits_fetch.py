@@ -3,6 +3,7 @@ import time
 
 import polars as pl
 from dotenv import load_dotenv
+from matplotlib.pylab import s_
 from polygon import RESTClient
 
 from cores.config import splits_dir
@@ -44,37 +45,52 @@ def fetch_splits_and_save(out_dir=splits_dir):
         print("not find previous splits file, first time run")
         splits_original = pl.DataFrame()
 
-    first_time = splits_original.is_empty()
+    try:
+        first_time = splits_original.is_empty()
 
-    splits = []
-    for i, s in enumerate(
-        client.list_splits(
-            order="desc",
-            limit="300",  # make sure it reaches to today
-            sort="execution_date",
+        splits = []
+        for i, s in enumerate(
+            client.list_splits(
+                order="desc",
+                limit="300",  # make sure it reaches to today
+                sort="execution_date",
+            )
+        ):
+
+            split_dict = {
+                "id": s.id,
+                "execution_date": s.execution_date,
+                "split_from": s.split_from,
+                "split_to": s.split_to,
+                "ticker": s.ticker,
+            }
+            splits.append(split_dict)
+
+            if not first_time:
+                # When incremental updating, don't need to fetch too much data.
+                if len(splits) >= 299:
+                    break
+
+        splits_new = pl.DataFrame(splits)
+
+        # splits_diff = splits_new.filter(~pl.col('id').is_in(splits_original['id'].implode()))
+
+        # Ensure schema compatibility
+        splits_new = splits_new.with_columns(
+            [
+                pl.col("split_from").cast(pl.Float64),
+            ]
         )
-    ):
 
-        split_dict = {
-            "id": s.id,
-            "execution_date": s.execution_date,
-            "split_from": s.split_from,
-            "split_to": s.split_to,
-            "ticker": s.ticker,
-        }
-        splits.append(split_dict)
+        splits = pl.concat([splits_original, splits_new]).unique()
+        for f in os.listdir(out_dir):
+            if f.startswith("all_splits_") and f.endswith(".parquet"):
+                os.remove(os.path.join(out_dir, f))
+        splits.write_parquet(out_file, compression="snappy")
+        print(f"Saved {out_file}. Splits data incremental update done.")
 
-        if not first_time:
-            # When incremental updating, don't need to fetch too much data.
-            if len(splits) >= 299:
-                break
-
-    splits_new = pl.DataFrame(splits)
-
-    # splits_diff = splits_new.filter(~pl.col('id').is_in(splits_original['id'].implode()))
-    splits = pl.concat([splits_original, splits_new]).unique()
-    splits.write_parquet(out_file, compression="snappy")
-    print(f"Saved {out_file}. Splits data incremental update done.")
+    except Exception as e:
+        print(f"Error during splits incremental update: {e}")
 
 
 fetch_splits_and_save(splits_dir)

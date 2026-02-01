@@ -29,26 +29,29 @@ def fetch_and_save(asset_type: str, out_dir: str):
         return out_file
 
     all_records = []
-    for active_flag in ["True", "False"]:
-        tickers = []
-        for t in client.list_tickers(
-            market=asset_type,
-            active=active_flag,
-            order="asc",
-            limit="1000",
-            sort="ticker",
-        ):
-            tickers.append(t)
-        all_records.extend(tickers)
+    try:
+        for active_flag in ["True", "False"]:
+            tickers = []
+            for t in client.list_tickers(
+                market=asset_type,
+                active=active_flag,
+                order="asc",
+                limit="1000",
+                sort="ticker",
+            ):
+                tickers.append(t)
+            all_records.extend(tickers)
 
-    df = pl.DataFrame(all_records)
-    # delete last updated all_ticker file(s)
-    for f in os.listdir(out_dir):
-        if f.startswith(f"all_{asset_type}_") and f.endswith(".parquet"):
-            os.remove(os.path.join(out_dir, f))
+        df = pl.DataFrame(all_records)
+        # delete last updated all_ticker file(s)
+        for f in os.listdir(out_dir):
+            if f.startswith(f"all_{asset_type}_") and f.endswith(".parquet"):
+                os.remove(os.path.join(out_dir, f))
 
-    df.write_parquet(out_file, compression="snappy")
-    print(f"Saved {out_file}")
+        df.write_parquet(out_file, compression="snappy")
+        print(f"Saved {out_file}")
+    except Exception as e:
+        print(f"Error fetching {asset_type} data: {e}")
 
 
 for asset, outdir in ASSET_CONFIG.items():

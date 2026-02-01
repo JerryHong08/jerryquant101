@@ -62,7 +62,9 @@ async def main(out_dir=float_shares_dir):
             start_page += batch_size
 
     df = pl.DataFrame(all_data)
-
+    for f in os.listdir(out_dir):
+        if f.startswith("float_shares_") and f.endswith(".parquet"):
+            os.remove(os.path.join(out_dir, f))
     df.write_parquet(out_file, compression="snappy")
     print(f"✔️ Done, Total {len(all_data)} rows saved into float_shares.csv")
 

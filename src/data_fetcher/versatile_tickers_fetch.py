@@ -13,7 +13,7 @@ load_dotenv()
 
 class VersatileFetcher:
     def __init__(self):
-        polygon_api_key = os.getenv("POLYGON_API_KEY")
+        polygon_api_key = os.getenv("POLYGON_API_KEY_indices")
         self.client = RESTClient(polygon_api_key)
 
         os.makedirs(data_dir, exist_ok=True)
