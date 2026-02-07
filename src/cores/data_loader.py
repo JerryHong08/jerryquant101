@@ -321,38 +321,61 @@ class SplitsAdjuster:
 
         Returns:
             Split-adjusted LazyFrame
-        """
-        date_range = lf.select(
-            [
-                pl.col("timestamps").min().alias("date_min"),
-                pl.col("timestamps").max().alias("date_max"),
-            ]
-        ).collect()
 
-        if date_range.height == 0 or date_range[0, 0] is None:
+        Note:
+            Splits are filtered PER TICKER based on each ticker's actual date range.
+            This prevents splits that occur after a ticker's last trading date from
+            corrupting historical data (e.g., delisted stocks with subsequent reverse splits).
+        """
+        # Get per-ticker date ranges to filter splits correctly
+        ticker_date_ranges = (
+            lf.group_by("ticker")
+            .agg(
+                [
+                    pl.col("timestamps").min().alias("date_min"),
+                    pl.col("timestamps").max().alias("date_max"),
+                ]
+            )
+            .collect()
+        )
+
+        if ticker_date_ranges.height == 0:
             return lf
 
-        date_min, date_max = date_range[0, 0], date_range[0, 1]
-        tickers = lf.select(pl.col("ticker").unique()).collect()["ticker"].to_list()
+        tickers = ticker_date_ranges["ticker"].to_list()
 
         if not tickers:
             return lf
 
-        # Filter relevant splits
-        splits_filtered = splits.filter(
-            (pl.col("ticker").is_in(tickers))
-            & (
-                pl.col("execution_date")
-                .str.to_date()
-                .is_between(
-                    date_min.date() - pl.duration(days=1),
-                    date_max.date() + pl.duration(days=1),
+        # Filter splits PER TICKER based on each ticker's actual trading date range
+        # This prevents applying splits that occur after a ticker was delisted
+        splits_filtered_list = []
+        for row in ticker_date_ranges.iter_rows(named=True):
+            ticker = row["ticker"]
+            date_min = row["date_min"]
+            date_max = row["date_max"]
+
+            if date_min is None or date_max is None:
+                continue
+
+            ticker_splits = splits.filter(
+                (pl.col("ticker") == ticker)
+                & (
+                    pl.col("execution_date")
+                    .str.to_date()
+                    .is_between(
+                        date_min.date() - pl.duration(days=1),
+                        date_max.date() + pl.duration(days=1),
+                    )
                 )
             )
-        )
+            if ticker_splits.height > 0:
+                splits_filtered_list.append(ticker_splits)
 
-        if splits_filtered.height == 0:
+        if not splits_filtered_list:
             return lf
+
+        splits_filtered = pl.concat(splits_filtered_list)
 
         # Calculate cumulative split ratios
         splits_with_factor = SplitsAdjuster._calculate_split_factors(splits_filtered)
@@ -1140,14 +1163,14 @@ def stock_load_process(
 
 if __name__ == "__main__":
     # Example usage
-    tickers = ["NVDA", "AAPL", "TSLA"]
+    tickers = ["NVDA"]
     plot = True
     ticker_plot = tickers[0]
     timeframe = "1d"
     result = stock_load_process(
         tickers=tickers,
-        start_date="2024-01-01",
-        end_date="2024-12-01",
+        start_date="2026-01-31",
+        end_date="2026-02-07",
         timeframe=timeframe,
         use_cache=True,
         skip_low_volume=False,

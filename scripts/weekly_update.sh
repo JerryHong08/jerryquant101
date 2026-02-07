@@ -142,7 +142,7 @@ else
 
     # Step 4: Update low volume tickers (requires stock data + splits)
     run_task "Updating low_volume_tickers..." \
-        python scripts/low_volume_ticker_update.py
+        python scripts/low_volume_ticker_update.py -i
 
     echo "" | tee -a "$LOGFILE"
     echo "=== Client tasks completed ===" | tee -a "$LOGFILE"

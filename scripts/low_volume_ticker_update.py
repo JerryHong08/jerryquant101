@@ -47,7 +47,7 @@ class LowVolumeTrackerEventStream:
         print(f"   Min duration: {min_duration_days} days")
 
     def initialize(
-        self, start_date: str = "2015-01-01", end_date: Optional[str] = None
+        self, start_date: str = "2025-01-01", end_date: Optional[str] = None
     ):
         """
         Initialize: full processing from scratch
@@ -62,10 +62,13 @@ class LowVolumeTrackerEventStream:
         print(f"\n🔄 Initializing from {start_date} to {end_date}...")
 
         print("⏳ Loading OHLCV data...")
-        tickers = get_common_stocks(filter_date=start_date).collect()
+        tickers = (
+            get_common_stocks(filter_date=start_date).collect().to_series().to_list()
+        )
+        # tickers = ["NVDA", "AAPL", "RNVA", "NUTR"]
 
         ohlcv_data = stock_load_process(
-            tickers=tickers.to_series().to_list(),
+            tickers=tickers,
             timeframe="1d",
             start_date=start_date,
             end_date=end_date,
@@ -84,6 +87,337 @@ class LowVolumeTrackerEventStream:
         self._export_csv()
 
         print(f"✅ Initialization complete!")
+
+    def incremental_update(self, end_date: Optional[str] = None):
+        """
+        Incremental update: only process new data since the earliest ongoing period_start
+
+        Strategy:
+        1. Load existing state to find ongoing low volume tickers
+        2. Find the earliest period_start among ongoing tickers (or last_check_date if none)
+        3. Only load and process data from that date
+        4. Merge results with existing history
+
+        Args:
+            end_date: End date (YYYY-MM-DD), defaults to today
+        """
+        if end_date is None:
+            end_date = datetime.now().strftime("%Y-%m-%d")
+
+        # Check if state file exists
+        if not self.state_file.exists():
+            print("⚠️  No existing state file found. Running full initialization...")
+            self.initialize(end_date=end_date)
+            return
+
+        print("\n🔄 Starting incremental update...")
+
+        # Load existing state
+        existing_state = pl.read_parquet(self.state_file)
+        print(f"📂 Loaded existing state: {existing_state.height} tickers")
+
+        # Find the incremental start date
+        start_date = self._determine_incremental_start_date(existing_state)
+        print(f"📅 Incremental update from {start_date} to {end_date}")
+
+        # Load only the data we need
+        print("⏳ Loading OHLCV data for incremental period...")
+        tickers = get_common_stocks(filter_date=start_date).collect()
+
+        ohlcv_data = stock_load_process(
+            tickers=tickers.to_series().to_list(),
+            timeframe="1d",
+            start_date=start_date,
+            end_date=end_date,
+            use_cache=True,
+            skip_low_volume=False,
+        ).with_columns(pl.col("timestamps").dt.date().alias("date"))
+
+        print(
+            f"✅ Loaded {ohlcv_data.select(pl.col('ticker').n_unique()).collect().item()} tickers"
+        )
+
+        # Process with existing state as initial state
+        state, new_history = self._process_event_stream_incremental(
+            ohlcv_data, existing_state, start_date
+        )
+
+        # Merge history
+        history = self._merge_history(new_history, start_date)
+
+        self._save_state(state)
+        self._save_history(history)
+        self._export_csv()
+
+        print(f"✅ Incremental update complete!")
+
+    def _determine_incremental_start_date(self, existing_state: pl.DataFrame) -> str:
+        """
+        Determine the start date for incremental update.
+
+        Strategy:
+        - Find the earliest period_start among ongoing low volume tickers
+        - This ensures we re-process any ongoing periods correctly
+        - If no ongoing periods, use the last_check_date
+
+        Args:
+            existing_state: Current state DataFrame
+
+        Returns:
+            Start date string (YYYY-MM-DD)
+        """
+        # Get ongoing low volume tickers
+        ongoing = existing_state.filter(pl.col("is_currently_low_volume"))
+
+        if ongoing.height > 0:
+            # Find earliest period_start among ongoing tickers
+            earliest_period_start = ongoing.select(
+                pl.col("current_period_start").min()
+            ).item()
+
+            if earliest_period_start is not None:
+                print(
+                    f"   Found {ongoing.height} ongoing low volume tickers, "
+                    f"earliest period_start: {earliest_period_start}"
+                )
+                return earliest_period_start.strftime("%Y-%m-%d")
+
+        # Fallback: use the latest last_check_date
+        last_check = existing_state.select(pl.col("last_check_date").max()).item()
+        if last_check is not None:
+            # Start from the day after last check to avoid reprocessing
+            next_day = last_check + timedelta(days=1)
+            print(
+                f"   No ongoing periods, starting from day after last check: {next_day}"
+            )
+            return next_day.strftime("%Y-%m-%d")
+
+        # Ultimate fallback
+        print("   No state info found, starting from 2015-01-01")
+        return "2015-01-01"
+
+    def _process_event_stream_incremental(
+        self,
+        ohlcv_data: pl.LazyFrame,
+        existing_state: pl.DataFrame,
+        start_date: str,
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        """
+        Process event stream with existing state as initial state.
+
+        Args:
+            ohlcv_data: New OHLCV data to process
+            existing_state: Existing state from previous run
+            start_date: Start date of incremental update
+
+        Returns:
+            (state_df, history_df)
+        """
+        print("🔄 Processing incremental event stream...")
+
+        events = (
+            ohlcv_data.with_columns(
+                (pl.col("volume") <= self.low_volume_threshold).alias("is_low_volume")
+            )
+            .collect()
+            .sort(["ticker", "date"])
+        )
+
+        # Initialize ticker_states from existing state
+        ticker_states = {}
+        start_date_parsed = datetime.strptime(start_date, "%Y-%m-%d").date()
+
+        for row in existing_state.iter_rows(named=True):
+            ticker = row["ticker"]
+            # For tickers with ongoing periods starting before our start_date,
+            # we need to restore their state
+            if row["is_currently_low_volume"] and row["current_period_start"]:
+                if row["current_period_start"] < start_date_parsed:
+                    # This ticker has an ongoing period from before our start date
+                    ticker_states[ticker] = {
+                        "is_low_volume": True,
+                        "period_start": row["current_period_start"],
+                        "period_days": row["current_period_days"],
+                        "max_period_days": row["max_period_days"],
+                        "last_check_date": row["last_check_date"],
+                    }
+                else:
+                    # Period started within our processing window, will be reprocessed
+                    ticker_states[ticker] = {
+                        "is_low_volume": False,
+                        "period_start": None,
+                        "period_days": 0,
+                        "max_period_days": row["max_period_days"],
+                        "last_check_date": row["last_check_date"],
+                    }
+            else:
+                # Ticker was not in low volume state
+                ticker_states[ticker] = {
+                    "is_low_volume": False,
+                    "period_start": None,
+                    "period_days": 0,
+                    "max_period_days": row["max_period_days"],
+                    "last_check_date": row["last_check_date"],
+                }
+
+        history_buffer = []
+
+        total_events = len(events)
+        for i, row in enumerate(events.iter_rows(named=True)):
+            ticker = row["ticker"]
+            date = row["date"]
+            is_low_volume = row["is_low_volume"]
+
+            if (i + 1) % 100000 == 0:
+                print(f"   Processed {i+1}/{total_events} events...")
+
+            if ticker not in ticker_states:
+                ticker_states[ticker] = {
+                    "is_low_volume": False,
+                    "period_start": None,
+                    "period_days": 0,
+                    "max_period_days": 0,
+                    "last_check_date": None,
+                }
+
+            state = ticker_states[ticker]
+            prev_is_low = state["is_low_volume"]
+
+            if is_low_volume:
+                if prev_is_low:
+                    state["period_days"] += 1
+                    state["max_period_days"] = max(
+                        state["max_period_days"], state["period_days"]
+                    )
+                else:
+                    state["is_low_volume"] = True
+                    state["period_start"] = date
+                    state["period_days"] = 1
+                    state["max_period_days"] = max(state["max_period_days"], 1)
+            else:
+                if prev_is_low:
+                    if state["period_days"] >= self.min_duration_days:
+                        history_buffer.append(
+                            {
+                                "ticker": ticker,
+                                "period_start": state["period_start"],
+                                "period_end": state["last_check_date"],
+                                "duration_days": state["period_days"],
+                                "status": "closed",
+                            }
+                        )
+
+                    state["is_low_volume"] = False
+                    state["period_start"] = None
+                    state["period_days"] = 0
+
+            state["last_check_date"] = date
+
+        # Handle ongoing periods
+        for ticker, state in ticker_states.items():
+            if (
+                state["is_low_volume"]
+                and state["period_days"] >= self.min_duration_days
+            ):
+                history_buffer.append(
+                    {
+                        "ticker": ticker,
+                        "period_start": state["period_start"],
+                        "period_end": state["last_check_date"],
+                        "duration_days": state["period_days"],
+                        "status": "ongoing",
+                    }
+                )
+
+        state_df = pl.DataFrame(
+            data=[
+                {
+                    "ticker": ticker,
+                    "is_currently_low_volume": state["is_low_volume"],
+                    "current_period_start": state["period_start"],
+                    "current_period_days": state["period_days"],
+                    "max_period_days": state["max_period_days"],
+                    "last_check_date": state["last_check_date"],
+                }
+                for ticker, state in ticker_states.items()
+            ],
+            schema={
+                "ticker": pl.String,
+                "is_currently_low_volume": pl.Boolean,
+                "current_period_start": pl.Date,
+                "current_period_days": pl.Int64,
+                "max_period_days": pl.Int64,
+                "last_check_date": pl.Date,
+            },
+        )
+
+        if history_buffer:
+            history_df = pl.DataFrame(
+                data=history_buffer,
+                schema={
+                    "ticker": pl.String,
+                    "period_start": pl.Date,
+                    "period_end": pl.Date,
+                    "duration_days": pl.Int64,
+                    "status": pl.String,
+                },
+            )
+        else:
+            history_df = pl.DataFrame(
+                schema={
+                    "ticker": pl.String,
+                    "period_start": pl.Date,
+                    "period_end": pl.Date,
+                    "duration_days": pl.Int64,
+                    "status": pl.String,
+                }
+            )
+
+        print(f"✅ Processed {total_events} events")
+        print(
+            f"   Current low volume tickers: {state_df.filter(pl.col('is_currently_low_volume')).height}"
+        )
+        print(f"   New history records: {history_df.height}")
+
+        return state_df, history_df
+
+    def _merge_history(
+        self, new_history: pl.DataFrame, start_date: str
+    ) -> pl.DataFrame:
+        """
+        Merge new history with existing history.
+
+        Strategy:
+        - Keep old history records that started before the incremental start_date
+        - Replace any records that overlap with the new processing window
+        - Add all new history records
+
+        Args:
+            new_history: New history from incremental processing
+            start_date: Start date of incremental update
+
+        Returns:
+            Merged history DataFrame
+        """
+        if not self.history_file.exists():
+            return new_history
+
+        existing_history = pl.read_parquet(self.history_file)
+        start_date_parsed = datetime.strptime(start_date, "%Y-%m-%d").date()
+
+        # Keep only records that ended before our start_date
+        # (records that overlap will be replaced by new processing)
+        old_history = existing_history.filter(pl.col("period_end") < start_date_parsed)
+
+        print(
+            f"   Keeping {old_history.height} old history records, "
+            f"adding {new_history.height} new records"
+        )
+
+        # Combine old and new
+        merged = pl.concat([old_history, new_history], how="vertical")
+
+        return merged
 
     def _process_event_stream(
         self, ohlcv_data: pl.LazyFrame
@@ -114,6 +448,7 @@ class LowVolumeTrackerEventStream:
             .collect()
             .sort(["ticker", "date"])
         )
+        print(f"   Total events to process: {len(events)}")
 
         ticker_states = {}
 
@@ -205,10 +540,10 @@ class LowVolumeTrackerEventStream:
             schema={
                 "ticker": pl.String,
                 "is_currently_low_volume": pl.Boolean,
-                "current_period_start": pl.Date,  # ✅ 显式指定为 Date 类型
+                "current_period_start": pl.Date,
                 "current_period_days": pl.Int64,
                 "max_period_days": pl.Int64,
-                "last_check_date": pl.Date,  # ✅ 显式指定为 Date 类型
+                "last_check_date": pl.Date,
             },
         )
 
@@ -335,8 +670,8 @@ class LowVolumeTrackerEventStream:
             )
             print("   No previous CSV found, initializing notes columns")
         result = result.sort(
-            ["avg_turnover", "max_duration_days", "ticker"],
-            descending=[True, True, False],
+            ["max_duration_end_date", "avg_turnover", "max_duration_days", "ticker"],
+            descending=[True, True, True, False],
         )
 
         result.write_csv(self.csv_file)
@@ -357,6 +692,13 @@ if __name__ == "__main__":
         default=None,
         help="End date for initialization (YYYY-MM-DD), defaults to today",
     )
+    parser.add_argument(
+        "--incremental",
+        "-i",
+        action="store_true",
+        help="Run incremental update instead of full initialization. "
+        "Starts from the earliest period_start of ongoing low volume tickers.",
+    )
 
     args = parser.parse_args()
 
@@ -364,4 +706,7 @@ if __name__ == "__main__":
         data_dir=Path("."), low_volume_threshold=0, min_duration_days=1
     )
 
-    tracker.initialize(start_date=args.start_date, end_date=args.end_date)
+    if args.incremental:
+        tracker.incremental_update(end_date=args.end_date)
+    else:
+        tracker.initialize(start_date=args.start_date, end_date=args.end_date)
