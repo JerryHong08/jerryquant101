@@ -99,8 +99,8 @@ if [ "$MACHINE_ROLE" = "server" ]; then
     run_task "Fetching tickers list (stocks, otc, indices)..." \
         python src/data_fetcher/all_tickers_fetch.py
 
-    run_task "Fetching versatile tickers (IRX, SPX, etc.)..." \
-        python src/data_fetcher/versatile_tickers_fetch.py
+    run_task "Fetching indices data (IRX, SPX, etc.)..." \
+        python src/data_fetcher/indices_fetch.py
 
     run_task "Fetching float shares data..." \
         python src/data_fetcher/fmp_fundamental_fetch.py

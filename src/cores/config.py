@@ -63,6 +63,11 @@ float_shares_dir = os.path.join(data_dir, "raw/us_stocks_sip/float_shares")
 all_tickers_dir = os.path.join(data_dir, "raw/us_stocks_sip/us_all_tickers")
 all_indices_dir = os.path.join(data_dir, "raw/us_indices/us_all_indices")
 
+# ===================== indices day aggregates ================================
+indices_day_aggs_dir = os.path.join(
+    data_dir, "raw/us_indices/us_indices_sip/day_aggs_v1"
+)
+
 # ===================== other data ============================================
 sppc_dir = "/mnt/blackdisk/quant_data/kaggle_data/sppc"
 

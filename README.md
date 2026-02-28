@@ -122,21 +122,7 @@ This directory includes **configs, loaders, and plotting tools**.
 
 ### `live_monitor`
 
-### 1. market_mover_monitor
-
-    This is a another huge part of this project, which concentrates on the US pre-market trading.
-
-1.1. Analyzer and Plotter
-
-First start the web dashboard,
-
-    python src/live_monitor/market_mover/start.py web
-
-Open `http://localhost:5000`, then choose the data supply,see below. And you will see Top20 tickers updated continuously.
-
-![Market Mover Monitor dashboard screenshot](./figures/Market_Mover_Monitor.png)
-
-You can highlight the tickers line, choose the timeframe, see the Hot Movers etc....
+this part is separated and moved to another [repository](https://github.com/JerryHong08/jerryib_trader), now is a web trading platform.
 
 1.2. Data Supply
 
@@ -266,12 +252,15 @@ For example, most of the long-term like over years 0 volume is because of relist
 * ✅ News Fetcher: momo web, fmp, benzinga.
 * ✅ Add Logger
 
+2025-12-04
+
+* ✅ mmm frontend rewrite and moved to jerryib_trade
+
 ---
 
 ## Roadmap
 
 * features to be add:
-* [ ] mmm frontend rewrite.
 * [ ] universal indicator plot.
 * [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
 
