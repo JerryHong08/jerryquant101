@@ -1,8 +1,13 @@
+import logging
 import os
 from pathlib import Path
 
 import polars as pl
 import yaml
+
+from utils.logger import setup_logger
+
+logger = setup_logger(__name__, log_to_file=True, level=logging.WARNING)
 
 # ===================== data root =============================================
 blackdisk_data_dir = "/mnt/blackdisk/quant_data/polygon_data"
@@ -120,12 +125,22 @@ def get_asset_overview_data(asset: str) -> pl.DataFrame:
             ),
         )
         asset_original = pl.read_parquet(asset_file)
+
+        # Try to find error correction file: first the source file, then the copy
+        error_file_to_use = None
         if os.path.exists(asset_error_file):
-            # print(f"Applying error corrections from {asset_error_file}")
-            asset_errors = pl.read_csv(asset_error_file)
-            asset_errors.write_csv(
-                asset_error_file_copy
-            )  # make a copy, you can delete it if you want.
+            error_file_to_use = asset_error_file
+            logger.info(f"Using error corrections from {asset_error_file}")
+        elif os.path.exists(asset_error_file_copy):
+            error_file_to_use = asset_error_file_copy
+            logger.info(f"Using error corrections from copy: {asset_error_file_copy}")
+
+        if error_file_to_use:
+            asset_errors = pl.read_csv(error_file_to_use)
+            # Make a copy to the asset directory if using the source file
+            if error_file_to_use == asset_error_file:
+                asset_errors.write_csv(asset_error_file_copy)
+
             error_type_remove = asset_errors.filter(pl.col("error_type") == "remove")
             error_type_add = asset_errors.filter(pl.col("error_type") == "add").select(
                 pl.all().exclude("error_type")
@@ -142,10 +157,13 @@ def get_asset_overview_data(asset: str) -> pl.DataFrame:
 
             asset_data = pl.concat([filtered_original, error_type_add])
         else:
+            logger.warning(
+                f"No error file found for {asset}, loading original data without corrections."
+            )
             asset_data = asset_original
 
     except (ValueError, FileNotFoundError, OSError) as e:
-        print(f"Error loading {asset}: {e}")
+        logger.error(f"Error loading {asset}: {e}")
         asset_file = None
         asset_original = pl.DataFrame()
         asset_errors = pl.DataFrame()
