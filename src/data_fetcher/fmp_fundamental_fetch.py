@@ -6,7 +6,7 @@ import httpx
 import polars as pl
 from dotenv import load_dotenv
 
-from cores.config import float_shares_dir
+from config import float_shares_dir
 
 os.makedirs(float_shares_dir, exist_ok=True)
 

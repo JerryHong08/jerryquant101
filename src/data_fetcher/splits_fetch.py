@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from matplotlib.pylab import s_
 from polygon import RESTClient
 
-from cores.config import splits_dir
+from config import splits_dir
 
 load_dotenv()
 

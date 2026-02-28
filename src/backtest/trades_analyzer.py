@@ -6,9 +6,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import polars as pl
 
-from cores.config import splits_data
-from utils.backtest_utils.backtest_utils import generate_backtest_date
-from utils.longbridge_utils.update_watchlist import update_watchlist
+from config import splits_data
+from data_supply.date_utils import generate_backtest_date
+from data_supply.ticker_utils import get_mapped_tickers
+from longport.update_watchlist import update_watchlist
 
 strategy_name = "bbiboll"
 
@@ -34,12 +35,7 @@ def load_backtest_data(date):
         return pl.DataFrame()
 
 
-delisted_info = pl.read_csv(
-    "tickers_name_alignment.csv",
-    infer_schema_length=50000,
-    schema_overrides={"group_id": pl.String},
-    try_parse_dates=True,
-)
+delisted_info = get_mapped_tickers()
 
 all_backtest_data = []
 for date in backtest_dates:

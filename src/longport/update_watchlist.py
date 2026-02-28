@@ -4,6 +4,7 @@ import time
 
 import dotenv
 import polars as pl
+
 from longport.openapi import Config, Market, QuoteContext, SecuritiesUpdateMode
 
 dotenv.load_dotenv()

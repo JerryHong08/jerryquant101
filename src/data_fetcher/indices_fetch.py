@@ -6,7 +6,7 @@ import polars as pl
 import requests
 from dotenv import load_dotenv
 
-from cores.config import indices_day_aggs_dir
+from config import indices_day_aggs_dir
 
 load_dotenv()
 

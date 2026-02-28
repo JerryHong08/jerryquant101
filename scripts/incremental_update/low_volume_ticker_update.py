@@ -14,8 +14,13 @@ from typing import Optional
 
 import polars as pl
 
-from cores.data_loader import stock_load_process
-from utils.backtest_utils.backtest_utils import get_common_stocks
+from config import (
+    low_volume_history_parquet,
+    low_volume_state_parquet,
+    low_volume_tickers_csv,
+)
+from data_supply.data_loader import stock_load_process
+from data_supply.ticker_utils import get_common_stocks
 
 
 class LowVolumeTrackerEventStream:
@@ -30,19 +35,23 @@ class LowVolumeTrackerEventStream:
 
     def __init__(
         self,
-        data_dir: Path = Path("."),
         low_volume_threshold: int = 0,
         min_duration_days: int = 1,
     ):
-        self.data_dir = data_dir
         self.low_volume_threshold = low_volume_threshold
         self.min_duration_days = min_duration_days
 
-        self.state_file = data_dir / "low_volume_state.parquet"
-        self.history_file = data_dir / "low_volume_history.parquet"
-        self.csv_file = data_dir / "low_volume_tickers.csv"
+        self.state_file = Path(low_volume_state_parquet)
+        self.history_file = Path(low_volume_history_parquet)
+        self.csv_file = Path(low_volume_tickers_csv)
+
+        # Ensure directory exists
+        self.csv_file.parent.mkdir(parents=True, exist_ok=True)
 
         print(f"📊 LowVolumeTracker initialized:")
+        print(f"   State file: {self.state_file}")
+        print(f"   History file: {self.history_file}")
+        print(f"   CSV file: {self.csv_file}")
         print(f"   Volume threshold: <= {low_volume_threshold}")
         print(f"   Min duration: {min_duration_days} days")
 
@@ -702,9 +711,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    tracker = LowVolumeTrackerEventStream(
-        data_dir=Path("."), low_volume_threshold=0, min_duration_days=1
-    )
+    tracker = LowVolumeTrackerEventStream(low_volume_threshold=0, min_duration_days=1)
 
     if args.incremental:
         tracker.incremental_update(end_date=args.end_date)

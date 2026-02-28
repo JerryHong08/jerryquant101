@@ -4,13 +4,10 @@ import polars as pl
 
 from backtest.engine import BacktestEngine
 from backtest.visualizer import BacktestVisualizer
-from cores.config import all_tickers_dir
-from cores.data_loader import stock_load_process
-from utils.backtest_utils.backtest_utils import (
-    generate_backtest_date,
-    get_common_stocks,
-    load_spx_benchmark,
-)
+from config import all_tickers_dir
+from data_supply.data_loader import stock_load_process
+from data_supply.date_utils import generate_backtest_date
+from data_supply.ticker_utils import get_common_stocks, load_spx_benchmark
 
 
 def run_backtest(strategy, strategy_config=None):

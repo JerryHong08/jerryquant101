@@ -20,7 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_FILE="$PROJECT_ROOT/machine_config.yaml"
 
-LOGFILE="$PROJECT_ROOT/logs/weekly_update_$(date +%Y%m%d_%H%M%S).log"
+LOGFILE="$PROJECT_ROOT/logs/weekly_update_logs/weekly_update_$(date +%Y%m%d_%H%M%S).log"
 mkdir -p "$PROJECT_ROOT/logs"
 
 TOTAL_DAYS=7
@@ -94,16 +94,16 @@ if [ "$MACHINE_ROLE" = "server" ]; then
     echo "Fetching metadata from external APIs..." | tee -a "$LOGFILE"
 
     run_task "Fetching splits data..." \
-        python src/data_fetcher/splits_fetch.py
+        python src/data_supply/splits_fetch.py
 
     run_task "Fetching tickers list (stocks, otc, indices)..." \
-        python src/data_fetcher/all_tickers_fetch.py
+        python src/data_supply/all_tickers_fetch.py
 
     run_task "Fetching indices data (IRX, SPX, etc.)..." \
-        python src/data_fetcher/indices_fetch.py
+        python src/data_supply/indices_fetch.py
 
     run_task "Fetching float shares data..." \
-        python src/data_fetcher/fmp_fundamental_fetch.py
+        python src/data_supply/fmp_fundamental_fetch.py
 
     echo "" | tee -a "$LOGFILE"
     echo "=== Server tasks completed ===" | tee -a "$LOGFILE"
@@ -124,25 +124,25 @@ else
 
     # Step 1: Download stock data from Polygon
     run_task "Downloading minute_aggs_v1 data..." \
-        python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data_supply/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
 
     run_task "Downloading day_aggs_v1 data..." \
-        python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data_supply/polygon_downloader.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
 
     # Step 2: Convert to Parquet format
     run_task "Transforming minute_aggs_v1 to Parquet..." \
-        python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data_supply/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
 
     run_task "Transforming day_aggs_v1 to Parquet..." \
-        python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data_supply/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
 
     # Step 3: Sync metadata from server (splits, tickers, indices, float_shares)
     run_task "Syncing metadata from server..." \
-        python src/data_fetcher/fetch_from_server.py
+        python src/data_supply/fetch_from_server.py
 
     # Step 4: Update low volume tickers (requires stock data + splits)
     run_task "Updating low_volume_tickers..." \
-        python scripts/low_volume_ticker_update.py -i
+        python scripts/incremental_update/low_volume_ticker_update.py -i
 
     echo "" | tee -a "$LOGFILE"
     echo "=== Client tasks completed ===" | tee -a "$LOGFILE"

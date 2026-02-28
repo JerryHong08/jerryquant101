@@ -41,6 +41,17 @@ raw_data_dir = os.path.join(data_dir, "raw")
 cache_dir = os.path.join(data_dir, "processed")
 low_volume_tickers_dir = os.path.join(cache_dir, "low_volume_tickers")
 
+# ===================== low volume tickers ================================
+low_volume_tickers_csv = os.path.join(
+    data_dir, "low_volume_tickers/low_volume_tickers.csv"
+)
+low_volume_state_parquet = os.path.join(
+    data_dir, "low_volume_tickers/low_volume_state.parquet"
+)
+low_volume_history_parquet = os.path.join(
+    data_dir, "low_volume_tickers/low_volume_history.parquet"
+)
+
 # ==================== config of config =======================================
 asset_dir_config = {
     "splits": ["raw/us_stocks_sip/splits", "id"],
@@ -54,7 +65,7 @@ splits_dir = os.path.join(data_dir, "raw/us_stocks_sip/splits")
 splits_error_file_copy = os.path.join(
     data_dir, "raw/us_stocks_sip/splits/splits_error.csv"
 )
-splits_error_file = "src/utils/data_discrepancy_fixed/splits_error.csv"
+splits_error_file = "src/data/data_discrepancy_fixed/splits_error.csv"
 
 # ===================== float shares =====================
 float_shares_dir = os.path.join(data_dir, "raw/us_stocks_sip/float_shares")
@@ -79,7 +90,7 @@ def get_asset_dir(asset):
 
     asset_dir = os.path.join(data_dir, asset_dir_config[asset][0])
     asset_error_file = os.path.join(
-        "src/utils/data_discrepancy_fixed", f"{asset}_error.csv"
+        "src/data/data_discrepancy_fixed", f"{asset}_error.csv"
     )
     asset_error_file_copy = os.path.join(asset_dir, f"{asset}_error.csv")
 

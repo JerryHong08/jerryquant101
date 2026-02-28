@@ -13,9 +13,10 @@ import exchange_calendars as xcals
 import polars as pl
 from dotenv import load_dotenv
 
-from cores.config import data_dir, splits_data
-from utils.data_utils.data_uitils import get_mapped_tickers, resolve_date_range
-from utils.data_utils.path_loader import DataPathFetcher
+from config import data_dir, splits_data
+from data_supply.date_utils import resolve_date_range
+from data_supply.path_loader import DataPathFetcher
+from data_supply.ticker_utils import get_mapped_tickers
 
 load_dotenv()
 
@@ -938,9 +939,11 @@ class StockDataLoader:
     @staticmethod
     def _filter_low_volume(aligned_tickers: pl.LazyFrame) -> pl.LazyFrame:
         """Filter out low volume tickers"""
+        from config import low_volume_tickers_csv
+
         try:
             skipped = (
-                pl.read_csv("low_volume_tickers.csv", truncate_ragged_lines=True)
+                pl.read_csv(low_volume_tickers_csv, truncate_ragged_lines=True)
                 .filter(
                     (pl.col("max_duration_days") > 50)
                     | (pl.col("avg_turnover") < 60000)

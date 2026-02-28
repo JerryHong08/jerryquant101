@@ -5,7 +5,7 @@ This script syncs metadata/reference data from the server machine to the client.
 Used when MACHINE_ROLE=client to get splits, tickers, indices, and float shares data.
 
 Usage:
-    python src/data_fetcher/fetch_from_server.py [--dry-run] [--paths PATH1,PATH2]
+    python src/data_supply/fetch_from_server.py [--dry-run] [--paths PATH1,PATH2]
 """
 
 import argparse

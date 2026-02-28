@@ -6,7 +6,7 @@ from datetime import datetime
 
 import polars as pl
 
-from cores.config import data_dir
+from config import data_dir
 
 print(data_dir)
 #  data_dir/quant_data/polygon_data

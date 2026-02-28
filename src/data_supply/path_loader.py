@@ -7,7 +7,7 @@ import s3fs
 from dotenv import load_dotenv
 
 load_dotenv()
-from cores.config import data_dir
+from config import data_dir
 
 ACCESS_KEY_ID = os.getenv("ACCESS_KEY_ID")
 SECRET_ACCESS_KEY = os.getenv("SECRET_ACCESS_KEY")
