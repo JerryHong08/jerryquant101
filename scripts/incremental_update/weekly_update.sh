@@ -17,7 +17,7 @@ set -e
 # Configuration
 # ===========================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_FILE="$PROJECT_ROOT/machine_config.yaml"
 
 LOGFILE="$PROJECT_ROOT/logs/weekly_update_$(date +%Y%m%d_%H%M%S).log"
