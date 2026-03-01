@@ -14,23 +14,25 @@ documented as a learning journal in LaTeX.
 ## Architecture
 
 ```bash
-quant101/
-├── src/
-│   ├── config.py              # Central config — data paths, machine role, asset loaders
-│   ├── data/
-│   │   ├── fetcher/           # Data acquisition — Polygon.io, FMP, yfinance
-│   │   └── loader/            # Data loading & transformation
-│   ├── backtest/              # Backtesting framework
-│   ├── strategy/              # Trading strategies & indicators
-│   ├── visualizer/            # Standalone charting
-│   ├── longport/              # Longport/Longbridge broker integration
-│   └── utils/                 # Logger, shared utilities
-├── scripts/                   # Operational scripts
-├── docs/                      # LaTeX learning journal & architecture guide
-├── notebooks/                 # Research & exploration notebooks
-├── data/                      # Error correction CSVs, fundamentals
-└── backtest_output/           # Generated reports, charts, position analysis
+src/
+├── config.py                  # Central config — data paths, asset loaders, lazy getters
+├── alpha/                     # Factor research — signals, evaluation, preprocessing, combination
+├── data/
+│   ├── fetcher/               # Data acquisition — Polygon.io S3, FMP, yfinance, rsync
+│   └── loader/                # Data loading — OHLCV, split adjustment, resampling, caching
+├── backtest/                  # Backtesting — engine, strategy base, performance analyzer, visualizer
+├── strategy/                  # Trading strategies & indicator registry
+│   └── indicators/            # Technical indicators (BBIBOLL, OBV, etc.)
+├── visualizer/                # Standalone charting
+├── longport/                  # Longport broker integration
+├── examples/                  # Usage examples
+└── utils/                     # Logger, shared utilities
 ```
+
+**Target modules** (not yet built):
+- `src/risk/` — VaR, CVaR, position sizing, portfolio construction
+- `src/execution/` — Transaction cost modeling
+- `src/ml/` — Feature engineering, time-series validation, tree models
 
 ---
 
@@ -95,6 +97,7 @@ polygon_data/
 - [x] **Factor combination**: Equal-weight, IC-weight, mean-variance, risk-parity on IC covariance
 - [x] **Forward returns**: Utility to compute 1/5/10/20-day forward returns for the universe
 - [x] **Validation notebook**: `notebooks/alpha_research.ipynb` — end-to-end BBIBOLL factor analysis (30 cells, all passing)
+- [x] **Alpha iteration**: `notebooks/alpha_iteration.ipynb` — STR, Volume-Price Divergence, Vol Ratio factors; IC correlation analysis; diversification confirmed (BBIBOLL + Vol Ratio composite |IR|=0.136 > best individual 0.122)
 
 ### Phase 2 — Risk & Portfolio (`src/risk/`)
 
