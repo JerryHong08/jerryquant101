@@ -17,6 +17,7 @@ documented as a learning journal in LaTeX.
 src/
 ├── config.py                  # Central config — data paths, asset loaders, lazy getters
 ├── alpha/                     # Factor research — signals, evaluation, preprocessing, combination
+├── risk/                      # Risk & portfolio — VaR/CVaR, distribution analysis, position sizing
 ├── data/
 │   ├── fetcher/               # Data acquisition — Polygon.io S3, FMP, yfinance, rsync
 │   └── loader/                # Data loading — OHLCV, split adjustment, resampling, caching
@@ -30,7 +31,6 @@ src/
 ```
 
 **Target modules** (not yet built):
-- `src/risk/` — VaR, CVaR, position sizing, portfolio construction
 - `src/execution/` — Transaction cost modeling
 - `src/ml/` — Feature engineering, time-series validation, tree models
 
@@ -99,14 +99,15 @@ polygon_data/
 - [x] **Validation notebook**: `notebooks/alpha_research.ipynb` — end-to-end BBIBOLL factor analysis (30 cells, all passing)
 - [x] **Alpha iteration**: `notebooks/alpha_iteration.ipynb` — STR, Volume-Price Divergence, Vol Ratio factors; IC correlation analysis; diversification confirmed (BBIBOLL + Vol Ratio composite |IR|=0.136 > best individual 0.122)
 
-### Phase 2 — Risk & Portfolio (`src/risk/`)
+### Phase 2 — Risk & Portfolio (`src/risk/`) (🔧 In Progress)
 
 > LaTeX reference: Part IV, Chapters 13–14
 
-- [ ] **Risk measures**: VaR (historical + parametric), CVaR, skewness, kurtosis
-- [ ] **Return distribution analysis**: Histogram vs Gaussian, tail risk quantification
-- [ ] **Position sizing**: Equal-weight, volatility-targeted, half-Kelly
+- [x] **Risk measures**: VaR (historical + parametric), CVaR, drawdown, skewness, kurtosis, tail ratio
+- [x] **Return distribution analysis**: Normality tests (Jarque-Bera, Shapiro-Wilk), QQ-plot data, Gaussian comparison, tail analysis
+- [x] **Position sizing**: Equal-weight, inverse-volatility, volatility-target, half-Kelly
 - [ ] **Portfolio construction**: Market-neutral long-short, factor exposure targeting
+- [x] **Validation notebook**: `notebooks/risk_analysis.ipynb` — end-to-end risk analysis with BBIBOLL + Vol Ratio composite (14 code cells, all passing; 3 bugs found and fixed)
 
 ### Phase 3 — Execution & Cost Modeling (`src/execution/`)
 

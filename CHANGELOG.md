@@ -8,6 +8,14 @@
 
 ### Feat
 
+- **risk**: `risk_metrics.py` — VaR (historical + parametric), CVaR (historical + parametric), drawdown series, max drawdown, skewness, excess kurtosis, tail ratio, `risk_summary()` all-in-one
+- **risk**: `return_analysis.py` — normality tests (Jarque-Bera + Shapiro-Wilk), QQ-plot data, Gaussian comparison histogram, multi-level tail analysis, `distribution_summary()` all-in-one
+- **risk**: `position_sizing.py` — equal-weight, inverse-volatility, volatility-target, half-Kelly long-short sizing; `compute_realized_volatility()` utility
+- **notebook**: `risk_analysis.ipynb` — end-to-end risk analysis (14 code cells): distribution tests, VaR/CVaR comparison, drawdown, position sizing comparison across 4 methods
+
+### Fix
+
+- **risk**: `cvar_parametric()` sign error — conditional left-tail mean is μ − σ·φ(z)/(1−α), not μ + σ·φ(z)/(1−α); was producing negative CVaR
 - **config**: Renamed machine_config.yaml → basic_config.yaml, added standalone single-machine mode
 - **scripts**: Renamed weekly_update.sh → data_update.sh, added standalone mode (9-task pipeline)
 - **config**: Unified config structure — `update.mode` replaces `machine.role`, `data.data_dir` replaces split server/client dirs
@@ -36,8 +44,8 @@
 - **alpha**: Factor research framework — IC / Rank IC / IR / decay / turnover analysis
 - **alpha**: Cross-sectional factor construction, neutralization, orthogonalization
 - **alpha**: Factor combination (linear, mean-variance, risk parity)
-- **risk**: Factor risk model, covariance estimation
-- **risk**: Portfolio optimization, position sizing (Kelly, risk parity)
+- **risk**: ~~Factor risk model, covariance estimation~~ (partially done — risk_metrics.py)
+- **risk**: ~~Portfolio optimization, position sizing (Kelly, risk parity)~~ ✅
 - **execution**: Slippage and market impact modeling for backtests
 - **backtest**: Engine rewrite — Polars ETL + numba core loop
 - **backtest**: Walk-forward / out-of-sample validation framework
