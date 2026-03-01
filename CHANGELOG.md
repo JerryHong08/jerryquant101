@@ -11,6 +11,25 @@
 - **config**: Renamed machine_config.yaml → basic_config.yaml, added standalone single-machine mode
 - **scripts**: Renamed weekly_update.sh → data_update.sh, added standalone mode (9-task pipeline)
 - **config**: Unified config structure — `update.mode` replaces `machine.role`, `data.data_dir` replaces split server/client dirs
+- **docs**: Rewrote `quant_lab.tex` — lab-module structure (5 Parts + Appendices, 17 chapters, 55 pages). Methodology-oriented, not hardcoded architecture. Each chapter: Motivation → Concepts → Implementation → Experiment → Reflection
+
+### Refactor
+
+- **data**: Merged `data_fetcher/` + `data_supply/` into unified `src/data/` package (`data/fetcher/` + `data/loader/`)
+- **strategy**: Renamed `strategies/` → `strategy/`, `bbibollStrategy.py` → `bbiboll_strategy.py` (PEP 8)
+- **i18n**: Translated all Chinese comments, docstrings, and print messages to English (~35 items across 3 files)
+- **config**: Removed hardcoded `sppc_dir`, deferred `splits_data` to lazy getter `get_splits_data()`, removed dead `llmContext` loader
+- **cleanup**: Deleted 5 dead files (`main.py`, 2 backtest examples, `plotter.py`, `cuda_env_test.py`)
+
+### Fix
+
+- **data/fetcher**: `csvgz_to_parquet.py` — argparse rejected its own default (`zstd` missing from choices)
+- **data/fetcher**: `splits_fetch.py` — removed wrong unused `matplotlib.pylab` import
+- **data/fetcher**: `fmp_fundamental_fetch.py` — print message said "csv" but file writes parquet
+- **data/fetcher**: `indices_fetch.py` — removed debug print left in production code
+- **backtest**: `performance_analyzer.py` — trading fee now configurable (was hardcoded 0.7%), calmar ratio properly implemented (was stub returning 0.0)
+- **backtest**: `backtester.py` — fixed boolean precedence bug (`or` vs `and not`), fixed typo "isexported"
+- **scripts**: `write_overview_csv.py` — removed wrong unused `duckdb` import
 
 ### Planned
 
@@ -22,10 +41,10 @@
 - **execution**: Slippage and market impact modeling for backtests
 - **backtest**: Engine rewrite — Polars ETL + numba core loop
 - **backtest**: Walk-forward / out-of-sample validation framework
-- **data**: Unify data_fetcher + data_supply into a single `data/` module
+- **data**: ~~Unify data_fetcher + data_supply into a single `data/` module~~ ✅
 - **data**: Universe construction module (liquid universe, sector mapping)
 - **research**: Structured research notebook templates (factor exploration → signal → backtest → report)
-- **cli**: Unified entry point via typer/click (replace empty main.py)
+- **cli**: Unified entry point via typer/click
 - **docs**: LaTeX learning journal — probability, statistics, time series, alpha research, risk, microstructure, ML, stochastic calculus
 
 ### Known Issues (Carried Forward)
@@ -42,16 +61,16 @@
 
 - **backtest**: trades_analyzer — post-hoc analysis of open positions across rolling backtest dates with Plotly animated scatter charts
 - **backtest**: BBIBOLL rolling weekly backtest runner across 60+ date windows
-- **strategies**: BBIBOLL strategy — BBI + Bollinger Band deviation with stop-loss/take-profit rules
-- **strategies/indicators**: Decorator-based indicator registry with per-ticker group application
-- **strategies/indicators**: BBI + Bollinger deviation percentile rank indicator (TA-Lib)
-- **strategies/indicators**: OBV indicator
-- **data_supply**: Risk-free rate (IRX) and SPX benchmark loader
-- **data_supply**: Trading calendar-aware date utilities — weekly/monthly backtest date sequences
-- **data_supply**: FIGI-based ticker mapping via connected components (tracks name changes/delistings)
-- **data_fetcher**: Float shares fetcher (FinancialModelingPrep, async paginated)
-- **data_fetcher**: Index daily aggregates fetcher (SPX, IRX) with incremental updates
-- **data_fetcher**: Rsync-based multi-machine data sync (server → client)
+- **strategy**: BBIBOLL strategy — BBI + Bollinger Band deviation with stop-loss/take-profit rules
+- **strategy/indicators**: Decorator-based indicator registry with per-ticker group application
+- **strategy/indicators**: BBI + Bollinger deviation percentile rank indicator (TA-Lib)
+- **strategy/indicators**: OBV indicator
+- **data/loader**: Risk-free rate (IRX) and SPX benchmark loader
+- **data/loader**: Trading calendar-aware date utilities — weekly/monthly backtest date sequences
+- **data/loader**: FIGI-based ticker mapping via connected components (tracks name changes/delistings)
+- **data/fetcher**: Float shares fetcher (FinancialModelingPrep, async paginated)
+- **data/fetcher**: Index daily aggregates fetcher (SPX, IRX) with incremental updates
+- **data/fetcher**: Rsync-based multi-machine data sync (server → client)
 - **scripts**: file_examiner — inspects Polygon data directory tree, reports coverage dates
 - **scripts**: data_update.sh — mode-aware incremental data refresh orchestrator (standalone/server/client)
 - **scripts**: low_volume_ticker_update — event-stream state machine for zero-volume ticker tracking
@@ -70,7 +89,7 @@
 
 - **backtest**: trades_analyzer delisted status bug fixed
 - **scripts**: versatile → indices_update, changed dir, fixed proxy problem
-- **data_supply**: Low-volume ticker incremental update fixed
+- **data/supply**: Low-volume ticker incremental update fixed
 - **live_monitor**: Replay mode migrated to Redis Stream
 
 ### Refactor
@@ -88,12 +107,12 @@
 
 ### Feat
 
-- **data_fetcher**: Polygon.io S3 flat file downloader (stocks, options, indices, crypto, forex)
-- **data_fetcher**: CSV.gz → Parquet converter with schema mapping per data type
-- **data_fetcher**: All-tickers fetcher (stocks, OTC, indices) via Polygon REST API
-- **data_fetcher**: Stock splits fetcher with incremental update support
-- **data_supply**: Core data loader — OHLCV from Parquet/S3, split adjustment, timeframe resampling, caching
-- **data_supply**: DataPathLoader — file path calculation for Polygon flat files (local + S3)
+- **data/fetcher**: Polygon.io S3 flat file downloader (stocks, options, indices, crypto, forex)
+- **data/fetcher**: CSV.gz → Parquet converter with schema mapping per data type
+- **data/fetcher**: All-tickers fetcher (stocks, OTC, indices) via Polygon REST API
+- **data/fetcher**: Stock splits fetcher with incremental update support
+- **data/loader**: Core data loader — OHLCV from Parquet/S3, split adjustment, timeframe resampling, caching
+- **data/loader**: DataPathLoader — file path calculation for Polygon flat files (local + S3)
 - **backtest**: BacktestEngine with abstract StrategyBase interface
 - **backtest**: PerformanceAnalyzer — Sharpe, Sortino, CAGR, max drawdown, win rate, payoff ratio
 - **backtest**: BacktestVisualizer — equity curves, monthly heatmaps, candlestick with signals

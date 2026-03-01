@@ -1,8 +1,8 @@
 import polars as pl
 
 from backtest.visualizer import BacktestVisualizer
-from data_supply.data_loader import stock_load_process
-from strategies.indicators.registry import get_indicator
+from data.loader.data_loader import stock_load_process
+from strategy.indicators.registry import get_indicator
 from visualizer.figure import Visualizer
 
 visualizer = BacktestVisualizer()

@@ -1,5 +1,4 @@
 import polars as pl
-from duckdb import df
 
 from config import get_asset_overview_data
 

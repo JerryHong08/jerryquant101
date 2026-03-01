@@ -53,10 +53,6 @@ class IndicesFetcher:
                     pl.from_epoch(pl.col("timestamp"), time_unit="ms")
                 ).sort("timestamp")
 
-                print(
-                    f"debug: current data range {update_data.head(1).select('timestamp').to_series().to_list()[0]} - {update_data.tail(1).select('timestamp').to_series().to_list()[0]}"
-                )
-
                 last_updated = update_data["timestamp"].max().strftime("%Y-%m-%d")
                 start_ = (
                     datetime.strptime(last_updated, "%Y-%m-%d") + timedelta(days=1)

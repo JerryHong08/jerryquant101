@@ -2,7 +2,7 @@
 
 A personal quantitative trader & researcher learning project.
 
-Built around US equities data from [Polygon.io](https://polygon.io/) flat files,
+Built around US equities data from [Massive(Polygon.io)](https://massive.com/) flat files,
 processed with [Polars](https://pola.rs/), backtested with a custom engine, and
 documented as a learning journal in LaTeX.
 
@@ -13,40 +13,19 @@ documented as a learning journal in LaTeX.
 
 ## Architecture
 
-```
+```bash
 quant101/
 ├── src/
 │   ├── config.py              # Central config — data paths, machine role, asset loaders
-│   ├── data_fetcher/          # Data acquisition — Polygon.io, FMP, yfinance
-│   │   ├── polygon_downloader.py      # S3 flat file download (stocks, options, indices, crypto)
-│   │   ├── csvgz_to_parquet.py        # CSV.gz → Parquet conversion with schema mapping
-│   │   ├── all_tickers_fetch.py       # Full ticker list (stocks, OTC, indices) via REST API
-│   │   ├── splits_fetch.py            # Stock splits with incremental updates
-│   │   ├── indices_fetch.py           # Index daily aggs (SPX, IRX)
-│   │   ├── fmp_fundamental.py         # Float shares (async, paginated)
-│   │   └── fetch_from_server.py       # Rsync multi-machine data sync
-│   ├── data_supply/           # Data loading & transformation
-│   │   ├── data_loader.py             # Core OHLCV loader — split-adjusted, resampled, cached
-│   │   ├── benchmark_loader.py        # IRX risk-free rate, SPX benchmark
-│   │   ├── date_utils.py              # Trading calendar date math (XNYS)
-│   │   ├── path_loader.py             # File path resolver (local + S3)
-│   │   └── ticker_utils.py            # FIGI-based ticker mapping & universe filtering
+│   ├── data/
+│   │   ├── fetcher/           # Data acquisition — Polygon.io, FMP, yfinance
+│   │   └── loader/            # Data loading & transformation
 │   ├── backtest/              # Backtesting framework
-│   │   ├── backtest_engine.py         # Orchestrator — runs strategies, exports reports
-│   │   ├── strategy_base.py           # Abstract base: prepare_data → generate_signals → simulate
-│   │   ├── performance_analyzer.py    # Sharpe, Sortino, CAGR, drawdown, win rate
-│   │   ├── backtest_visualizer.py     # Equity curves, heatmaps, candlestick with signals
-│   │   ├── run_backtest.py            # End-to-end runner (main entry point)
-│   │   └── trades_analyzer.py         # Post-hoc position analysis with Plotly animation
-│   ├── strategies/            # Trading strategies & indicators
-│   │   ├── bbiboll_strategy.py        # BBI + Bollinger Band deviation strategy
-│   │   └── indicators/               # Registry-based indicator system (TA-Lib)
+│   ├── strategy/              # Trading strategies & indicators
 │   ├── visualizer/            # Standalone charting
 │   ├── longport/              # Longport/Longbridge broker integration
 │   └── utils/                 # Logger, shared utilities
 ├── scripts/                   # Operational scripts
-│   ├── incremental_update/            # data_update.sh, low_volume_ticker_update.py
-│   └── file_examiner.py              # Data directory inspector
 ├── docs/                      # LaTeX learning journal & architecture guide
 ├── notebooks/                 # Research & exploration notebooks
 ├── data/                      # Error correction CSVs, fundamentals
@@ -62,15 +41,17 @@ quant101/
 Configure your data paths and update mode in `basic_config.yaml` (copy from `basic_config.yaml.example`), then:
 
 ```bash
-# Download recent Polygon.io flat files
-python src/data_fetcher/polygon_downloader.py \
+# Data acquisition scripts under data/fetcher
+# Example: 
+# Download recent Polygon.io whole market daily flat files
+python src/data/fetcher/polygon_downloader.py \
     --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days 7
 
 # Convert to Parquet
-python src/data_fetcher/csvgz_to_parquet.py \
+python src/data/fetcher/csvgz_to_parquet.py \
     --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days 7
 
-# Or run the full incremental update (standalone mode by default)
+# incremental update (standalone mode by default)
 bash scripts/incremental_update/data_update.sh
 ```
 
@@ -82,7 +63,7 @@ python src/backtest/run_backtest.py
 
 ### 3. Data Directory Structure
 
-```
+```bash
 polygon_data/
 ├── lake/           # Parquet files (converted from csv.gz)
 ├── processed/      # Cached/resampled data
@@ -93,17 +74,66 @@ polygon_data/
 
 ## Roadmap
 
-### v1.0.0 — Quant Research Framework (Next)
+### Phase 0 — Foundation (✅ Complete)
 
-- [ ] **Alpha Research**: Factor IC/IR analysis, cross-sectional factor construction, decay & turnover
-- [ ] **Risk & Portfolio**: Factor risk model, covariance estimation, portfolio optimization
-- [ ] **Backtest Rewrite**: Polars ETL + numba engine, walk-forward validation
-- [ ] **Execution Model**: Slippage & market impact modeling
-- [ ] **Data Unification**: Merge data_fetcher + data_supply into single `data/` module
-- [ ] **Universe Construction**: Liquid universe, sector mapping
-- [ ] **CLI**: Unified entry point via typer (replace empty main.py)
-- [ ] **Research Notebooks**: Templated workflow — factor exploration → signal → backtest → report
-- [ ] **Documentation**: LaTeX learning journal covering probability, time series, alpha, risk, ML
+- [x] Data pipeline: Polygon.io S3 flat files → Parquet, split adjustment, FIGI ticker mapping
+- [x] Backtest engine: Abstract `StrategyBase` → `BacktestEngine` → `PerformanceAnalyzer`
+- [x] BBIBOLL strategy: BBI + Bollinger Band deviation, indicator registry
+- [x] Data unification: Merged `data_fetcher/` + `data_supply/` into `src/data/` (fetcher + loader)
+- [x] Code quality: English-only codebase, dead code removed, 7 critical bugs fixed
+- [x] Documentation: LaTeX learning journal (55 pages, 5 Parts, 17 chapters)
+- [x] Config: `basic_config.yaml` with standalone/server/client modes
+
+### Phase 1 — Alpha Research Framework (`src/alpha/`) (✅ Complete)
+
+> LaTeX reference: Part III, Chapters 9–12
+
+- [x] **Factor base**: Factor abstraction — `(date, ticker, value)` signal DataFrame convention
+- [x] **Factor evaluation**: `FactorAnalyzer` — IC series, IR, IC decay curve, turnover, quantile returns
+- [x] **Factor preprocessing**: `preprocess_factor()` — winsorize, z-score, rank-normalize, sector neutralize
+- [x] **Factor construction**: Convert BBIBOLL deviation to cross-sectional factor, 20-day momentum factor
+- [x] **Factor combination**: Equal-weight, IC-weight, mean-variance, risk-parity on IC covariance
+- [x] **Forward returns**: Utility to compute 1/5/10/20-day forward returns for the universe
+- [x] **Validation notebook**: `notebooks/alpha_research.ipynb` — end-to-end BBIBOLL factor analysis (30 cells, all passing)
+
+### Phase 2 — Risk & Portfolio (`src/risk/`)
+
+> LaTeX reference: Part IV, Chapters 13–14
+
+- [ ] **Risk measures**: VaR (historical + parametric), CVaR, skewness, kurtosis
+- [ ] **Return distribution analysis**: Histogram vs Gaussian, tail risk quantification
+- [ ] **Position sizing**: Equal-weight, volatility-targeted, half-Kelly
+- [ ] **Portfolio construction**: Market-neutral long-short, factor exposure targeting
+
+### Phase 3 — Execution & Cost Modeling (`src/execution/`)
+
+> LaTeX reference: Part IV, Chapter 15
+
+- [ ] **Cost model**: Fixed cost, spread model, square-root market impact model
+- [ ] **Cost integration**: Plug cost model into backtest engine
+- [ ] **Cost sensitivity analysis**: Sharpe vs. cost curve, breakeven cost
+
+### Phase 4 — Backtest Engine Rewrite
+
+> LaTeX reference: Part II, Chapters 7–8
+
+- [ ] **Engine rewrite**: Polars ETL + numba core loop
+- [ ] **Walk-forward validation**: Rolling train/test with purged embargo
+- [ ] **Statistical significance**: Bootstrap Sharpe confidence intervals
+
+### Phase 5 — ML Integration (`src/ml/`)
+
+> LaTeX reference: Part V, Chapters 16–18
+
+- [ ] **Feature engineering**: Factor values as features, lagged returns, volatility features
+- [ ] **Time-series validation**: Purged k-fold, embargo gap
+- [ ] **Tree models**: LightGBM/XGBoost return prediction, feature importance analysis
+
+### Phase 6 — Infrastructure
+
+- [ ] **Universe construction**: Liquid universe module, sector/industry mapping (GICS)
+- [ ] **CLI**: Unified `typer` entry point (backtest, alpha, data-update)
+- [ ] **Research notebooks**: Templated workflow — factor exploration → signal → backtest → report
 
 ### Open Bugs
 

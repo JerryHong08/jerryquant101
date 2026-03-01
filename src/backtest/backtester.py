@@ -5,10 +5,10 @@ import polars as pl
 from backtest.engine import BacktestEngine
 from backtest.visualizer import BacktestVisualizer
 from config import all_tickers_dir
-from data_supply.benchmark_loader import load_spx_benchmark
-from data_supply.data_loader import stock_load_process
-from data_supply.date_utils import generate_backtest_date
-from data_supply.ticker_utils import get_common_stocks
+from data.loader.benchmark_loader import load_spx_benchmark
+from data.loader.data_loader import stock_load_process
+from data.loader.date_utils import generate_backtest_date
+from data.loader.ticker_utils import get_common_stocks
 
 
 def run_backtest(strategy, strategy_config=None):
@@ -69,8 +69,7 @@ def run_backtest(strategy, strategy_config=None):
         if (
             len(strategy_config.get("selected_tickers", [])) > 2000
             or selected_ticker == "random"
-            and not strategy_config["silent"]
-        ):
+        ) and not strategy_config["silent"]:
             engine.plot_results(
                 strategy_name=strategy_name,
                 plot_equity=True,
@@ -146,11 +145,11 @@ def run_backtest(strategy, strategy_config=None):
     for metric, value in key_metrics:
         print(f"{metric:<12}: {value}")
 
-    print(f"\nBacktest done! result isexported to {output_dir}")
+    print(f"\nBacktest done! Results exported to {output_dir}")
 
 
 if __name__ == "__main__":
-    from strategies.bbibollStrategy import BBIBOLLStrategy
+    from strategy.bbiboll_strategy import BBIBOLLStrategy
 
     print("BBIBOLL Strategy Backtest")
     print("=" * 60)

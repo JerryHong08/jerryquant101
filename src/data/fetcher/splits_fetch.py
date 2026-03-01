@@ -3,7 +3,6 @@ import time
 
 import polars as pl
 from dotenv import load_dotenv
-from matplotlib.pylab import s_
 from polygon import RESTClient
 
 from config import splits_dir

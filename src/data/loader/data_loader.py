@@ -13,10 +13,10 @@ import exchange_calendars as xcals
 import polars as pl
 from dotenv import load_dotenv
 
-from config import data_dir, splits_data
-from data_supply.date_utils import resolve_date_range
-from data_supply.path_loader import DataPathFetcher
-from data_supply.ticker_utils import get_mapped_tickers
+from config import data_dir, get_splits_data
+from data.loader.date_utils import resolve_date_range
+from data.loader.path_loader import DataPathFetcher
+from data.loader.ticker_utils import get_mapped_tickers
 
 load_dotenv()
 
@@ -967,7 +967,7 @@ class StockDataLoader:
         lf = self.ticker_aligner.align_ohlcv_data(lf).lazy()
 
         print("Adjusting for splits...")
-        splits_aligned = self.ticker_aligner.align_splits_data(splits_data)
+        splits_aligned = self.ticker_aligner.align_splits_data(get_splits_data())
         lf = self.splits_adjuster.adjust(lf, splits_aligned.collect())
 
         return lf

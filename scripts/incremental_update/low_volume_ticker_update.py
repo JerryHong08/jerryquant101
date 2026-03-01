@@ -19,8 +19,8 @@ from config import (
     low_volume_state_parquet,
     low_volume_tickers_csv,
 )
-from data_supply.data_loader import stock_load_process
-from data_supply.ticker_utils import get_common_stocks
+from data.loader.data_loader import stock_load_process
+from data.loader.ticker_utils import get_common_stocks
 
 
 class LowVolumeTrackerEventStream:

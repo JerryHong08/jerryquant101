@@ -25,7 +25,7 @@ def _get_data_dir_from_config() -> str:
       2. update.mode in basic_config.yaml
     Raises FileNotFoundError if basic_config.yaml is missing.
     """
-    config_path = Path(__file__).resolve().parents[2] / _CONFIG_FILENAME
+    config_path = Path(__file__).resolve().parents[1] / _CONFIG_FILENAME
 
     if not config_path.exists():
         raise FileNotFoundError(
@@ -90,9 +90,6 @@ all_indices_dir = os.path.join(data_dir, "raw/us_indices/us_all_indices")
 indices_day_aggs_dir = os.path.join(
     data_dir, "raw/us_indices/us_indices_sip/day_aggs_v1"
 )
-
-# ===================== other data ============================================
-sppc_dir = "/mnt/blackdisk/quant_data/kaggle_data/sppc"
 
 
 # ===================== data_return_functions =================================
@@ -179,19 +176,15 @@ def get_asset_overview_data(asset: str) -> pl.DataFrame:
     return asset_data
 
 
-splits_data = get_asset_overview_data(asset="splits")
+_splits_data_cache = None
 
 
-from pathlib import Path
-
-PROMPT_DIR = Path(__file__).resolve().parents[0] / "llmContext"
-
-
-def load_prompt(name: str) -> str:
-    path = PROMPT_DIR / name
-    if not path.exists():
-        raise FileNotFoundError(f"Prompt not found: {path}")
-    return path.read_text(encoding="utf-8")
+def get_splits_data() -> pl.DataFrame:
+    """Lazy-load splits overview data (cached after first call)."""
+    global _splits_data_cache
+    if _splits_data_cache is None:
+        _splits_data_cache = get_asset_overview_data(asset="splits")
+    return _splits_data_cache
 
 
 if __name__ == "__main__":

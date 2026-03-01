@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 import polars as pl
 
 from config import cache_dir
-from data_supply.benchmark_loader import load_irx_data
+from data.loader.benchmark_loader import load_irx_data
 
 strategy_cache_dir = os.path.join(cache_dir, "strategies")
 
@@ -83,8 +83,8 @@ class StrategyBase(ABC):
 
         Returns:
             tuple: (trades_df, portfolio_daily_df)
-                - trades_df: 每笔交易记录
-                - portfolio_daily_df: 每日组合表现
+                - trades_df: Individual trade records
+                - portfolio_daily_df: Daily portfolio performance
         """
         pass
 

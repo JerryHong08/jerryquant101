@@ -10,9 +10,9 @@ __pycache__/
 env/
 venv/
 
-# Jupyter Notebook / discard / experiments
+# discard or AI
+claude/
 .ipynb_checkpoints
-notebooks/
 discard/
 
 # VSCode
@@ -36,6 +36,3 @@ docs/
 src/strategies/*
 !src/strategies/indicators/
 basic_config.yaml
-
-# AI
-claude/

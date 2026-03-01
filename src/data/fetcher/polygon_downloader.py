@@ -101,11 +101,11 @@ class PolygonDownloader:
         try:
             print(f"Downloading: {s3_key}")
 
-            # 获取文件大小
+            # Get file size
             obj = self.s3.head_object(Bucket=BUCKET_NAME, Key=s3_key)
             total_size = obj["ContentLength"]
 
-            # 进度条回调
+            # Progress bar callback
             pbar = tqdm(
                 total=total_size,
                 unit="B",
@@ -126,7 +126,7 @@ class PolygonDownloader:
                     speed=f"{speed/1024:.1f}KB/s",
                 )
 
-            # 下载文件
+            # Download file
             self.s3.download_file(
                 BUCKET_NAME,
                 s3_key,
@@ -288,16 +288,16 @@ def main():
     else:
         print("\nUsage examples:")
         print(
-            "  List files: python src/data_supply/polygon_downloader.py --list --prefix us_stocks_sip/trades_v1/2024/"
+            "  List files: python src/data/fetcher/polygon_downloader.py --list --prefix us_stocks_sip/trades_v1/2024/"
         )
         print(
-            "  Download recent 7 days: python src/data_supply/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days 7"
+            "  Download recent 7 days: python src/data/fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days 7"
         )
         print(
-            "  Download date range: python src/data_supply/polygon_downloader.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
+            "  Download date range: python src/data/fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type trades_v1 --start-date 2024-03-01 --end-date 2024-03-07"
         )
         print(
-            "  Download specific file: python src/data_supply/polygon_downloader.py --specific-file us_stocks_sip/minute_aggs_v1/2024-03-07.csv.gz"
+            "  Download specific file: python src/data/fetcher/polygon_downloader.py --specific-file us_stocks_sip/minute_aggs_v1/2024-03-07.csv.gz"
         )
 
 

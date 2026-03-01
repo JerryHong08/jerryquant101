@@ -97,30 +97,30 @@ if [ "$UPDATE_MODE" = "standalone" ]; then
 
     # Step 1: Fetch metadata from APIs
     run_task "Fetching splits data..." \
-        python src/data_fetcher/splits_fetch.py
+        python src/data/fetcher/splits_fetch.py
 
     run_task "Fetching tickers list (stocks, otc, indices)..." \
-        python src/data_fetcher/all_tickers_fetch.py
+        python src/data/fetcher/all_tickers_fetch.py
 
     run_task "Fetching indices data (IRX, SPX, etc.)..." \
-        python src/data_fetcher/indices_fetch.py
+        python src/data/fetcher/indices_fetch.py
 
     run_task "Fetching float shares data..." \
-        python src/data_fetcher/fmp_fundamental.py
+        python src/data/fetcher/fmp_fundamental.py
 
     # Step 2: Download stock data from Polygon
     run_task "Downloading minute_aggs_v1 data..." \
-        python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data/fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
 
     run_task "Downloading day_aggs_v1 data..." \
-        python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data/fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
 
     # Step 3: Convert to Parquet format
     run_task "Transforming minute_aggs_v1 to Parquet..." \
-        python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data/fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
 
     run_task "Transforming day_aggs_v1 to Parquet..." \
-        python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data/fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
 
     # Step 4: Update low volume tickers
     run_task "Updating low_volume_tickers..." \
@@ -141,16 +141,16 @@ elif [ "$UPDATE_MODE" = "server" ]; then
     echo "Fetching metadata from external APIs..." | tee -a "$LOGFILE"
 
     run_task "Fetching splits data..." \
-        python src/data_fetcher/splits_fetch.py
+        python src/data/fetcher/splits_fetch.py
 
     run_task "Fetching tickers list (stocks, otc, indices)..." \
-        python src/data_fetcher/all_tickers_fetch.py
+        python src/data/fetcher/all_tickers_fetch.py
 
     run_task "Fetching indices data (IRX, SPX, etc.)..." \
-        python src/data_fetcher/indices_fetch.py
+        python src/data/fetcher/indices_fetch.py
 
     run_task "Fetching float shares data..." \
-        python src/data_fetcher/fmp_fundamental.py
+        python src/data/fetcher/fmp_fundamental.py
 
     echo "" | tee -a "$LOGFILE"
     echo "=== Server tasks completed ===" | tee -a "$LOGFILE"
@@ -171,21 +171,21 @@ elif [ "$UPDATE_MODE" = "client" ]; then
 
     # Step 1: Download stock data from Polygon
     run_task "Downloading minute_aggs_v1 data..." \
-        python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data/fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
 
     run_task "Downloading day_aggs_v1 data..." \
-        python src/data_fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data/fetcher/polygon_downloader.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
 
     # Step 2: Convert to Parquet format
     run_task "Transforming minute_aggs_v1 to Parquet..." \
-        python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data/fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type minute_aggs_v1 --recent-days $TOTAL_DAYS
 
     run_task "Transforming day_aggs_v1 to Parquet..." \
-        python src/data_fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
+        python src/data/fetcher/csvgz_to_parquet.py --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days $TOTAL_DAYS
 
     # Step 3: Sync metadata from server (splits, tickers, indices, float_shares)
     run_task "Syncing metadata from server..." \
-        python src/data_fetcher/fetch_from_server.py
+        python src/data/fetcher/fetch_from_server.py
 
     # Step 4: Update low volume tickers (requires stock data + splits)
     run_task "Updating low_volume_tickers..." \

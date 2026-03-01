@@ -1,5 +1,5 @@
 """
-Data Supply Module - Utilities for data loading, ticker management, and date calculations.
+Data Loader Module - Utilities for data loading, ticker management, and date calculations.
 
 Modules:
     ticker_utils: Ticker mapping and filtering (get_mapped_tickers, get_common_stocks)
@@ -9,23 +9,23 @@ Modules:
 """
 
 # Benchmark loaders
-from data_supply.benchmark_loader import (
+from data.loader.benchmark_loader import (
     load_irx_data,
     load_spx_benchmark,
 )
 
 # Date utilities
-from data_supply.date_utils import (
+from data.loader.date_utils import (
     generate_backtest_date,
     generate_backtest_dates,
     resolve_date_range,
 )
 
 # Path loader
-from data_supply.path_loader import DataPathFetcher
+from data.loader.path_loader import DataPathFetcher
 
 # Ticker utilities
-from data_supply.ticker_utils import (
+from data.loader.ticker_utils import (
     clear_common_stocks_cache,
     get_common_stocks,
     get_common_stocks_full,

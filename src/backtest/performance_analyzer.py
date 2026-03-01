@@ -10,8 +10,9 @@ class PerformanceAnalyzer:
     Backtest performance analyzer for calculating various performance metrics
     """
 
-    def __init__(self, initial_capital: float = 100.0):
+    def __init__(self, initial_capital: float = 100.0, trading_fee_rate: float = 0.007):
         self.initial_capital = initial_capital
+        self.trading_fee_rate = trading_fee_rate
 
     def calculate_performance_metrics(
         self,
@@ -71,10 +72,10 @@ class PerformanceAnalyzer:
 
         returns = portfolio_daily["portfolio_return"].drop_nulls()
 
-        risk_metrics = self._calculate_risk_metrics(returns)
+        risk_metrics = self._calculate_risk_metrics(returns, np.min(drawdown))
 
-        # Trading fees calculation (assume 0.7% per trade)
-        total_fees = len(trades) * end_value * 0.007
+        # Trading fees calculation
+        total_fees = len(trades) * end_value * self.trading_fee_rate
 
         # Exposure (assume fully invested)
         max_gross_exposure = 100.0
@@ -200,7 +201,9 @@ class PerformanceAnalyzer:
             "Expectancy": expectancy,
         }
 
-    def _calculate_risk_metrics(self, returns: pl.Series) -> Dict[str, float]:
+    def _calculate_risk_metrics(
+        self, returns: pl.Series, max_drawdown: float = 0.0
+    ) -> Dict[str, float]:
         """Calculate risk metrics"""
         if returns.is_empty():
             return {
@@ -227,8 +230,8 @@ class PerformanceAnalyzer:
         )
         sortino_ratio = annual_return / downside_vol if downside_vol > 0 else 0
 
-        # Calmar ratio (simplified, would need max_drawdown)
-        calmar_ratio = 0.0  # Simplified handling, actually needs max_drawdown
+        # Calmar ratio = annualized return / |max drawdown|
+        calmar_ratio = annual_return / abs(max_drawdown) if max_drawdown != 0 else 0.0
 
         # Omega ratio (simplified calculation)
         positive_returns = returns_array[returns_array > 0]

@@ -11,8 +11,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import polars as pl
 
-from data_supply.date_utils import generate_backtest_date
-from data_supply.ticker_utils import get_mapped_tickers
+from data.loader.date_utils import generate_backtest_date
+from data.loader.ticker_utils import get_mapped_tickers
 
 STRATEGY_NAME = "bbiboll"
 
