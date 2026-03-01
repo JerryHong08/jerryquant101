@@ -12,13 +12,9 @@
 - **risk**: `return_analysis.py` — normality tests (Jarque-Bera + Shapiro-Wilk), QQ-plot data, Gaussian comparison histogram, multi-level tail analysis, `distribution_summary()` all-in-one
 - **risk**: `position_sizing.py` — equal-weight, inverse-volatility, volatility-target, half-Kelly long-short sizing; `compute_realized_volatility()` utility
 - **notebook**: `risk_analysis.ipynb` — end-to-end risk analysis (14 code cells): distribution tests, VaR/CVaR comparison, drawdown, position sizing comparison across 4 methods
-
-### Fix
-
-- **risk**: `cvar_parametric()` sign error — conditional left-tail mean is μ − σ·φ(z)/(1−α), not μ + σ·φ(z)/(1−α); was producing negative CVaR
 - **config**: Renamed machine_config.yaml → basic_config.yaml, added standalone single-machine mode
-- **scripts**: Renamed weekly_update.sh → data_update.sh, added standalone mode (9-task pipeline)
 - **config**: Unified config structure — `update.mode` replaces `machine.role`, `data.data_dir` replaces split server/client dirs
+- **scripts**: Renamed weekly_update.sh → data_update.sh, added standalone mode (9-task pipeline)
 - **docs**: Rewrote `quant_lab.tex` — lab-module structure (5 Parts + Appendices, 17 chapters, 55 pages). Methodology-oriented, not hardcoded architecture. Each chapter: Motivation → Concepts → Implementation → Experiment → Reflection
 
 ### Refactor
@@ -31,6 +27,7 @@
 
 ### Fix
 
+- **risk**: `cvar_parametric()` sign error — conditional left-tail mean is μ − σ·φ(z)/(1−α), not μ + σ·φ(z)/(1−α); was producing negative CVaR
 - **data/fetcher**: `csvgz_to_parquet.py` — argparse rejected its own default (`zstd` missing from choices)
 - **data/fetcher**: `splits_fetch.py` — removed wrong unused `matplotlib.pylab` import
 - **data/fetcher**: `fmp_fundamental_fetch.py` — print message said "csv" but file writes parquet
@@ -41,19 +38,28 @@
 
 ### Planned
 
-- **alpha**: Factor research framework — IC / Rank IC / IR / decay / turnover analysis
-- **alpha**: Cross-sectional factor construction, neutralization, orthogonalization
-- **alpha**: Factor combination (linear, mean-variance, risk parity)
-- **risk**: ~~Factor risk model, covariance estimation~~ (partially done — risk_metrics.py)
-- **risk**: ~~Portfolio optimization, position sizing (Kelly, risk parity)~~ ✅
-- **execution**: Slippage and market impact modeling for backtests
+**Phase 2 — Risk & Portfolio** (remaining)
+- **risk**: Portfolio construction — market-neutral long-short, factor exposure targeting
+
+**Phase 3 — Execution & Cost Modeling** (`src/execution/`)
+- **execution**: Cost model — fixed cost, spread model, square-root market impact
+- **execution**: Cost integration — plug cost model into backtest engine
+- **execution**: Cost sensitivity analysis — Sharpe vs. cost curve, breakeven cost
+
+**Phase 4 — Backtest Engine Rewrite**
 - **backtest**: Engine rewrite — Polars ETL + numba core loop
-- **backtest**: Walk-forward / out-of-sample validation framework
-- **data**: ~~Unify data_fetcher + data_supply into a single `data/` module~~ ✅
-- **data**: Universe construction module (liquid universe, sector mapping)
-- **research**: Structured research notebook templates (factor exploration → signal → backtest → report)
-- **cli**: Unified entry point via typer/click
-- **docs**: LaTeX learning journal — probability, statistics, time series, alpha research, risk, microstructure, ML, stochastic calculus
+- **backtest**: Walk-forward validation — rolling train/test with purged embargo
+- **backtest**: Statistical significance — bootstrap Sharpe confidence intervals
+
+**Phase 5 — ML Integration** (`src/ml/`)
+- **ml**: Feature engineering — factor values as features, lagged returns, volatility features
+- **ml**: Time-series validation — purged k-fold, embargo gap
+- **ml**: Tree models — LightGBM/XGBoost return prediction, feature importance analysis
+
+**Phase 6 — Infrastructure**
+- **data**: Universe construction — liquid universe module, sector/industry mapping (GICS)
+- **cli**: Unified `typer` entry point (backtest, alpha, data-update)
+- **research**: Templated research notebooks — factor exploration → signal → backtest → report
 
 ### Known Issues (Carried Forward)
 
