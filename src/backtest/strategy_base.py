@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 import polars as pl
 
 from config import cache_dir
-from data_supply.ticker_utils import load_irx_data
+from data_supply.benchmark_loader import load_irx_data
 
 strategy_cache_dir = os.path.join(cache_dir, "strategies")
 

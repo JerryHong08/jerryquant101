@@ -124,28 +124,6 @@ This directory includes **configs, loaders, and plotting tools**.
 
 this part is separated and moved to another [repository](https://github.com/JerryHong08/jerryib_trader), now is a web trading platform.
 
-1.2. Data Supply
-
-1.2.1. `collector.py`
-
-Using the polygon api collect the real time market snapshot, using html+css+js to monitor the real time market mover to get a early catch on.
-
-    python src/live_monitor/market_mover/start.py collector
-
-1.2.2. `replayer.py`
-
-Replay data that collector have fecthed and saved to `analyzer`.
-
-    python src/live_monitor/market_mover/start.py replay --date 20251016 --speed 5.0
-
-1.2.3. `trades_replayer`
-
-Aggregate the trades level flatfile data to `analyzer`.
-
-    python src/live_monitor/market_mover_monitor/start.py replay --date 20251016 --speed 5.0 --type trade_replay
-
-**Currently it's only a dashboard, though enough for a hands-on trader, more mathematical analysis and data process to be added.**
-
 ---
 
 ## Change Log

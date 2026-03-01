@@ -5,9 +5,10 @@ import polars as pl
 from backtest.engine import BacktestEngine
 from backtest.visualizer import BacktestVisualizer
 from config import all_tickers_dir
+from data_supply.benchmark_loader import load_spx_benchmark
 from data_supply.data_loader import stock_load_process
 from data_supply.date_utils import generate_backtest_date
-from data_supply.ticker_utils import get_common_stocks, load_spx_benchmark
+from data_supply.ticker_utils import get_common_stocks
 
 
 def run_backtest(strategy, strategy_config=None):
@@ -129,7 +130,7 @@ def run_backtest(strategy, strategy_config=None):
     except Exception as e:
         print(f"backtest result export failed: {e}")
 
-    print("\n关键结果摘要:")
+    print("\nkey metrics:")
     print("-" * 40)
     performance = results["performance_metrics"]
 
@@ -177,23 +178,25 @@ if __name__ == "__main__":
         # "silent": True,
     }
 
+    # single backtest run
+    # strategy = BBIBOLLStrategy(config=strategy_config)
+    # run_backtest(strategy, strategy_config=strategy_config)
+
+    # multiple backtest runs with different end dates
     backtest_dates = generate_backtest_date(
         start_date="2026-02-27",
         period="week",
         reverse=True,
-        reverse_limit="2025-01-01",
+        reverse_limit="2025-11-21",
         # reverse_limit_count=2
     )
 
-    # for backtest_date in backtest_dates:
-    #     # strategy_config["silent"] = True
-    #     print(f"info: backtesing: {backtest_date}")
+    for backtest_date in backtest_dates:
+        # strategy_config["silent"] = True
+        print(f"info: backtesing: {backtest_date}")
 
-    #     strategy_config["result_customized_name"] = backtest_date
-    #     strategy_config["end_date"] = backtest_date
+        strategy_config["result_customized_name"] = backtest_date
+        strategy_config["end_date"] = backtest_date
 
-    #     strategy = BBIBOLLStrategy(config=strategy_config)
-    #     run_backtest(strategy, strategy_config=strategy_config)
-
-    strategy = BBIBOLLStrategy(config=strategy_config)
-    run_backtest(strategy, strategy_config=strategy_config)
+        strategy = BBIBOLLStrategy(config=strategy_config)
+        run_backtest(strategy, strategy_config=strategy_config)

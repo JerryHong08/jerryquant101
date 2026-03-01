@@ -29,12 +29,12 @@ data/
 # Logs
 *.log
 logs/
+docs/
 
 # Secrets
 .env
 src/strategies/*
 !src/strategies/indicators/
-momo_token.py
 
 # AI
 claude/
