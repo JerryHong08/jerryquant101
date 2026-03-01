@@ -35,6 +35,7 @@ docs/
 .env
 src/strategies/*
 !src/strategies/indicators/
+basic_config.yaml
 
 # AI
 claude/

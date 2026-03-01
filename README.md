@@ -1,251 +1,120 @@
-# Table of Contents
+# Quant101
 
-* [Document](#document)
-  * [data_fecther](#data_fecther)
-  * [cores](#cores)
-  * [backtest](#backtest)
-  * [live_monitor](#live_monitor)
-* [Change Log](#change-log)
-* [Roadmap](#roadmap)
+A personal quantitative trader & researcher learning project.
 
----
+Built around US equities data from [Polygon.io](https://polygon.io/) flat files,
+processed with [Polars](https://pola.rs/), backtested with a custom engine, and
+documented as a learning journal in LaTeX.
 
-## Document
-
-### `data_fecther`
-
-This directory handles **data download & save**.
-
-I use a bash scripts [`scripts/weekly_update.sh`](scripts/weekly_update.sh) to handle all the data_fecther process in one. You can walk through each file below to pick what you need.
-
-### 1. Polygon.io Flat File Downloader
-
-Use prefixes to download specific files by **date range** or **recent days**.
-
-    python src/data_fecther/polygon_downloader.py \
-        --asset-class us_stocks_sip \
-        --data-type minute_aggs_v1 \
-        --recent-days 7
-
-* First Time Setup
-
-    1. Configure your data directory in `cores/config.py`
-    2. Suggested file structure:
-
-            ├── lake/          # parquet files
-            │   ├── us_options_opra/trades_v1
-            │   └── us_stocks_sip/{day_aggs_v1, minute_aggs_v1}
-            ├── processed/     # cache
-            │   └── us_stocks_sip/day_aggs_v1
-            └── raw/           # original csv.gz files
-                ├── global_crypto/minute_aggs_v1
-                ├── us_indices/{day_aggs_v1, minute_aggs_v1, us_all_indices}
-                ├── us_options_opra/{day_aggs_v1, minute_aggs_v1, quotes_v1, trades_v1}
-                └── us_stocks_sip/{day_aggs_v1, minute_aggs_v1, splits, us_all_tickers}
-
-* File Size Reference (per year)
-
-    | Data Type        | Stock | Option | Indice | Forex     | Crypto |
-    | ---------------- | ----- | ------ | ------ | --------- | ------ |
-    | Day Aggregate    | 50 MB | 600 MB | 80 MB  | 8 MB      | 5 MB   |
-    | Minute Aggregate | 4.5GB | 4.5GB  | 25 GB  | 3 GB      | 1 GB   |
-    | Trades           | 350GB | 10 GB  | —      | —         | 15 GB  |
-    | Quotes           | 1.5TB | 22 TB  | 2TB/M  | 100GB/day | 60 GB  |
+> **Current version**: 0.2.0 — See [CHANGELOG.md](CHANGELOG.md) for details.
+> **Detailed documentation**: See [docs/quant_lab.tex](docs/quant_lab.tex) for the full learning guide.
 
 ---
 
-### 2. CSVGZ → Parquet Conversion
+## Architecture
 
-For faster access using Polars.
-
-    # Convert recent 7 days
-    python src/data_fecther/csvgz_to_parquet.py \
-        --asset-class us_stocks_sip \
-        --data-type day_aggs_v1 \
-        --recent-days 7
-
-Other options:`--file`, `--directory`, `--asset-class`, `--date-range`, `--info`, `--list-schemas`.
-
----
-
-### 3. Splits Adjustment
-
-splits&merge data are from Polygon.io, and there will be some discrepancy, and you can customize by editing `splits_error.csv`.
-
-I have left mine in[`src/data_fecther/data_discrepancy_fixed/splits_error.csv`](src/data_fecther/data_discrepancy_fixed/splits_error.csv), which comes from my experience, you can use it as a reference.
-
-* Example:
-
-| id         | execution\_date | split\_from | split\_to | ticker | error\_type |
-| ---------- | --------------- | ----------- | --------- | ------ | ----------- |
-| E1a3…625   | 2025-07-17      | 7.0         | 8.0       | ENVX   | remove      |
-| fixed\_dxf | 2024-12-04      | 125.0       | 1.0       | DXF    | add         |
-
-`error_type` → determines whether to **remove** or **add** split events.
-
----
-
-### `cores`
-
-This directory includes **configs, loaders, and plotting tools**.
-
-### 1. config
-
-    Defined in `config.py`.
-
-### 2. data_loader
-
-    Core of the project.
-    Loads data from configured directories using **Polars**.
-
-### 3. plotter
-
-    Based on `seolpyo_mplchart` (wrapper around Matplotlib).
-
-    * Simple to configure
-    * Good appearance
-    * have basic chart elements
-
-![NVDA 1-day price chart showing technical analysis indicators and trading signals](./figures/NVDA1d_Chart.png)
-
-### `backtest`
-
-### 1. Backtest Engine
-
-### 2. StrategyBase
-
-### 3. Backtester
-
-### 4. Results Analyzer
-
-![backtest/trades_analyzer.py](./figures/Trades_Analyzer_plotly.png)
-
-### `live_monitor`
-
-this part is separated and moved to another [repository](https://github.com/JerryHong08/jerryib_trader), now is a web trading platform.
+```
+quant101/
+├── src/
+│   ├── config.py              # Central config — data paths, machine role, asset loaders
+│   ├── data_fetcher/          # Data acquisition — Polygon.io, FMP, yfinance
+│   │   ├── polygon_downloader.py      # S3 flat file download (stocks, options, indices, crypto)
+│   │   ├── csvgz_to_parquet.py        # CSV.gz → Parquet conversion with schema mapping
+│   │   ├── all_tickers_fetch.py       # Full ticker list (stocks, OTC, indices) via REST API
+│   │   ├── splits_fetch.py            # Stock splits with incremental updates
+│   │   ├── indices_fetch.py           # Index daily aggs (SPX, IRX)
+│   │   ├── fmp_fundamental.py         # Float shares (async, paginated)
+│   │   └── fetch_from_server.py       # Rsync multi-machine data sync
+│   ├── data_supply/           # Data loading & transformation
+│   │   ├── data_loader.py             # Core OHLCV loader — split-adjusted, resampled, cached
+│   │   ├── benchmark_loader.py        # IRX risk-free rate, SPX benchmark
+│   │   ├── date_utils.py              # Trading calendar date math (XNYS)
+│   │   ├── path_loader.py             # File path resolver (local + S3)
+│   │   └── ticker_utils.py            # FIGI-based ticker mapping & universe filtering
+│   ├── backtest/              # Backtesting framework
+│   │   ├── backtest_engine.py         # Orchestrator — runs strategies, exports reports
+│   │   ├── strategy_base.py           # Abstract base: prepare_data → generate_signals → simulate
+│   │   ├── performance_analyzer.py    # Sharpe, Sortino, CAGR, drawdown, win rate
+│   │   ├── backtest_visualizer.py     # Equity curves, heatmaps, candlestick with signals
+│   │   ├── run_backtest.py            # End-to-end runner (main entry point)
+│   │   └── trades_analyzer.py         # Post-hoc position analysis with Plotly animation
+│   ├── strategies/            # Trading strategies & indicators
+│   │   ├── bbiboll_strategy.py        # BBI + Bollinger Band deviation strategy
+│   │   └── indicators/               # Registry-based indicator system (TA-Lib)
+│   ├── visualizer/            # Standalone charting
+│   ├── longport/              # Longport/Longbridge broker integration
+│   └── utils/                 # Logger, shared utilities
+├── scripts/                   # Operational scripts
+│   ├── incremental_update/            # data_update.sh, low_volume_ticker_update.py
+│   └── file_examiner.py              # Data directory inspector
+├── docs/                      # LaTeX learning journal & architecture guide
+├── notebooks/                 # Research & exploration notebooks
+├── data/                      # Error correction CSVs, fundamentals
+└── backtest_output/           # Generated reports, charts, position analysis
+```
 
 ---
 
-## Change Log
+## Quick Start
 
-2025-09-19
+### 1. Data Setup
 
-* ✅ Changed `splits_error` handling → now supports flexible CSV editing (add/remove error types).
+Configure your data paths and update mode in `basic_config.yaml` (copy from `basic_config.yaml.example`), then:
 
-2025-09-20
+```bash
+# Download recent Polygon.io flat files
+python src/data_fetcher/polygon_downloader.py \
+    --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days 7
 
-* ✅ `csvgz_to_parquet.py` now supports **recent-days convert**.
+# Convert to Parquet
+python src/data_fetcher/csvgz_to_parquet.py \
+    --asset-class us_stocks_sip --data-type day_aggs_v1 --recent-days 7
 
-* ✅ Added **Longbridge watchlist import** feature.
+# Or run the full incremental update (standalone mode by default)
+bash scripts/incremental_update/data_update.sh
+```
 
-* ✅ changed the structure from _src/quant101/*_ to _src/*_
+### 2. Run a Backtest
 
-2025-09-21
+```bash
+python src/backtest/run_backtest.py
+```
 
-* ✅ Improved **alignment**: use both `composite_figi`&`share_class_figi` to align and make sure as much as possible.
+### 3. Data Directory Structure
 
-2025-09-22
-
-* ✅ `config.py` reconstructed, add data with error correction fuction.
-
-* ✅ add one `stocks_error.csv`.
-
-2025-09-24
-
-* 🥹 `low_volume_tickers.csv` the specious low volume tickers have too much to examined and each case seems to be different, which would cost too much time for me to do it.
-And the most important part about low_volume_tickers is that it can show the correctness of your data load process. As you can find some notes in the [`src/data_fecther/data_discrepancy_fixed/low_volume_tickers_copy.csv`](src/data_fecther/data_discrepancy_fixed/low_volume_tickers_copy.csv).
-For example, most of the long-term like over years 0 volume is because of relisted on the market or there is a new ticker has the same name, which complicates the situation now for it's hard to distinguish. So, as for now, 2025-09-24, I have decided to leave this tickers(max_duration_days > 50) as skipped tickers. I know it's unwise, but it saves me time for now.
-
-2025-09-27
-
-* ✅ add strategies indicators, registry version.
-
-* ✅ BBIBOLL Strategy signal and trade rule established.
-
-* ✅ add risk-free rate to fix sharpe ratio calculate.
-
-2025-09-30
-
-* ✅ add quantstats
-
-2025-10-02
-
-* ✅ add redis for market mover monitor collector and analyzer.
-
-2025-10-04
-
-* ✅ add market mover replayer.
-* ✅ More universal indicator calculator.
-
-2025-10-07
-
-* ✅ market live monitor web version
-
-2025-10-12
-
-* ✅ update versatile_tickers_fetch.py
-* ✅ update weekly_update.sh in scripts
-* ✅ add file_examiner in scripts
-
-2025-10-20
-
-* ✅ market live monitor trades timespan replayer
-
-2025-10-23
-
-* ✅ market live monitor trades timespan replayer v2 & v3(v2 is better.) optimized, data_manager add last_df to concate for v2.
-
-2025-10-27
-
-* ✅ updated README.md
-* ✅ add trades_analyzer.py
-
-2025-11-12
-
-* ✅ removed Chinese. From now on, English will be used as the default language for this project.
-* ✅ add trades_analyzer.py
-
-2025-11-24
-
-* ✅ redis to redis stream
-* ✅ reconstructing MMM
-* ✅ float shares fetcher and MMM add float shares display.
-
-2025-11-26
-
-* ✅ added borrow_fee.
-* ✅ Async fetch and union float shares.
-
-2025-11-27
-
-* ✅ MMM Redis to Redis Stream. Backend decoupled to Redis_client.py as data receiver
-
-2025-12-03
-
-* ✅ Add momo news fetch.
-* ✅ add redis/callback for mmm factor engine. now works, but only a simple version.
-
-2025-12-04
-
-* ✅ News Fetcher: momo web, fmp, benzinga.
-* ✅ Add Logger
-
-2025-12-04
-
-* ✅ mmm frontend rewrite and moved to jerryib_trade
+```
+polygon_data/
+├── lake/           # Parquet files (converted from csv.gz)
+├── processed/      # Cached/resampled data
+└── raw/            # Original csv.gz + metadata (splits, tickers, indices)
+```
 
 ---
 
 ## Roadmap
 
-* features to be add:
-* [ ] universal indicator plot.
-* [ ] Develop more startegies. Build a robust backtest signal generator and trade rules engine.
+### v1.0.0 — Quant Research Framework (Next)
 
-* bugs to be fixed:
-* [ ] backtest engine needed rewrite(Polars ETL + numba backtest engine(long-term)).
-* [ ] backtest open positions need to be fixed.
-* [ ] Stock dividends
-* [ ] low_volume_tickers.csv, see more detail below in the changelog.
+- [ ] **Alpha Research**: Factor IC/IR analysis, cross-sectional factor construction, decay & turnover
+- [ ] **Risk & Portfolio**: Factor risk model, covariance estimation, portfolio optimization
+- [ ] **Backtest Rewrite**: Polars ETL + numba engine, walk-forward validation
+- [ ] **Execution Model**: Slippage & market impact modeling
+- [ ] **Data Unification**: Merge data_fetcher + data_supply into single `data/` module
+- [ ] **Universe Construction**: Liquid universe, sector mapping
+- [ ] **CLI**: Unified entry point via typer (replace empty main.py)
+- [ ] **Research Notebooks**: Templated workflow — factor exploration → signal → backtest → report
+- [ ] **Documentation**: LaTeX learning journal covering probability, time series, alpha, risk, ML
+
+### Open Bugs
+
+- [ ] Backtest open position tracking
+- [ ] Stock dividends not handled
+- [ ] Low-volume tickers skipped (>50 days zero volume)
 
 ---
+
+## Related
+
+- **Live Trading**: [jerryib_trader](https://github.com/JerryHong08/jerryib_trader) — Market Mover Monitor + GridTrader (separated from this repo)
+- **Data Source**: [Polygon.io Flat Files](https://polygon.io/flat-files)
+- **Documentation**: [docs/quant_lab.tex](docs/quant_lab.tex) — detailed learning journal

@@ -1,0 +1,42 @@
+# Basic Configuration for quant101
+# =====================================================
+# Copy this file to basic_config.yaml and fill in your paths.
+#
+#   cp basic_config.yaml.example basic_config.yaml
+#
+# basic_config.yaml is gitignored — your local paths stay private.
+#
+# Three update modes:
+#   - "standalone": Single machine does everything (default)
+#   - "server":     Multi-machine — this machine fetches metadata, serves to clients
+#   - "client":     Multi-machine — syncs metadata from server, downloads Polygon data
+#
+# Override mode at runtime: UPDATE_MODE=standalone|server|client
+
+update:
+  mode: "standalone"
+  recent_days: 7          # how many days of data to fetch/convert
+
+# Data directory on this machine (absolute path)
+data:
+  data_dir: "/path/to/your/quant_data/polygon_data"
+
+# Multi-machine settings (only needed for mode=server or mode=client)
+multi_machine:
+  server:
+    ssh_alias: "your_server"                          # SSH alias (must have key-based auth)
+    data_dir: "/path/on/server/quant_data/polygon_data"
+
+# Directories to sync from server → client (relative to data_dir)
+# Only used when mode=client
+sync_paths:
+  - "raw/us_stocks_sip/splits"
+  - "raw/us_stocks_sip/us_all_tickers"
+  - "raw/us_indices/us_all_indices"
+  - "raw/us_indices/us_indices_sip/day_aggs_v1"
+  - "raw/us_stocks_sip/float_shares"
+
+# Rsync options (only used when mode=client)
+rsync:
+  options: "-avz --progress --delete"
+  dry_run: false

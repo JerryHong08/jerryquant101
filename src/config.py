@@ -10,33 +10,40 @@ from utils.logger import setup_logger
 logger = setup_logger(__name__, log_to_file=True, level=logging.WARNING)
 
 # ===================== data root =============================================
-blackdisk_data_dir = "/mnt/blackdisk/quant_data/polygon_data"
-oldman_data_dir = "/home/oldman/quant_data/polygon_data"
+# The canonical data root is read from basic_config.yaml (project root).
+# basic_config.yaml is gitignored; copy basic_config.yaml.example to get started.
+
+_CONFIG_FILENAME = "basic_config.yaml"
 
 
 def _get_data_dir_from_config() -> str:
     """
-    Get data_dir based on machine role from machine_config.yaml.
-    Falls back to blackdisk_data_dir if config is not found.
+    Read data_dir from basic_config.yaml.
+
+    Resolution order:
+      1. UPDATE_MODE env var → picks local or server data_dir
+      2. update.mode in basic_config.yaml
+    Raises FileNotFoundError if basic_config.yaml is missing.
     """
-    config_path = Path(__file__).resolve().parents[2] / "machine_config.yaml"
+    config_path = Path(__file__).resolve().parents[2] / _CONFIG_FILENAME
 
     if not config_path.exists():
-        return blackdisk_data_dir
+        raise FileNotFoundError(
+            f"{_CONFIG_FILENAME} not found at {config_path}.\n"
+            "Copy basic_config.yaml.example → basic_config.yaml and fill in your paths."
+        )
 
-    try:
-        with open(config_path, "r") as f:
-            config = yaml.safe_load(f)
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
 
-        # Get role from environment variable or config
-        role = os.environ.get("MACHINE_ROLE", config["machine"]["role"])
+    # Get mode from environment variable or config
+    mode = os.environ.get("UPDATE_MODE", config["update"]["mode"])
 
-        if role == "server":
-            return config["server"]["data_dir"]
-        else:
-            return config["client"]["data_dir"]
-    except Exception:
-        return blackdisk_data_dir
+    if mode == "server":
+        return config["multi_machine"]["server"]["data_dir"]
+    else:
+        # standalone and client both use the local data dir
+        return config["data"]["data_dir"]
 
 
 # =====================================================================

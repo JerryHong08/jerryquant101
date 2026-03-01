@@ -1,11 +1,11 @@
 """
-Fetch data from remote server (oldman) to local machine.
+Fetch data from remote server to local machine.
 
 This script syncs metadata/reference data from the server machine to the client.
-Used when MACHINE_ROLE=client to get splits, tickers, indices, and float shares data.
+Used when UPDATE_MODE=client to get splits, tickers, indices, and float shares data.
 
 Usage:
-    python src/data_supply/fetch_from_server.py [--dry-run] [--paths PATH1,PATH2]
+    python src/data_fetcher/fetch_from_server.py [--dry-run] [--paths PATH1,PATH2]
 """
 
 import argparse
@@ -18,22 +18,22 @@ import yaml
 
 
 def load_config() -> dict:
-    """Load machine configuration from YAML file."""
-    config_path = Path(__file__).resolve().parents[2] / "machine_config.yaml"
+    """Load update configuration from YAML file."""
+    config_path = Path(__file__).resolve().parents[2] / "basic_config.yaml"
 
     if not config_path.exists():
         raise FileNotFoundError(
             f"Configuration file not found: {config_path}\n"
-            "Please create machine_config.yaml in the project root."
+            "Please create basic_config.yaml in the project root (copy from basic_config.yaml.example)."
         )
 
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
 
-def get_machine_role(config: dict) -> str:
-    """Get machine role from environment variable or config file."""
-    return os.environ.get("MACHINE_ROLE", config["machine"]["role"])
+def get_update_mode(config: dict) -> str:
+    """Get update mode from environment variable or config file."""
+    return os.environ.get("UPDATE_MODE", config["update"]["mode"])
 
 
 def get_latest_files_info(directory: str) -> list[str]:
@@ -163,17 +163,17 @@ def fetch_from_server(
         bool: True if all syncs succeeded, False otherwise
     """
     config = load_config()
-    role = get_machine_role(config)
+    mode = get_update_mode(config)
 
-    if role != "client":
-        print(f"Warning: Machine role is '{role}', not 'client'.")
+    if mode != "client":
+        print(f"Warning: Update mode is '{mode}', not 'client'.")
         print("This script is intended for client machines to sync from server.")
-        print("Set MACHINE_ROLE=client or update machine_config.yaml to proceed.")
+        print("Set UPDATE_MODE=client or update basic_config.yaml to proceed.")
         return False
 
-    ssh_alias = config["server"]["ssh_alias"]
-    remote_base = config["server"]["data_dir"]
-    local_base = config["client"]["data_dir"]
+    ssh_alias = config["multi_machine"]["server"]["ssh_alias"]
+    remote_base = config["multi_machine"]["server"]["data_dir"]
+    local_base = config["data"]["data_dir"]
     sync_paths = config["sync_paths"]
     rsync_options = config["rsync"]["options"]
 
