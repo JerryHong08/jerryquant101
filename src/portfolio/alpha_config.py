@@ -51,12 +51,17 @@ class FactorConfig:
         normalize_method: "zscore" or "rank".
         neutralize: List of neutralization targets (e.g. ["sector"]).
         params: Factor-specific computation kwargs (e.g. short_window, lookback).
+        direction: Factor sign convention.  ``+1`` means high value → go long
+            (default). ``-1`` means high value → go short (factor is negated
+            before ranking so that the pipeline always longs the top-ranked
+            stocks).  Use ``-1`` for contrarian / mean-reversion signals.
     """
 
     winsorize_pct: float = 0.01
     normalize_method: Literal["zscore", "rank"] = "zscore"
     neutralize: List[str] = field(default_factory=list)
     params: Dict[str, Any] = field(default_factory=dict)
+    direction: Literal[1, -1] = 1
 
 
 @dataclass
@@ -159,6 +164,7 @@ class AlphaConfig:
                     "normalize_method": fc.normalize_method,
                     "neutralize": list(fc.neutralize),
                     "params": dict(fc.params),
+                    "direction": fc.direction,
                 }
                 for name, fc in self.factor_configs.items()
             },

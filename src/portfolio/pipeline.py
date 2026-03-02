@@ -156,7 +156,11 @@ def build_factor_pipeline(
     for name in factor_names:
         factor_fn = get_factor_fn(name)
         fc = config.get_factor_config(name.lower()) if config else None
-        factors.append(factor_fn(ohlcv, factor_config=fc, **kwargs))
+        factor_df = factor_fn(ohlcv, factor_config=fc, **kwargs)
+        # Apply direction: negate factor values when direction == -1
+        if fc is not None and fc.direction == -1:
+            factor_df = factor_df.with_columns(-pl.col(VALUE_COL))
+        factors.append(factor_df)
 
     if len(factors) == 1:
         return factors[0]

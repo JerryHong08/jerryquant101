@@ -45,6 +45,14 @@ class TestFactorConfig:
         assert fc.normalize_method == "rank"
         assert fc.params["short_window"] == 10
 
+    def test_direction_default(self):
+        fc = FactorConfig()
+        assert fc.direction == 1
+
+    def test_direction_negative(self):
+        fc = FactorConfig(direction=-1)
+        assert fc.direction == -1
+
     def test_frozen(self):
         fc = FactorConfig()
         with pytest.raises(AttributeError):
@@ -185,6 +193,34 @@ class TestAlphaConfig:
         cfg2 = AlphaConfig()
         cfg1.factor_names.append("momentum")
         assert "momentum" not in cfg2.factor_names
+
+    def test_direction_roundtrip_dict(self):
+        """direction field survives to_dict → from_dict."""
+        original = AlphaConfig(
+            factor_names=["bbiboll"],
+            factor_configs={
+                "bbiboll": FactorConfig(direction=-1),
+            },
+        )
+        d = original.to_dict()
+        assert d["factor_configs"]["bbiboll"]["direction"] == -1
+        restored = AlphaConfig.from_dict(d)
+        assert restored.get_factor_config("bbiboll").direction == -1
+
+    def test_direction_yaml_roundtrip(self, tmp_path):
+        """direction field survives YAML save/load."""
+        original = AlphaConfig(
+            factor_names=["bbiboll"],
+            factor_configs={
+                "bbiboll": FactorConfig(direction=-1, params={"extra": 42}),
+            },
+        )
+        yaml_path = tmp_path / "dir_test.yaml"
+        original.to_yaml(yaml_path)
+        restored = AlphaConfig.from_yaml(yaml_path)
+        fc = restored.get_factor_config("bbiboll")
+        assert fc.direction == -1
+        assert fc.params["extra"] == 42
 
 
 # ── Factor Registry (from portfolio.factors) ─────────────────────────────────
