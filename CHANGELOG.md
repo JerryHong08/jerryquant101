@@ -6,7 +6,19 @@
 > quant trader & researcher learning project. Incremental restructuring — add new
 > modules without breaking existing ones.
 
-### Feat
+### Feat (Phase 5 — Portfolio Pipeline)
+
+- **portfolio**: `src/portfolio/pipeline.py` — 7-stage signal→weights→returns pipeline: `compute_daily_returns()`, `compute_next_day_returns()`, `build_factor_pipeline()` (with extensible factor registry: bbiboll, vol_ratio, momentum), `build_sizing_methods()` (all 4 sizing methods), `resample_weights()`, `compute_portfolio_return()`, `run_alpha_pipeline()` (all-in-one). Replaces ~80 lines of boilerplate duplicated across 4 notebooks.
+- **portfolio**: `src/portfolio/walk_forward_runner.py` — `run_walk_forward()` executes pipeline per walk-forward fold, collects IS/OOS Sharpe/return/vol per fold, computes mean OOS Sharpe, Sharpe decay (overfitting signal), and OOS Sharpe std (stability). `fold_results_to_dataframe()` for analysis.
+- **data**: `src/data/universe.py` — named stock universe registry: `US_LARGE_CAP_50` (50 tickers, sector-organized), `US_LARGE_CAP_52` (52 tickers), sector mapping dict, `get_universe()`, `list_universes()`, `register_universe()`. Replaces hardcoded ticker lists in every notebook.
+- **tests**: `tests/test_portfolio.py` — 25 tests: `TestComputeDailyReturns` (4), `TestComputeNextDayReturns` (3), `TestResampleWeights` (4), `TestComputePortfolioReturn` (4), `TestFactorRegistry` (3), `TestUniverse` (7). **132 tests total, all passing.**
+- **notebook**: `notebooks/pipeline_demo.ipynb` — demonstrates all 7 pipeline stages end-to-end
+
+### Fix (Phase 5)
+
+- **data**: SQL injection risk in `data_loader.py` — credential values now escaped with single-quote doubling before interpolation into DuckDB `SET` statements
+
+### Feat (Phase 4.5 — Cleanup Sprint)
 
 - **tests**: Full pytest suite — `tests/conftest.py` (shared fixtures: synthetic returns, factor DataFrames, weight DataFrames, turnover arrays), `test_validation.py` (34 tests), `test_execution.py` (25 tests), `test_risk.py` (26 tests), `test_alpha.py` (22 tests). **107 tests, all passing.**
 - **constants**: `src/constants.py` — single source of truth for `TRADING_DAYS_PER_YEAR=252`, column name conventions (`DATE_COL`, `TICKER_COL`, `VALUE_COL`, `WEIGHT_COL`, `RETURN_COL`, `OHLCV_DATE_COL`)
@@ -61,11 +73,6 @@
 
 ### Planned
 
-**Phase 5 — Portfolio Pipeline** (`src/portfolio/`)
-- **portfolio**: Signal→weights→backtest bridge — `run_alpha_pipeline(ohlcv, factors, sizing_method, rebal_freq, cost_model)`. Currently this 80-line pipeline is duplicated across `cost_analysis.ipynb` and `validation.ipynb`
-- **portfolio**: Universe registry — `src/data/universe.py` with `SP500_TOP50`, `LIQUID_US`, etc. Replace copy-pasted ticker lists in every notebook
-- **portfolio**: Walk-forward harness — `run_walk_forward(pipeline_fn, folds, dates)` that executes per fold and collects IS/OOS metrics (currently `walk_forward.py` only splits dates)
-
 **Phase 6 — Backtest Refactor** (targeted surgery, not full rewrite)
 - **backtest**: Extract God class — `engine.py` is a monolithic class mixing data loading, signal routing, position tracking, and reporting. Split into composable pieces
 - **backtest**: Make `BacktestEngine` accept portfolio weights directly (not just `StrategyBase` subclasses) — bridge the alpha→backtest gap
@@ -82,7 +89,6 @@
 - **ml**: Tree models — LightGBM/XGBoost factor combination, feature importance analysis
 
 **Phase 9 — Infrastructure**
-- **data**: Universe construction — liquid universe module, sector/industry mapping (GICS)
 - **cli**: Unified `typer` entry point (backtest, alpha, data-update)
 - **research**: Templated research notebooks — factor exploration → signal → backtest → report
 
@@ -97,13 +103,11 @@
 **Data layer (Medium severity)**
 - `data_loader.py` is a 1,192-line monolith with mixed concerns
 - AWS creds loaded at module-level import — should be lazy-loaded
-- SQL injection risk in DuckDB credential queries — use parameterized queries
 - Date column naming inconsistency: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution)
 
 **Other (Low severity)**
 - `src/constants.py` only wired into `performance_analyzer.py` — other modules (risk, execution, validation) still accept `252` as parameter defaults rather than importing the constant
 - Low-volume tickers (>50 days zero volume) are skipped — see v0.1.0 notes
-- No universe module — stock universe is hardcoded as a list literal in every notebook
 
 ---
 

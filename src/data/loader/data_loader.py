@@ -789,8 +789,11 @@ class RawDataLoader:
             con.execute("INSTALL httpfs; LOAD httpfs;")
             con.execute("SET s3_region='us-east-1';")
             con.execute("SET s3_endpoint='files.polygon.io';")
-            con.execute(f"SET s3_access_key_id='{self.access_key}';")
-            con.execute(f"SET s3_secret_access_key='{self.secret_key}';")
+            # Escape single quotes in credentials to prevent SQL injection
+            safe_access = self.access_key.replace("'", "''")
+            safe_secret = self.secret_key.replace("'", "''")
+            con.execute(f"SET s3_access_key_id='{safe_access}';")
+            con.execute(f"SET s3_secret_access_key='{safe_secret}';")
             con.execute("SET s3_url_style='path';")
             query = f"SELECT * FROM read_csv_auto({paths})"
         else:

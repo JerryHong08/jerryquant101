@@ -144,11 +144,14 @@ polygon_data/
 - [x] **Dependency pruning**: `pyproject.toml` main deps 35 → 25, unused moved to `[ml]`/`[infra]` optional groups
 - [x] **Cleanup**: Dead imports removed, hardcoded `252` → constant, `testpaths` fixed
 
-### Phase 5 — Portfolio Pipeline (`src/portfolio/`)
+### Phase 5 — Portfolio Pipeline (`src/portfolio/`) (✅ Complete)
 
-- [ ] **Signal→weights bridge**: `run_alpha_pipeline()` — replace 80-line duplicated pipeline across notebooks
-- [ ] **Universe registry**: `src/data/universe.py` — `SP500_TOP50`, `LIQUID_US`, etc.
-- [ ] **Walk-forward harness**: `run_walk_forward(pipeline_fn, folds)` — execute per fold, collect IS/OOS metrics
+- [x] **Signal→weights bridge**: `pipeline.py` — 7-stage pipeline (`compute_daily_returns` → `run_alpha_pipeline`), extensible factor registry (bbiboll, vol_ratio, momentum), replaces ~80 lines duplicated across 4 notebooks
+- [x] **Universe registry**: `src/data/universe.py` — `US_LARGE_CAP_50` (50 tickers, sector-organized), `US_LARGE_CAP_52` (52 tickers), `get_universe()`, `register_universe()`
+- [x] **Walk-forward runner**: `walk_forward_runner.py` — `run_walk_forward()` executes pipeline per fold, collects IS/OOS Sharpe/return/vol, Sharpe decay metric
+- [x] **Tests**: `test_portfolio.py` — 25 tests (pipeline stages + universe). **132 tests total, all passing.**
+- [x] **SQL injection fix**: `data_loader.py` — credential escaping in DuckDB SET statements
+- [x] **Demo notebook**: `notebooks/pipeline_demo.ipynb`
 
 ### Phase 6 — Backtest Refactor
 
@@ -174,7 +177,6 @@ polygon_data/
 
 ### Phase 9 — Infrastructure
 
-- [ ] **Universe construction**: Liquid universe module, sector/industry mapping (GICS)
 - [ ] **CLI**: Unified `typer` entry point (backtest, alpha, data-update)
 - [ ] **Research notebooks**: Templated workflow — factor exploration → signal → backtest → report
 
@@ -184,19 +186,19 @@ polygon_data/
 
 **Legacy backtest (High)** — fix in Phase 6
 - [ ] `engine.py` God class — mixes data loading, signal routing, position tracking, reporting → extract in Phase 6
-- [ ] No alpha→backtest bridge — notebooks use inline workaround → **resolved by Phase 5** (`pipeline.py`)
+- [x] ~~No alpha→backtest bridge~~ → **resolved in Phase 5** (`portfolio/pipeline.py`)
 - [ ] Open position tracking bug → fix during Phase 6 refactor
 - [ ] Stock dividends not handled → fix in Phase 7 (needed for dividend yield factor)
 
-**Data layer (Medium)** — fix in Phase 5–6
+**Data layer (Medium)** — fix in Phase 6
 - [ ] `data_loader.py` 1,192-line monolith with mixed concerns → split gradually during Phase 6
 - [ ] AWS creds loaded at module-level import (should be lazy) → fix in Phase 6 when refactoring data loading
-- [ ] SQL injection risk in DuckDB credential queries → quick fix, do in Phase 5
-- [ ] Date column naming: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution) → enforce via `constants.py` in Phase 5
+- [x] ~~SQL injection risk in DuckDB credential queries~~ → **fixed in Phase 5** (credential escaping)
+- [ ] Date column naming: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution) → enforce via `constants.py` in Phase 6
 
-**Other (Low)** — fix in Phase 5
-- [ ] `src/constants.py` only wired into `performance_analyzer.py` — wire into pipeline in Phase 5
-- [ ] No universe module — stock universe hardcoded in every notebook → **resolved by Phase 5** (`universe.py`)
+**Other (Low)**
+- [x] ~~No universe module~~ → **resolved in Phase 5** (`data/universe.py`)
+- [ ] `src/constants.py` only wired into `performance_analyzer.py` — wire into more modules gradually
 - [ ] Low-volume tickers skipped (>50 days zero volume) → keep as-is (conscious data quality tradeoff)
 
 ---
