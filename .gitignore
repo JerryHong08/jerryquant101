@@ -29,10 +29,22 @@ data/
 # Logs
 *.log
 logs/
-docs/
 
 # Secrets
 .env
 src/strategies/*
 !src/strategies/indicators/
 basic_config.yaml
+
+# latex
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.nav
+*.snm
+*.vrb
+*.xdv
