@@ -256,37 +256,47 @@ def size_half_kelly(
     returns_history: pl.DataFrame,
     lookback: int = 60,
     max_position: float = 0.10,
+    max_leverage: float = 3.0,
 ) -> pl.DataFrame:
     """
     Half-Kelly position sizing.
 
     Full Kelly maximizes long-run growth rate:
-        f* = μ / σ² (for a single asset)
+        f* = μ / σ²   (single asset, diagonal approximation)
 
-    But full Kelly produces extreme drawdowns (~50% is common).
-    Half-Kelly (f*/2) sacrifices ~25% of growth for ~50% less variance.
-    This is why practitioners use half-Kelly or even quarter-Kelly.
+    For a vector of assets (diagonal covariance approximation):
+        w_i = μ_i / σ_i²
 
-    For a portfolio, we approximate:
-        w_i = 0.5 × (μ_i / σ_i²)
+    Half-Kelly halves the raw weights for safety:
+        w_i = 0.5 × μ_i / σ_i²
 
-    then normalize so sum(|w|) = 1.
+    Unlike equal-weight or inverse-vol, Kelly determines **both** the
+    direction (sign of μ_i) and the size.  The factor signal is only used
+    to select which stocks to consider, not to determine direction.
+
+    Leverage is **not** normalized to 1.  Kelly naturally uses less leverage
+    when expected returns are low and more when they are high.  A
+    ``max_leverage`` cap and per-position ``max_position`` cap are applied
+    as safety guardrails.
 
     Args:
         signal: DataFrame with columns (date, ticker, value).
-                Used to determine long/short direction only.
+                Used to select the stock universe on each date (stocks
+                present in the signal are candidates).
         returns_history: DataFrame with columns (date, ticker, return) —
                          historical daily returns for each stock.
         lookback: Number of trailing days for μ and σ estimation.
-        max_position: Maximum weight per stock (safety cap).
+        max_position: Maximum absolute weight per stock (safety cap).
+        max_leverage: Maximum gross leverage (sum of |w|) per date.
 
     Returns:
         DataFrame with columns (date, ticker, weight).
 
     Warning:
         Kelly sizing requires accurate estimates of μ and σ.  Small errors
-        in μ have large effects because Kelly is aggressive.  This is why
-        half-Kelly (or less) is standard practice.
+        in μ have large effects because Kelly divides by σ² (which is small).
+        This is why half-Kelly (or less) is standard practice.  The lookback
+        window controls the bias-variance trade-off of these estimates.
     """
     _validate_signal(signal)
 
@@ -312,7 +322,7 @@ def size_half_kelly(
         )
     )
 
-    # Join signal with stats to get direction
+    # Join signal with stats — signal selects the universe, μ determines direction
     kelly = (
         signal.join(
             stats.select(["date", "ticker", "mu", "var"]),
@@ -320,19 +330,20 @@ def size_half_kelly(
             how="inner",
         )
         .with_columns(
-            # Half-Kelly: 0.5 * μ/σ², with sign from the signal
-            (0.5 * pl.col("mu") / pl.col("var") * pl.col("value").sign())
+            # Half-Kelly: 0.5 * μ/σ², direction from μ (not signal)
+            (0.5 * pl.col("mu") / pl.col("var"))
             .clip(lower_bound=-max_position, upper_bound=max_position)
             .alias("raw_weight")
         )
-        # Normalize: sum(|w|) = 1 per date
+        .filter(pl.col("raw_weight").abs() > 1e-10)
+        # Apply max leverage cap: if gross leverage exceeds max, scale down
         .with_columns(
-            pl.col("raw_weight").abs().sum().over("date").alias("total_abs_weight")
+            pl.col("raw_weight").abs().sum().over("date").alias("gross_leverage")
         )
         .with_columns(
-            pl.when(pl.col("total_abs_weight") > 1e-10)
-            .then(pl.col("raw_weight") / pl.col("total_abs_weight"))
-            .otherwise(0.0)
+            pl.when(pl.col("gross_leverage") > max_leverage)
+            .then(pl.col("raw_weight") * max_leverage / pl.col("gross_leverage"))
+            .otherwise(pl.col("raw_weight"))
             .alias("weight")
         )
         .select(["date", "ticker", "weight"])

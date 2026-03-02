@@ -233,6 +233,7 @@ def build_sizing_methods(
     target_vol: float = 0.10,
     kelly_lookback: int = 60,
     kelly_max_position: float = 0.10,
+    kelly_max_leverage: float = 3.0,
     vol_window: int = 20,
     config: AlphaConfig | None = None,
 ) -> dict[str, pl.DataFrame]:
@@ -247,6 +248,7 @@ def build_sizing_methods(
         target_vol: Target annualized volatility for vol-target method.
         kelly_lookback: Look-back window for Half-Kelly.
         kelly_max_position: Max absolute position size for Half-Kelly.
+        kelly_max_leverage: Max gross leverage for Half-Kelly.
         vol_window: Window for realized volatility estimation.
 
     Returns:
@@ -267,6 +269,7 @@ def build_sizing_methods(
         target_vol = config.target_vol
         kelly_lookback = config.kelly_lookback
         kelly_max_position = config.kelly_max_position
+        kelly_max_leverage = config.kelly_max_leverage
         vol_window = config.vol_window
 
     vol_estimates = compute_realized_volatility(ohlcv, window=vol_window)
@@ -289,6 +292,7 @@ def build_sizing_methods(
             returns_for_kelly,
             lookback=kelly_lookback,
             max_position=kelly_max_position,
+            max_leverage=kelly_max_leverage,
         ),
     }
 

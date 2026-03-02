@@ -98,6 +98,7 @@ class AlphaConfig:
     target_vol: float = 0.10
     kelly_lookback: int = 60
     kelly_max_position: float = 0.10
+    kelly_max_leverage: float = 3.0
     vol_window: int = 20
 
     # ── Rebalancing ───────────────────────────────────────────────────
@@ -174,6 +175,7 @@ class AlphaConfig:
             "target_vol": self.target_vol,
             "kelly_lookback": self.kelly_lookback,
             "kelly_max_position": self.kelly_max_position,
+            "kelly_max_leverage": self.kelly_max_leverage,
             "vol_window": self.vol_window,
             "rebal_every_n": self.rebal_every_n,
             "cost_bps": self.cost_bps,
