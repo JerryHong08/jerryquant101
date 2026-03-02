@@ -6,7 +6,7 @@ Built around US equities data from [Massive(Polygon.io)](https://massive.com/) f
 processed with [Polars](https://pola.rs/), backtested with a custom engine, and
 documented as a learning journal in LaTeX.
 
-> **Current version**: 0.2.0 — See [CHANGELOG.md](CHANGELOG.md) for details.
+> **Current version**: 0.3.0 — See [CHANGELOG.md](CHANGELOG.md) for details.
 > **Detailed documentation**: See [docs/quant_lab.tex](docs/quant_lab.tex) for the full learning guide.
 
 ---
@@ -18,6 +18,7 @@ src/
 ├── config.py                  # Central config — data paths, asset loaders, lazy getters
 ├── alpha/                     # Factor research — signals, evaluation, preprocessing, combination
 ├── risk/                      # Risk & portfolio — VaR/CVaR, distribution analysis, position sizing
+├── execution/                 # Transaction costs — fixed, spread, sqrt-impact, composite models
 ├── data/
 │   ├── fetcher/               # Data acquisition — Polygon.io S3, FMP, yfinance, rsync
 │   └── loader/                # Data loading — OHLCV, split adjustment, resampling, caching
@@ -31,7 +32,6 @@ src/
 ```
 
 **Target modules** (not yet built):
-- `src/execution/` — Transaction cost modeling
 - `src/ml/` — Feature engineering, time-series validation, tree models
 
 ---
@@ -99,7 +99,7 @@ polygon_data/
 - [x] **Validation notebook**: `notebooks/alpha_research.ipynb` — end-to-end BBIBOLL factor analysis (30 cells, all passing)
 - [x] **Alpha iteration**: `notebooks/alpha_iteration.ipynb` — STR, Volume-Price Divergence, Vol Ratio factors; IC correlation analysis; diversification confirmed (BBIBOLL + Vol Ratio composite |IR|=0.136 > best individual 0.122)
 
-### Phase 2 — Risk & Portfolio (`src/risk/`) (🔧 In Progress)
+### Phase 2 — Risk & Portfolio (`src/risk/`) (✅ Complete)
 
 > LaTeX reference: Part IV, Chapters 13–14
 
@@ -109,13 +109,13 @@ polygon_data/
 - [ ] **Portfolio construction**: Market-neutral long-short, factor exposure targeting
 - [x] **Validation notebook**: `notebooks/risk_analysis.ipynb` — end-to-end risk analysis with BBIBOLL + Vol Ratio composite (14 code cells, all passing; 3 bugs found and fixed)
 
-### Phase 3 — Execution & Cost Modeling (`src/execution/`)
+### Phase 3 — Execution & Cost Modeling (`src/execution/`) (✅ Complete)
 
 > LaTeX reference: Part IV, Chapter 15
 
-- [ ] **Cost model**: Fixed cost, spread model, square-root market impact model
-- [ ] **Cost integration**: Plug cost model into backtest engine
-- [ ] **Cost sensitivity analysis**: Sharpe vs. cost curve, breakeven cost
+- [x] **Cost model**: ABC `CostModel` + 4 implementations (Fixed, Spread, SqrtImpact, Composite)
+- [x] **Cost analysis**: Turnover computation, net returns, Sharpe-vs-cost curves, breakeven cost
+- [x] **Validation notebook**: `notebooks/cost_analysis.ipynb` — 4 sizing methods compared gross vs net, all methods net-negative at 5 bps, Half-Kelly breakeven = 1.8 bps
 
 ### Phase 4 — Backtest Engine Rewrite
 
