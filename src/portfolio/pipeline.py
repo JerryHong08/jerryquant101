@@ -20,7 +20,7 @@ Usage:
     results = run_alpha_pipeline(
         ohlcv,
         factor_names=["bbiboll", "vol_ratio"],
-        sizing_method="Half-Kelly",
+        sizing_method="Signal-Weighted",
         rebal_every_n=5,
     )
     portfolio_returns = results["portfolio_returns"]
@@ -246,9 +246,9 @@ def build_sizing_methods(
         n_long: Number of long positions per method.
         n_short: Number of short positions per method.
         target_vol: Target annualized volatility for vol-target method.
-        kelly_lookback: Look-back window for Half-Kelly.
-        kelly_max_position: Max absolute position size for Half-Kelly.
-        kelly_max_leverage: Max gross leverage for Half-Kelly.
+        kelly_lookback: Look-back window for Signal-Weighted sizing.
+        kelly_max_position: Max absolute position size for Signal-Weighted sizing.
+        kelly_max_leverage: Max gross leverage for Signal-Weighted sizing.
         vol_window: Window for realized volatility estimation.
 
     Returns:
@@ -257,8 +257,8 @@ def build_sizing_methods(
     from risk.position_sizing import (
         compute_realized_volatility,
         size_equal_weight,
-        size_half_kelly,
         size_inverse_volatility,
+        size_signal_weighted,
         size_volatility_target,
     )
 
@@ -287,7 +287,7 @@ def build_sizing_methods(
             n_long=n_long,
             n_short=n_short,
         ),
-        "Half-Kelly": size_half_kelly(
+        "Signal-Weighted": size_signal_weighted(
             composite,
             returns_for_kelly,
             n_long=n_long,
@@ -417,7 +417,7 @@ def run_alpha_pipeline(
     *,
     # ── Legacy kwargs (used if config is None) ──
     factor_names: list[str] | None = None,
-    sizing_method: str = "Half-Kelly",
+    sizing_method: str = "Signal-Weighted",
     combination_method: str = "equal_weight",
     rebal_every_n: int = 5,
     n_long: int = 10,
@@ -439,7 +439,7 @@ def run_alpha_pipeline(
         config: ``AlphaConfig`` — if provided, all other kwargs are ignored.
         factor_names: Factors to compute. Default: ["bbiboll", "vol_ratio"].
         sizing_method: Which sizing to use. One of:
-            "Equal-Weight", "Inverse-Vol", "Vol-Target (10%)", "Half-Kelly".
+            "Equal-Weight", "Inverse-Vol", "Vol-Target (10%)", "Signal-Weighted".
         combination_method: Factor combination method.
         rebal_every_n: Rebalance every N days (1=daily, 5=weekly).
         n_long: Number of long positions.

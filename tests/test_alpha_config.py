@@ -67,7 +67,7 @@ class TestAlphaConfig:
         cfg = AlphaConfig()
         assert cfg.factor_names == ["bbiboll", "vol_ratio"]
         assert cfg.combination_method == "equal_weight"
-        assert cfg.sizing_method == "Half-Kelly"
+        assert cfg.sizing_method == "Signal-Weighted"
         assert cfg.n_long == 10
         assert cfg.n_short == 10
         assert cfg.target_vol == 0.10
@@ -121,7 +121,7 @@ class TestAlphaConfig:
         d = cfg.to_dict()
         assert d["factor_names"] == ["momentum"]
         assert d["factor_configs"]["momentum"]["params"] == {"lookback": 60}
-        assert d["sizing_method"] == "Half-Kelly"
+        assert d["sizing_method"] == "Signal-Weighted"
 
     def test_from_dict(self):
         d = {

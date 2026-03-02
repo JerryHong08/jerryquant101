@@ -14,7 +14,7 @@ Usage:
         test_days=63,
         embargo_days=5,
         factor_names=["bbiboll", "vol_ratio"],
-        sizing_method="Half-Kelly",
+        sizing_method="Signal-Weighted",
     )
     print(results["oos_sharpe_mean"])
 
@@ -61,7 +61,7 @@ def run_walk_forward(
     embargo_days: int = 5,
     mode: str = "rolling",
     factor_names: list[str] | None = None,
-    sizing_method: str = "Half-Kelly",
+    sizing_method: str = "Signal-Weighted",
     combination_method: str = "equal_weight",
     rebal_every_n: int = 5,
     n_long: int = 10,

@@ -4,7 +4,7 @@ Risk & Portfolio Module — Risk metrics, distribution analysis, and position si
 Sub-modules:
     risk_metrics: VaR, CVaR, drawdown, skewness, kurtosis, tail ratio
     return_analysis: Normality tests, QQ-plot data, Gaussian comparison
-    position_sizing: Equal-weight, inverse-vol, vol-target, half-Kelly
+    position_sizing: Equal-weight, inverse-vol, vol-target, signal-weighted
 
 Convention:
     - Risk functions: operate on 1-D numpy arrays of returns
@@ -18,8 +18,8 @@ Reference: docs/quant_lab.tex — Part IV, Chapters 13–14
 from risk.position_sizing import (
     compute_realized_volatility,
     size_equal_weight,
-    size_half_kelly,
     size_inverse_volatility,
+    size_signal_weighted,
     size_volatility_target,
 )
 from risk.return_analysis import (
@@ -64,6 +64,6 @@ __all__ = [
     "size_equal_weight",
     "size_inverse_volatility",
     "size_volatility_target",
-    "size_half_kelly",
+    "size_signal_weighted",
     "compute_realized_volatility",
 ]

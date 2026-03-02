@@ -10,7 +10,7 @@ Usage — code::
     config = AlphaConfig(
         factor_names=["bbiboll", "vol_ratio"],
         combination_method="ic_weight",
-        sizing_method="Half-Kelly",
+        sizing_method="Signal-Weighted",
         n_long=20,
         rebal_every_n=5,
     )
@@ -92,7 +92,7 @@ class AlphaConfig:
     factor_configs: Dict[str, FactorConfig] = field(default_factory=dict)
 
     # ── Portfolio construction ────────────────────────────────────────
-    sizing_method: str = "Half-Kelly"
+    sizing_method: str = "Signal-Weighted"
     n_long: int = 10
     n_short: int = 10
     target_vol: float = 0.10

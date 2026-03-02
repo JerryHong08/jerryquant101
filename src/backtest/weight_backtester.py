@@ -16,7 +16,7 @@ Usage:
 
     print(f"Sharpe: {result.metrics['Sharpe Ratio']:.3f}")
     bt.print_summary(result)
-    bt.export(result, output_dir="results/half_kelly")
+    bt.export(result, output_dir="results/signal_weighted")
 
 Reference: docs/quant_lab.tex — Part III, Chapter 12
 """

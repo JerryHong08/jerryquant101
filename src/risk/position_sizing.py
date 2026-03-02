@@ -9,7 +9,7 @@ Methods:
     1. Equal-weight: 1/N per position.  Simple, no estimation risk.
     2. Inverse-volatility: Weight ∝ 1/σ_i.  Equal risk contribution.
     3. Volatility-target: Scale portfolio to a target volatility.
-    4. Half-Kelly: Optimal growth rate, halved for safety.
+    4. Signal-weighted: z_i / σ_i² (conviction × inverse-variance).
 
 All functions take a Polars DataFrame with factor signals and return
 a DataFrame with portfolio weights.
@@ -248,10 +248,10 @@ def size_volatility_target(
     return scaled
 
 
-# ── Half-Kelly ────────────────────────────────────────────────────────────────
+# ── Signal-Weighted ───────────────────────────────────────────────────────────
 
 
-def size_half_kelly(
+def size_signal_weighted(
     signal: pl.DataFrame,
     returns_history: pl.DataFrame,
     n_long: int = 10,
@@ -261,34 +261,36 @@ def size_half_kelly(
     max_leverage: float = 1.0,
 ) -> pl.DataFrame:
     """
-    Half-Kelly position sizing: factor alpha × inverse variance.
+    Signal-weighted position sizing: conviction × inverse variance.
+
+    A signal-tilted alternative to equal-weight that gives larger
+    positions to high-conviction, low-risk stocks.
+
+    **Not true Kelly.**  Real Kelly determines *portfolio leverage*
+    (how much capital to deploy), not relative allocation.  This
+    function borrows Kelly's ``z / σ²`` formula for relative sizing
+    but normalizes to unit gross leverage, discarding the leverage
+    signal entirely.  The name was changed from "Half-Kelly" to
+    avoid the misleading implication.
 
     Two-stage process:
-        1. **Factor selection** — rank stocks by signal, go long top-N and
-           short bottom-N (same as equal-weight).
-        2. **Kelly sizing** — within each leg, weight each position by
+        1. **Factor selection** — rank stocks by signal, go long top-N
+           and short bottom-N (same as equal-weight).
+        2. **Signal sizing** — within each leg, weight each position by
 
                raw_w_i = direction_i × |z_i| / σ_i²
 
-           where *z_i* is the cross-sectional z-score of the factor signal
-           (our alpha estimate) and *σ_i²* is the rolling variance of
-           historical returns (risk estimate).
+           where *z_i* is the cross-sectional z-score of the factor
+           signal (conviction) and *σ_i²* is the rolling variance of
+           historical returns (risk).
 
-    The z-score replaces historical μ as the alpha signal because:
-        - μ estimated from a 60-day window is almost pure noise (daily
-          SNR ≈ 0.02), and
-        - the factor signal IS our alpha prediction — Kelly should size
-          by it, not by a noisy backward-looking mean.
+    Weights are normalized to unit gross leverage (``sum(|w|) = 1``)
+    so they are comparable with other sizing methods.  Set
+    ``max_leverage`` > 1 to scale up if desired.
 
-    Weights are normalized to unit gross leverage (``sum(|w|) = 1``) so
-    they are comparable with other sizing methods.  Set ``max_leverage``
-    > 1 to scale up if desired.
+    Math::
 
-    Math (diagonal covariance, factor-model alpha)::
-
-        E[r_i] = IC × σ_cs × z_i      (factor model)
-        f*_i   = E[r_i] / σ_i²         (full Kelly)
-        w_i    ∝ z_i / σ_i²            (IC × σ_cs cancels in normalization)
+        w_i  ∝ z_i / σ_i²     (conviction × inverse-variance)
         gross normalized to max_leverage
 
     Args:

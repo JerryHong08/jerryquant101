@@ -3,7 +3,7 @@ Tests for risk.position_sizing — sizing functions and their properties.
 
 Covers:
     - size_equal_weight: weight normalization, long/short counts
-    - size_half_kelly: factor z-score alpha, inverse-variance risk,
+    - size_signal_weighted: factor z-score conviction, inverse-variance risk,
       normalized to unit leverage, max_position cap
     - compute_realized_volatility: basic shape and positivity
     - _validate_signal: missing column errors
@@ -19,7 +19,7 @@ from risk.position_sizing import (
     _validate_signal,
     compute_realized_volatility,
     size_equal_weight,
-    size_half_kelly,
+    size_signal_weighted,
 )
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -102,17 +102,17 @@ class TestEqualWeight:
         assert long_tickers == {"E", "F"}
 
 
-# ── Half-Kelly ────────────────────────────────────────────────────────────────
+# ── Signal-Weighted ───────────────────────────────────────────────────────────
 
 
-class TestHalfKelly:
+class TestSignalWeighted:
     def test_direction_from_factor_ranking(self, signal_df, returns_history):
         """Direction comes from factor ranking: top-N long, bottom-N short.
 
         Signal values: A=10 < B=20 < C=30 < D=40 < E=50 < F=60.
         With n_long=3, n_short=3: A,B,C are short; D,E,F are long.
         """
-        w = size_half_kelly(
+        w = size_signal_weighted(
             signal_df,
             returns_history,
             n_long=3,
@@ -154,10 +154,10 @@ class TestHalfKelly:
             }
         )
 
-        w1 = size_half_kelly(
+        w1 = size_signal_weighted(
             signal_1, returns_history, n_long=3, n_short=3, lookback=60
         )
-        w2 = size_half_kelly(
+        w2 = size_signal_weighted(
             signal_2, returns_history, n_long=3, n_short=3, lookback=60
         )
 
@@ -176,7 +176,7 @@ class TestHalfKelly:
 
     def test_normalized_to_unit_leverage(self, signal_df, returns_history):
         """Gross leverage should be normalized to max_leverage (default 1.0)."""
-        w = size_half_kelly(
+        w = size_signal_weighted(
             signal_df,
             returns_history,
             n_long=3,
@@ -211,7 +211,7 @@ class TestHalfKelly:
                 "value": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
             }
         )
-        w = size_half_kelly(
+        w = size_signal_weighted(
             signal,
             returns_history,
             n_long=3,
@@ -239,7 +239,7 @@ class TestHalfKelly:
     def test_max_position_cap(self, signal_df, returns_history):
         """No single position should exceed max_position."""
         max_pos = 0.05
-        w = size_half_kelly(
+        w = size_signal_weighted(
             signal_df,
             returns_history,
             n_long=3,
@@ -255,7 +255,7 @@ class TestHalfKelly:
 
     def test_max_leverage_scaling(self, signal_df, returns_history):
         """max_leverage > 1 should scale up gross leverage proportionally."""
-        w1 = size_half_kelly(
+        w1 = size_signal_weighted(
             signal_df,
             returns_history,
             n_long=3,
@@ -264,7 +264,7 @@ class TestHalfKelly:
             max_position=1.0,
             max_leverage=1.0,
         )
-        w2 = size_half_kelly(
+        w2 = size_signal_weighted(
             signal_df,
             returns_history,
             n_long=3,
@@ -284,7 +284,7 @@ class TestHalfKelly:
 
     def test_position_count(self, signal_df, returns_history):
         """Kelly should select exactly n_long + n_short positions."""
-        w = size_half_kelly(
+        w = size_signal_weighted(
             signal_df,
             returns_history,
             n_long=2,

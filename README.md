@@ -115,7 +115,7 @@ polygon_data/
 
 - [x] **Risk measures**: VaR (historical + parametric), CVaR, drawdown, skewness, kurtosis, tail ratio
 - [x] **Return distribution analysis**: Normality tests (Jarque-Bera, Shapiro-Wilk), QQ-plot data, Gaussian comparison, tail analysis
-- [x] **Position sizing**: Equal-weight, inverse-volatility, volatility-target, half-Kelly
+- [x] **Position sizing**: Equal-weight, inverse-volatility, volatility-target, signal-weighted
 - [ ] **Portfolio construction**: Market-neutral long-short, factor exposure targeting
 - [x] **Validation notebook**: `notebooks/risk_analysis.ipynb` — end-to-end risk analysis with BBIBOLL + Vol Ratio composite (14 code cells, all passing; 3 bugs found and fixed)
 
@@ -125,7 +125,7 @@ polygon_data/
 
 - [x] **Cost model**: ABC `CostModel` + 4 implementations (Fixed, Spread, SqrtImpact, Composite)
 - [x] **Cost analysis**: Turnover computation, net returns, Sharpe-vs-cost curves, breakeven cost
-- [x] **Validation notebook**: `notebooks/cost_analysis.ipynb` — 4 sizing methods compared gross vs net, all methods net-negative at 5 bps, Half-Kelly breakeven = 1.8 bps
+- [x] **Validation notebook**: `notebooks/cost_analysis.ipynb` — 4 sizing methods compared gross vs net, all methods net-negative at 5 bps, Signal-Weighted breakeven = 1.8 bps
 
 ### Phase 4 — Walk-Forward Validation (`src/validation/`) (✅ Complete)
 

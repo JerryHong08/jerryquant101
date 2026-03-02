@@ -16,7 +16,7 @@ Usage — Strategy mode (existing)::
 Usage — Pipeline mode (new, default)::
 
     cd src && python -m backtest.backtester
-    cd src && python -m backtest.backtester --mode pipeline --sizing Half-Kelly
+    cd src && python -m backtest.backtester --mode pipeline --sizing Signal-Weighted
 
 Reference: docs/quant_lab.tex
 """
@@ -121,7 +121,7 @@ def run_pipeline_backtest(config: Dict[str, Any]) -> None:
         end_date: str — OHLCV end date
         alpha_config: AlphaConfig — full pipeline config (preferred)
         factor_names: list[str] — alpha factors (default: ["bbiboll", "vol_ratio"])
-        sizing_method: str — sizing method (default: "Half-Kelly")
+        sizing_method: str — sizing method (default: "Signal-Weighted")
         rebal_every_n: int — rebalance frequency (default: 5)
         combination_method: str — factor combination (default: "equal_weight")
         n_long: int — number of long positions (default: 10)
@@ -140,7 +140,7 @@ def run_pipeline_backtest(config: Dict[str, Any]) -> None:
     if alpha_config is None:
         alpha_config = AlphaConfig(
             factor_names=config.get("factor_names", ["bbiboll", "vol_ratio"]),
-            sizing_method=config.get("sizing_method", "Half-Kelly"),
+            sizing_method=config.get("sizing_method", "Signal-Weighted"),
             rebal_every_n=config.get("rebal_every_n", 5),
             combination_method=config.get("combination_method", "equal_weight"),
             n_long=config.get("n_long", 10),
@@ -291,7 +291,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--start", default="2023-12-01", help="OHLCV start date")
     parser.add_argument("--end", default="2026-02-27", help="End date")
-    parser.add_argument("--sizing", default="Half-Kelly", help="Sizing method")
+    parser.add_argument("--sizing", default="Signal-Weighted", help="Sizing method")
     parser.add_argument("--cost-bps", type=float, default=5.0, help="Cost in bps")
     parser.add_argument(
         "--factors",
