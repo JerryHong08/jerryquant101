@@ -258,56 +258,61 @@ def size_half_kelly(
     n_short: int = 10,
     lookback: int = 60,
     max_position: float = 0.10,
-    max_leverage: float = 3.0,
+    max_leverage: float = 1.0,
 ) -> pl.DataFrame:
     """
-    Half-Kelly position sizing with factor-directed stock selection.
+    Half-Kelly position sizing: factor alpha × inverse variance.
 
     Two-stage process:
-        1. **Factor selection** — the factor signal determines *which* stocks
-           go long (top-N by signal) and which go short (bottom-N), exactly
-           like equal-weight.
-        2. **Kelly sizing** — within each leg, Kelly determines *how much*
-           to allocate to each stock: ``w_i = 0.5 × |μ_i| / σ_i²``.
-           Direction comes from the factor ranking (step 1), not from μ.
+        1. **Factor selection** — rank stocks by signal, go long top-N and
+           short bottom-N (same as equal-weight).
+        2. **Kelly sizing** — within each leg, weight each position by
 
-    This separates alpha (factor) from risk management (Kelly).
-    The factor decides *what* to trade, Kelly decides *how much*.
+               raw_w_i = direction_i × |z_i| / σ_i²
 
-    Leverage is **not** normalized to 1.  Kelly naturally uses less leverage
-    when expected returns are low and more when they are high.  A
-    ``max_leverage`` cap and per-position ``max_position`` cap are applied
-    as safety guardrails.
+           where *z_i* is the cross-sectional z-score of the factor signal
+           (our alpha estimate) and *σ_i²* is the rolling variance of
+           historical returns (risk estimate).
 
-    Math (diagonal covariance approximation)::
+    The z-score replaces historical μ as the alpha signal because:
+        - μ estimated from a 60-day window is almost pure noise (daily
+          SNR ≈ 0.02), and
+        - the factor signal IS our alpha prediction — Kelly should size
+          by it, not by a noisy backward-looking mean.
 
-        f*_i = μ_i / σ_i²           (full Kelly)
-        w_i  = 0.5 × |μ_i| / σ_i²  (half-Kelly magnitude)
-        sign(w_i) from factor rank   (long top-N, short bottom-N)
+    Weights are normalized to unit gross leverage (``sum(|w|) = 1``) so
+    they are comparable with other sizing methods.  Set ``max_leverage``
+    > 1 to scale up if desired.
+
+    Math (diagonal covariance, factor-model alpha)::
+
+        E[r_i] = IC × σ_cs × z_i      (factor model)
+        f*_i   = E[r_i] / σ_i²         (full Kelly)
+        w_i    ∝ z_i / σ_i²            (IC × σ_cs cancels in normalization)
+        gross normalized to max_leverage
 
     Args:
         signal: DataFrame with columns (date, ticker, value).
-                Factor signal used to rank stocks into long/short legs.
+                Factor signal used to rank and size positions.
         returns_history: DataFrame with columns (date, ticker, return) —
-                         historical daily returns for each stock.
+                         historical daily returns for σ² estimation.
         n_long: Number of stocks in the long leg.
         n_short: Number of stocks in the short leg.
-        lookback: Number of trailing days for μ and σ estimation.
+        lookback: Number of trailing days for σ² estimation.
         max_position: Maximum absolute weight per stock (safety cap).
-        max_leverage: Maximum gross leverage (sum of |w|) per date.
+        max_leverage: Target gross leverage (default 1.0 = unit leverage).
 
     Returns:
         DataFrame with columns (date, ticker, weight).
 
-    Warning:
-        Kelly sizing requires accurate estimates of μ and σ.  Small errors
-        in μ have large effects because Kelly divides by σ² (which is small).
-        This is why half-Kelly (or less) is standard practice.  The lookback
-        window controls the bias-variance trade-off of these estimates.
+    Note:
+        The improvement over equal-weight comes from *relative* sizing:
+        high-conviction (large |z|) and low-risk (small σ²) positions
+        get proportionally larger weights.
     """
     _validate_signal(signal)
 
-    # Stage 1: Factor-directed stock selection (same as equal-weight)
+    # Stage 1: Factor-directed stock selection + z-score computation
     positions = (
         signal.sort(["date", "value"])
         .with_columns(
@@ -316,6 +321,11 @@ def size_half_kelly(
             .over("date")
             .alias("rank"),
             pl.col("value").count().over("date").alias("n_stocks"),
+            # Cross-sectional z-score of factor signal (our alpha estimate)
+            (
+                (pl.col("value") - pl.col("value").mean().over("date"))
+                / pl.col("value").std().over("date").clip(lower_bound=1e-10)
+            ).alias("z_score"),
         )
         .with_columns(
             pl.when(pl.col("rank") <= n_short)
@@ -326,54 +336,44 @@ def size_half_kelly(
             .alias("direction")
         )
         .filter(pl.col("direction") != 0)
-        .select(["date", "ticker", "direction"])
+        .select(["date", "ticker", "direction", "z_score"])
     )
 
-    # Compute rolling mean and variance of returns
+    # Compute rolling variance of returns (risk estimate)
     stats = (
         returns_history.sort(["ticker", "date"])
         .with_columns(
-            [
-                pl.col("return")
-                .rolling_mean(window_size=lookback)
-                .over("ticker")
-                .alias("mu"),
-                pl.col("return")
-                .rolling_var(window_size=lookback)
-                .over("ticker")
-                .alias("var"),
-            ]
+            pl.col("return")
+            .rolling_var(window_size=lookback)
+            .over("ticker")
+            .alias("var"),
         )
-        .filter(
-            pl.col("mu").is_not_null()
-            & pl.col("var").is_not_null()
-            & (pl.col("var") > 1e-10)
-        )
+        .filter(pl.col("var").is_not_null() & (pl.col("var") > 1e-10))
     )
 
-    # Stage 2: Kelly sizing — magnitude from |μ|/σ², direction from factor
+    # Stage 2: Kelly sizing — |z|/σ² magnitude, direction from factor rank
     kelly = (
         positions.join(
-            stats.select(["date", "ticker", "mu", "var"]),
+            stats.select(["date", "ticker", "var"]),
             on=["date", "ticker"],
             how="inner",
         )
         .with_columns(
-            # Half-Kelly magnitude: 0.5 * |μ| / σ²
-            # Direction from factor ranking (not μ sign)
-            (pl.col("direction") * (0.5 * pl.col("mu").abs() / pl.col("var")))
-            .clip(lower_bound=-max_position, upper_bound=max_position)
-            .alias("raw_weight")
+            # raw weight = direction × |z_score| / σ²
+            (pl.col("direction") * pl.col("z_score").abs() / pl.col("var")).alias(
+                "raw_weight"
+            )
         )
         .filter(pl.col("raw_weight").abs() > 1e-10)
-        # Apply max leverage cap: if gross leverage exceeds max, scale down
+        # Normalize to unit gross leverage, then scale to max_leverage
+        .with_columns(pl.col("raw_weight").abs().sum().over("date").alias("gross"))
         .with_columns(
-            pl.col("raw_weight").abs().sum().over("date").alias("gross_leverage")
+            (pl.col("raw_weight") / pl.col("gross") * max_leverage).alias("weight")
         )
+        # Per-position cap
         .with_columns(
-            pl.when(pl.col("gross_leverage") > max_leverage)
-            .then(pl.col("raw_weight") * max_leverage / pl.col("gross_leverage"))
-            .otherwise(pl.col("raw_weight"))
+            pl.col("weight")
+            .clip(lower_bound=-max_position, upper_bound=max_position)
             .alias("weight")
         )
         .select(["date", "ticker", "weight"])

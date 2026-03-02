@@ -3,8 +3,8 @@ Tests for risk.position_sizing — sizing functions and their properties.
 
 Covers:
     - size_equal_weight: weight normalization, long/short counts
-    - size_half_kelly: direction from μ (not signal), leverage floats,
-      max_position cap, max_leverage cap, no normalization
+    - size_half_kelly: factor z-score alpha, inverse-variance risk,
+      normalized to unit leverage, max_position cap
     - compute_realized_volatility: basic shape and positivity
     - _validate_signal: missing column errors
 """
@@ -111,7 +111,6 @@ class TestHalfKelly:
 
         Signal values: A=10 < B=20 < C=30 < D=40 < E=50 < F=60.
         With n_long=3, n_short=3: A,B,C are short; D,E,F are long.
-        Kelly only determines magnitude (from |μ|/σ²).
         """
         w = size_half_kelly(
             signal_df,
@@ -120,7 +119,6 @@ class TestHalfKelly:
             n_short=3,
             lookback=60,
             max_position=1.0,
-            max_leverage=100.0,
         )
         if w.shape[0] == 0:
             pytest.skip("No Kelly weights produced (data issue)")
@@ -176,8 +174,8 @@ class TestHalfKelly:
         diffs = merged.filter((pl.col("w1") * pl.col("w2")) < 0)  # opposite signs
         assert diffs.shape[0] > 0, "Reversed signals should flip some positions"
 
-    def test_leverage_not_normalized_to_one(self, signal_df, returns_history):
-        """Gross leverage should NOT be forced to 1.0."""
+    def test_normalized_to_unit_leverage(self, signal_df, returns_history):
+        """Gross leverage should be normalized to max_leverage (default 1.0)."""
         w = size_half_kelly(
             signal_df,
             returns_history,
@@ -185,16 +183,58 @@ class TestHalfKelly:
             n_short=3,
             lookback=60,
             max_position=1.0,
-            max_leverage=100.0,
+            max_leverage=1.0,
         )
         if w.shape[0] == 0:
             pytest.skip("No Kelly weights produced")
 
         gross = w.group_by("date").agg(pl.col("weight").abs().sum().alias("gross"))
-        # With uncapped leverage, gross should NOT be exactly 1.0
         for row in gross.iter_rows(named=True):
-            # It could be anything; the key test is it's NOT always 1.0
-            pass  # just ensure no crash; direction test is the critical one
+            assert (
+                abs(row["gross"] - 1.0) < 1e-6
+            ), f"Gross leverage should be 1.0, got {row['gross']}"
+
+    def test_higher_signal_gets_larger_weight(self, returns_history):
+        """Within the same leg, stocks with more extreme signal z-scores
+        should get larger absolute weights (when σ² is similar).
+
+        All stocks in returns_history have similar noise (σ=0.005),
+        so z-score should dominate weight magnitude.
+        """
+        dates = ["2024-12-20"] * 6
+        tickers = ["A", "B", "C", "D", "E", "F"]
+        # Signal values linearly spaced: A has lowest, F has highest
+        signal = pl.DataFrame(
+            {
+                "date": pl.Series(dates).str.to_date(),
+                "ticker": tickers,
+                "value": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
+            }
+        )
+        w = size_half_kelly(
+            signal,
+            returns_history,
+            n_long=3,
+            n_short=3,
+            lookback=60,
+            max_position=1.0,
+        )
+        if w.shape[0] == 0:
+            pytest.skip("No Kelly weights produced")
+
+        day1 = w.filter(pl.col("date") == pl.lit("2024-12-20").str.to_date())
+        long_positions = day1.filter(pl.col("weight") > 0).sort(
+            "weight", descending=True
+        )
+        if long_positions.shape[0] >= 2:
+            # F (value=60) should have larger weight than D (value=40)
+            weights_by_ticker = {
+                r["ticker"]: r["weight"] for r in long_positions.iter_rows(named=True)
+            }
+            if "F" in weights_by_ticker and "D" in weights_by_ticker:
+                assert (
+                    weights_by_ticker["F"] > weights_by_ticker["D"]
+                ), "Higher signal should get larger weight"
 
     def test_max_position_cap(self, signal_df, returns_history):
         """No single position should exceed max_position."""
@@ -206,7 +246,6 @@ class TestHalfKelly:
             n_short=3,
             lookback=60,
             max_position=max_pos,
-            max_leverage=100.0,
         )
         if w.shape[0] == 0:
             pytest.skip("No Kelly weights produced")
@@ -214,24 +253,34 @@ class TestHalfKelly:
         max_abs = w["weight"].abs().max()
         assert max_abs <= max_pos + 1e-10
 
-    def test_max_leverage_cap(self, signal_df, returns_history):
-        """Gross leverage should not exceed max_leverage."""
-        max_lev = 1.5
-        w = size_half_kelly(
+    def test_max_leverage_scaling(self, signal_df, returns_history):
+        """max_leverage > 1 should scale up gross leverage proportionally."""
+        w1 = size_half_kelly(
             signal_df,
             returns_history,
             n_long=3,
             n_short=3,
             lookback=60,
             max_position=1.0,
-            max_leverage=max_lev,
+            max_leverage=1.0,
         )
-        if w.shape[0] == 0:
+        w2 = size_half_kelly(
+            signal_df,
+            returns_history,
+            n_long=3,
+            n_short=3,
+            lookback=60,
+            max_position=1.0,
+            max_leverage=2.0,
+        )
+        if w1.shape[0] == 0 or w2.shape[0] == 0:
             pytest.skip("No Kelly weights produced")
 
-        gross = w.group_by("date").agg(pl.col("weight").abs().sum().alias("gross"))
-        for row in gross.iter_rows(named=True):
-            assert row["gross"] <= max_lev + 1e-10
+        gross1 = w1.group_by("date").agg(pl.col("weight").abs().sum().alias("g"))
+        gross2 = w2.group_by("date").agg(pl.col("weight").abs().sum().alias("g"))
+        g1 = gross1["g"].to_list()[0]
+        g2 = gross2["g"].to_list()[0]
+        assert abs(g2 / g1 - 2.0) < 1e-6, "2x max_leverage should double gross"
 
     def test_position_count(self, signal_df, returns_history):
         """Kelly should select exactly n_long + n_short positions."""
@@ -242,7 +291,6 @@ class TestHalfKelly:
             n_short=2,
             lookback=60,
             max_position=1.0,
-            max_leverage=100.0,
         )
         if w.shape[0] == 0:
             pytest.skip("No Kelly weights produced")
