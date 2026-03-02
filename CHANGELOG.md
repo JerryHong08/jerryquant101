@@ -8,6 +8,10 @@
 
 ### Feat
 
+- **validation**: `walk_forward.py` — `WalkForwardFold` dataclass, `walk_forward_split()` (rolling/anchored modes), `apply_folds_to_dates()`, `summarize_folds()`. Rolling 126d train / 63d test / 5d purged embargo.
+- **validation**: `statistical_tests.py` — `bootstrap_sharpe_ci()` (circular block bootstrap, 10K resamples), `sharpe_pvalue()` (Lo 2002 adjusted SE), `probabilistic_sharpe_ratio()` (Bailey & de Prado 2012), `deflated_sharpe_ratio()` (Bailey & de Prado 2014, adjusts for multiple trials)
+- **validation**: `multiple_testing.py` — `bonferroni()`, `holm_bonferroni()`, `benjamini_hochberg()`, `apply_all_corrections()`. FWER and FDR control for strategy sweeps.
+- **notebook**: `validation.ipynb` — full validation gauntlet for 16-config sweep (4 sizing × 4 freq). Walk-forward IS/OOS: HK_W avg OOS SR=1.15, 60% hit rate. Bootstrap: 95% CI=[−0.58, 2.65] includes 0. PSR=91.8%, DSR=34.2% (16 trials). Multiple-testing: 0/16 survive BH correction. **Verdict: no config is statistically significant.**
 - **execution**: `cost_model.py` — ABC `CostModel` with `estimate()` + `estimate_array()`, 4 implementations: `FixedCostModel` (flat bps), `SpreadCostModel` (half bid-ask spread), `SqrtImpactCostModel` (Almgren-style η·σ·√(participation)), `CompositeCostModel` (sum of models)
 - **execution**: `cost_analysis.py` — `compute_turnover()` (weight-diff-based, full outer join), `compute_net_returns()`, `sharpe_vs_cost_curve()` (sweep), `breakeven_cost()` (binary search for Sharpe=0)
 - **notebook**: `cost_analysis.ipynb` — end-to-end cost analysis + rebalancing frequency experiment + sub-period stability check. Key findings: (1) all methods net-negative at 5 bps with daily rebalancing; Half-Kelly breakeven 1.8 bps. (2) Weekly Half-Kelly SR=1.04 net at 5 bps full-sample, but sub-period check reveals **only 2/4 half-years positive** (2025-H1 SR=−2.59). Full-sample result is an aggregation artifact — alpha is period-dependent. Includes `resample_weights()`, 4×4 sweep, efficiency frontier, stability heatmap
@@ -41,20 +45,15 @@
 
 ### Planned
 
-**Phase 2 — Risk & Portfolio** (remaining)
-- **risk**: Portfolio construction — market-neutral long-short, factor exposure targeting
-
-**Phase 4 — Backtest Engine Rewrite**
+**Phase 5 — Backtest Engine Rewrite**
 - **backtest**: Engine rewrite — Polars ETL + numba core loop
-- **backtest**: Walk-forward validation — rolling train/test with purged embargo
-- **backtest**: Statistical significance — bootstrap Sharpe confidence intervals
 
-**Phase 5 — ML Integration** (`src/ml/`)
+**Phase 6 — ML Integration** (`src/ml/`)
 - **ml**: Feature engineering — factor values as features, lagged returns, volatility features
 - **ml**: Time-series validation — purged k-fold, embargo gap
 - **ml**: Tree models — LightGBM/XGBoost return prediction, feature importance analysis
 
-**Phase 6 — Infrastructure**
+**Phase 7 — Infrastructure**
 - **data**: Universe construction — liquid universe module, sector/industry mapping (GICS)
 - **cli**: Unified `typer` entry point (backtest, alpha, data-update)
 - **research**: Templated research notebooks — factor exploration → signal → backtest → report

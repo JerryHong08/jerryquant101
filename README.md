@@ -6,7 +6,7 @@ Built around US equities data from [Massive(Polygon.io)](https://massive.com/) f
 processed with [Polars](https://pola.rs/), backtested with a custom engine, and
 documented as a learning journal in LaTeX.
 
-> **Current version**: 0.3.0 — See [CHANGELOG.md](CHANGELOG.md) for details.
+> **Current version**: 0.4.0 — See [CHANGELOG.md](CHANGELOG.md) for details.
 > **Detailed documentation**: See [docs/quant_lab.tex](docs/quant_lab.tex) for the full learning guide.
 
 ---
@@ -19,6 +19,7 @@ src/
 ├── alpha/                     # Factor research — signals, evaluation, preprocessing, combination
 ├── risk/                      # Risk & portfolio — VaR/CVaR, distribution analysis, position sizing
 ├── execution/                 # Transaction costs — fixed, spread, sqrt-impact, composite models
+├── validation/                # Walk-forward, bootstrap CI, PSR/DSR, multiple-testing corrections
 ├── data/
 │   ├── fetcher/               # Data acquisition — Polygon.io S3, FMP, yfinance, rsync
 │   └── loader/                # Data loading — OHLCV, split adjustment, resampling, caching
@@ -33,6 +34,7 @@ src/
 
 **Target modules** (not yet built):
 - `src/ml/` — Feature engineering, time-series validation, tree models
+- `src/backtest/` — Engine rewrite (Polars ETL + numba core loop)
 
 ---
 
@@ -117,23 +119,30 @@ polygon_data/
 - [x] **Cost analysis**: Turnover computation, net returns, Sharpe-vs-cost curves, breakeven cost
 - [x] **Validation notebook**: `notebooks/cost_analysis.ipynb` — 4 sizing methods compared gross vs net, all methods net-negative at 5 bps, Half-Kelly breakeven = 1.8 bps
 
-### Phase 4 — Backtest Engine Rewrite
+### Phase 4 — Walk-Forward Validation (`src/validation/`) (✅ Complete)
+
+> LaTeX reference: Part IV, Chapter 16
+
+- [x] **Walk-forward splitter**: Rolling/anchored modes, purged embargo gap, date mapping
+- [x] **Statistical tests**: Bootstrap Sharpe CI (circular block), Lo (2002) p-values, PSR (Bailey & de Prado 2012), DSR (Bailey & de Prado 2014)
+- [x] **Multiple testing**: Bonferroni, Holm-Bonferroni, Benjamini-Hochberg corrections
+- [x] **Validation notebook**: `notebooks/validation.ipynb` — 16-config gauntlet: walk-forward IS/OOS, bootstrap, PSR/DSR, p-value corrections. Verdict: 0/16 survive correction (DSR=34.2% for best config)
+
+### Phase 5 — Backtest Engine Rewrite
 
 > LaTeX reference: Part II, Chapters 7–8
 
 - [ ] **Engine rewrite**: Polars ETL + numba core loop
-- [ ] **Walk-forward validation**: Rolling train/test with purged embargo
-- [ ] **Statistical significance**: Bootstrap Sharpe confidence intervals
 
-### Phase 5 — ML Integration (`src/ml/`)
+### Phase 6 — ML Integration (`src/ml/`)
 
-> LaTeX reference: Part V, Chapters 16–18
+> LaTeX reference: Part V, Chapters 17–19
 
 - [ ] **Feature engineering**: Factor values as features, lagged returns, volatility features
 - [ ] **Time-series validation**: Purged k-fold, embargo gap
 - [ ] **Tree models**: LightGBM/XGBoost return prediction, feature importance analysis
 
-### Phase 6 — Infrastructure
+### Phase 7 — Infrastructure
 
 - [ ] **Universe construction**: Liquid universe module, sector/industry mapping (GICS)
 - [ ] **CLI**: Unified `typer` entry point (backtest, alpha, data-update)
