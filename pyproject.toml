@@ -1,6 +1,6 @@
 [project]
 name = "quant101"
-version = "0.6.0"
+version = "1.0.0"
 description = ""
 authors = [
     {name = "JerryHong",email = "huntcamilla06@gmail.com"}

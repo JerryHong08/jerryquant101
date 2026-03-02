@@ -6,8 +6,8 @@ Built around US equities data from [Massive(Polygon.io)](https://massive.com/) f
 processed with [Polars](https://pola.rs/), backtested with a custom engine, and
 documented as a learning journal in LaTeX.
 
-> **Current version**: 0.4.5 — See [CHANGELOG.md](CHANGELOG.md) for details.
-> **Detailed documentation**: See [docs/quant_lab.tex](docs/quant_lab.tex) for the full learning guide.
+> **Current version**: 1.0.0 — See [CHANGELOG.md](CHANGELOG.md) for details.
+> **Detailed documentation**: See [docs/quant_lab.tex](docs/quant_lab.tex) for the full learning guide (59 pages).
 
 ---
 
@@ -18,13 +18,15 @@ src/
 ├── constants.py                   # Shared constants — TRADING_DAYS_PER_YEAR, column name conventions
 ├── config.py                      # Central config — data paths, asset loaders, lazy getters
 ├── alpha/                         # Factor research — signals, evaluation, preprocessing, combination
+├── portfolio/                     # Alpha pipeline — AlphaConfig, factor registry, signal→weights→returns
 ├── risk/                          # Risk & portfolio — VaR/CVaR, distribution analysis, position sizing
 ├── execution/                     # Transaction costs — fixed, spread, sqrt-impact, composite models
 ├── validation/                    # Walk-forward, bootstrap CI, PSR/DSR, multiple-testing corrections
 ├── data/
 │   ├── fetcher/               # Data acquisition — Polygon.io S3, FMP, yfinance, rsync
-│   └── loader/                # Data loading — OHLCV, split adjustment, resampling, caching
-├── backtest/                  # Backtesting — engine, strategy base, performance analyzer, visualizer
+│   ├── loader/                # Data loading — OHLCV, split adjustment, resampling, caching
+│   └── universe.py            # Named stock universes (US_LARGE_CAP_50, etc.)
+├── backtest/                  # Backtesting — engine, weight backtester, portfolio tracker, exporter
 ├── strategy/                  # Trading strategies & indicator registry
 │   └── indicators/            # Technical indicators (BBIBOLL, OBV, etc.)
 ├── visualizer/                # Standalone charting
@@ -37,11 +39,14 @@ tests/
 ├── test_validation.py         # 34 tests — walk-forward, bootstrap, p-values, multiple testing
 ├── test_execution.py          # 25 tests — cost models, turnover, net returns, breakeven
 ├── test_risk.py               # 26 tests — VaR, CVaR, drawdown, distribution stats
-└── test_alpha.py              # 22 tests — winsorize, z-score, rank, neutralize, combination
+├── test_alpha.py              # 22 tests — winsorize, z-score, rank, neutralize, combination
+├── test_portfolio.py          # 25 tests — pipeline stages, universe registry
+├── test_alpha_config.py       # 24 tests — AlphaConfig/FactorConfig dataclasses
+├── test_position_sizing.py    # 13 tests — EW, signal-weighted, validation
+└── test_backtest_refactor.py  # 32 tests — PortfolioTracker, WeightBacktester, exporter
 ```
 
 **Target modules** (not yet built):
-- `src/portfolio/` — Signal→weights pipeline, universe registry
 - `src/ml/` — Feature engineering, time-series validation, tree models
 
 ---
@@ -149,7 +154,7 @@ polygon_data/
 - [x] **Signal→weights bridge**: `pipeline.py` — 7-stage pipeline (`compute_daily_returns` → `run_alpha_pipeline`), extensible factor registry (bbiboll, vol_ratio, momentum), replaces ~80 lines duplicated across 4 notebooks
 - [x] **Universe registry**: `src/data/universe.py` — `US_LARGE_CAP_50` (50 tickers, sector-organized), `US_LARGE_CAP_52` (52 tickers), `get_universe()`, `register_universe()`
 - [x] **Walk-forward runner**: `walk_forward_runner.py` — `run_walk_forward()` executes pipeline per fold, collects IS/OOS Sharpe/return/vol, Sharpe decay metric
-- [x] **Tests**: `test_portfolio.py` — 25 tests (pipeline stages + universe). **132 tests total, all passing.**
+- [x] **Tests**: `test_portfolio.py` — 25 tests (pipeline stages + universe)
 - [x] **SQL injection fix**: `data_loader.py` — credential escaping in DuckDB SET statements
 - [x] **Demo notebook**: `notebooks/pipeline_demo.ipynb`
 
@@ -162,17 +167,21 @@ polygon_data/
 - [x] **Unified CLI**: `backtester.py` rewritten with `argparse` — `--mode strategy` (legacy) / `--mode pipeline` (new, default)
 - [x] **Fix open position tracking bug**: `trade_rules` type hint corrected (2-tuple → 3-tuple)
 - [x] **Fix datetime mismatch**: `portfolio_tracker.py` — auto-cast datetime resolution (ns ↔ μs) before join
-- [x] **Tests**: 32 new tests in `test_backtest_refactor.py`. **164 tests total, all passing.**
+- [x] **Tests**: 32 new tests in `test_backtest_refactor.py`
 
-### Phase 7 — Alpha Config & Multi-Factor (🔄 In Progress)
+### Phase 7 — Alpha Config & Multi-Factor (✅ Complete)
 
 > Soft-code the alpha pipeline — make factor selection, params, and combination method fully configurable.
 
-- [ ] **`AlphaConfig` dataclass**: Single config object holding factor list with per-factor params (windows, preprocessing), portfolio construction params (`n_long`, `n_short`, `target_vol`), sizing params (`kelly_lookback`, `kelly_max_position`), combination method. Loadable from YAML.
-- [ ] **Refactor pipeline to accept config**: `run_alpha_pipeline(config: AlphaConfig)` replaces 10+ keyword args. Each factor function receives its own params from config.
-- [ ] **Wire full config through backtester**: `run_pipeline_backtest(config)` passes all params end-to-end (currently drops `n_long`, `n_short`, `target_vol`, `combination_method`)
-- [ ] **Wire IC-weighted combination**: `build_factor_pipeline()` computes IC series and passes to `combine_factors()` — currently dead code for `ic_weight`/`mean_variance`/`risk_parity` methods
-- [ ] **More factors**: Momentum (12-1 month), quality/earnings, mean reversion, value
+- [x] **`AlphaConfig` dataclass**: `alpha_config.py` — single config object with `FactorConfig` (per-factor winsorize/normalize/neutralize params, `direction: Literal[1, -1]`), sizing method, combination method, all portfolio construction params
+- [x] **Factor registry**: `factors.py` — `register_factor()` / `get_factor_fn()` / `list_factors()`. 3 built-in: bbiboll, vol_ratio, momentum. Extracted from inline lambdas
+- [x] **Refactor pipeline to accept config**: `run_alpha_pipeline(config: AlphaConfig)` replaces 10+ keyword args
+- [x] **Wire IC-weighted combination**: `build_factor_pipeline()` computes IC series and passes to `combine_factors()` — all 4 combination methods now functional
+- [x] **Signal-weighted sizing**: Renamed from "Half-Kelly" — `w_i ∝ direction × |z_i| / σ_i²` (conviction × inverse-variance, explicitly not Kelly)
+- [x] **Ablation study**: 2×2 (sizing × rebalancing) proving sizing accounts for 0.68 Sharpe swing; Kelly lesson documented in LaTeX Entry 4
+- [x] **Factor diagnostics notebook**: 8-section diagnostic with IC/IR, cumulative L/S, direction check, IC correlation, config comparison
+- [x] **Tests**: 24 AlphaConfig tests + 13 position-sizing tests. **201 tests total, all passing.**
+- [ ] **More factors**: Cross-sectional momentum (12-1 month), short-term reversal, low-volatility
 - [ ] **Regime tagging**: `src/data/regime.py` — bull/bear/sideways from rolling SPX returns
 
 ### Phase 8 — ML Integration (`src/ml/`)
@@ -192,27 +201,27 @@ polygon_data/
 
 > Issues are fixed as natural byproducts of each phase — no separate fix sprint needed.
 
-**Legacy backtest (High)** — ~~fix in Phase 6~~ mostly resolved
-- [x] ~~`engine.py` God class~~ → **resolved in Phase 6** (export extracted to `result_exporter.py`, engine now thin orchestrator)
-- [x] ~~No alpha→backtest bridge~~ → **resolved in Phase 5** (`portfolio/pipeline.py`) + **Phase 6** (`WeightBacktester`)
+**Legacy backtest** — ~~High~~ mostly resolved
+- [x] ~~`engine.py` God class~~ → **resolved in Phase 6** (export extracted to `result_exporter.py`)
+- [x] ~~No alpha→backtest bridge~~ → **resolved in Phase 5+6** (`pipeline.py` + `WeightBacktester`)
 - [x] ~~Open position tracking bug~~ → **resolved in Phase 6** (type hint fix)
-- [ ] Stock dividends not handled → fix in Phase 7 (needed for dividend yield factor)
+- [ ] Stock dividends not handled (needed for dividend yield factor)
 
-**Alpha pipeline (High)** — fix in Phase 7
-- [ ] Per-factor params hardcoded inside private functions (winsorize, normalize, windows) → `AlphaConfig` in Phase 7
-- [ ] IC-weighted combination is dead code (`build_factor_pipeline` never computes IC series) → wire in Phase 7
-- [ ] `run_pipeline_backtest()` drops 6 of 10 `run_alpha_pipeline()` params → full config passthrough in Phase 7
+**Alpha pipeline** — ~~High~~ mostly resolved
+- [x] ~~Per-factor params hardcoded~~ → **resolved in Phase 7** (`AlphaConfig` + `FactorConfig`)
+- [x] ~~IC-weighted combination dead code~~ → **resolved in Phase 7** (wired through `build_factor_pipeline`)
+- [ ] `run_pipeline_backtest()` does not pass full `AlphaConfig` yet (uses keyword args)
 
 **Data layer (Medium)**
 - [ ] `data_loader.py` 1,192-line monolith with mixed concerns → split gradually
 - [ ] AWS creds loaded at module-level import (should be lazy)
-- [x] ~~SQL injection risk in DuckDB credential queries~~ → **fixed in Phase 5** (credential escaping)
-- [ ] Date column naming: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution) → enforce via `constants.py`
+- [x] ~~SQL injection risk~~ → **fixed in Phase 5** (credential escaping)
+- [ ] Date column naming: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution)
 
 **Other (Low)**
 - [x] ~~No universe module~~ → **resolved in Phase 5** (`data/universe.py`)
-- [ ] `src/constants.py` only wired into `performance_analyzer.py` — wire into more modules gradually
-- [ ] Low-volume tickers skipped (>50 days zero volume) → keep as-is (conscious data quality tradeoff)
+- [ ] `src/constants.py` only wired into `performance_analyzer.py`
+- [ ] Low-volume tickers skipped (>50 days zero volume) — conscious data quality tradeoff
 
 ---
 

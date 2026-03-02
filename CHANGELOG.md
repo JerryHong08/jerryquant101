@@ -1,9 +1,34 @@
-## Unreleased
+## 1.0.0 (2026-03-02)
 
-### Project Direction
+> **Milestone**: quant101 graduates from a backtesting experiment into a structured
+> quant research laboratory.  64 source files (12.8K lines), 201 tests (2.6K lines),
+> 7 research notebooks, 59-page LaTeX encyclopedia.  All infrastructure needed to
+> research, validate, and backtest equity alpha factors is in place.
 
-> **v1.0.0 Goal**: Upgrade quant101 from a backtesting experiment into a structured
-> quant trader & researcher learning project.
+### Feat (Phase 7 — AlphaConfig & Multi-Factor)
+
+- **portfolio**: `src/portfolio/alpha_config.py` — `AlphaConfig` dataclass: single config object holding factor list (with per-factor `FactorConfig`: winsorize/normalize/neutralize params, `direction: Literal[1, -1]`), sizing method, combination method, portfolio construction params (`n_long`, `n_short`, `target_vol`, `rebal_every_n`). Replaces 10+ keyword args with one object.
+- **portfolio**: `src/portfolio/factors.py` — factor function registry: `register_factor()`, `get_factor_fn()`, `list_factors()`. 3 built-in factors: `bbiboll`, `vol_ratio`, `momentum`. Extracted from inline lambdas in `pipeline.py`.
+- **portfolio**: Wired IC-weighted combination through `build_factor_pipeline()` — `ic_weight`, `mean_variance`, `risk_parity` combination methods now fully functional (were dead code).
+- **portfolio**: `FactorConfig.direction` field — factors can declare their expected IC sign; pipeline auto-flips signal for short-alpha factors (e.g., `direction=-1` for BBIBOLL).
+- **notebook**: `notebooks/factor_diagnostics.ipynb` — 8-section factor diagnostic notebook: per-factor IC/IR, cumulative L/S returns, direction check, IC correlation matrix, AlphaConfig comparison.
+- **notebook**: `notebooks/pipeline_demo.ipynb` — rewritten as 2×2 ablation study isolating sizing (EW vs Signal-Weighted) × rebalancing (daily vs weekly). Key finding: sizing alone accounts for 0.68 Sharpe swing.
+- **tests**: `tests/test_alpha_config.py` — 24 tests for AlphaConfig/FactorConfig. `tests/test_position_sizing.py` — 13 tests (7 rewritten for signal-weighted sizing). **201 tests total, all passing.**
+
+### Fix (Phase 7 — Position Sizing)
+
+- **risk**: `position_sizing.py` — three successive bugs fixed in the "Half-Kelly" sizing method:
+  1. **Normalization destroyed Kelly property**: normalizing `sum(|w|) = 1` discards the leverage signal. Fix: direction from μ sign, leverage not normalized internally.
+  2. **All configs identical (Sharpe = 0.343)**: Kelly used `|μ_i|/σ_i²` where μ came from returns history — completely ignored the factor signal. Fix: two-stage design (factor selects stocks, Kelly sizes by `|μ|/σ²`).
+  3. **Historical μ is stealth momentum**: 60-day rolling mean return has SNR ≈ 0.02 — pure noise that injects momentum bias conflicting with mean-reversion factors. Fix: replaced `|μ_i|` with `|z_i|` (cross-sectional z-score of factor signal). Final formula: `w_i ∝ direction_i × |z_i| / σ_i²`.
+
+### Refactor (Phase 7)
+
+- **risk**: Renamed `size_half_kelly()` → `size_signal_weighted()` across entire codebase (15 files). Docstring explicitly states "Not true Kelly" — Kelly determines portfolio leverage, not relative allocation. Honest naming prevents misleading implications.
+
+### Docs (Phase 7)
+
+- **docs**: `quant_lab.tex` Entry 4 — "Kelly Criterion Is a Leverage Tool, Not an Allocation Tool": three-bug journey, 2×2 ablation results, root cause (`z/σ²` under-weights high-vol opportunities where mean-reversion alpha is strongest), conceptual error (scalar Kelly ignores correlations), multivariate Kelly reference (`f* = Σ⁻¹μ`), resolution and interview one-liner.
 
 ### Feat (Phase 6 — Backtest Refactor) ⚠️ BREAKING
 
@@ -93,16 +118,6 @@
 
 ### Planned
 
-**Phase 6 — Backtest Refactor** (targeted surgery, not full rewrite)
-- **backtest**: Extract God class — `engine.py` is a monolithic class mixing data loading, signal routing, position tracking, and reporting. Split into composable pieces
-- **backtest**: Make `BacktestEngine` accept portfolio weights directly (not just `StrategyBase` subclasses) — bridge the alpha→backtest gap
-- **backtest**: Fix open position tracking bug
-
-**Phase 7 — Multi-Factor Alpha**
-- **alpha**: More factors — momentum (12-1 month), quality/earnings, mean reversion, value
-- **alpha**: Factor registry — `src/alpha/registry.py` — register factor functions by name (like indicator registry), so you can do `get_factor("bbiboll_dev")` instead of 30 lines of setup per notebook
-- **alpha**: Regime tagging — `src/data/regime.py` — tag each date as bull/bear/sideways using rolling SPX returns; walk-forward should report per-regime stats
-
 **Phase 8 — ML Integration** (`src/ml/`)
 - **ml**: Feature engineering — factor values as features, lagged returns, volatility features
 - **ml**: Time-series validation — purged k-fold, embargo gap
@@ -112,22 +127,9 @@
 - **cli**: Unified `typer` entry point (backtest, alpha, data-update)
 - **research**: Templated research notebooks — factor exploration → signal → backtest → report
 
-### Known Issues
-
-**Legacy backtest (High severity)**
-- `engine.py` is a God class (~400 lines) mixing data loading, signal routing, position tracking, and reporting
-- No alpha→backtest bridge — alpha module produces signals, backtest module accepts `StrategyBase` subclasses; notebooks work around this with inline `compute_portfolio_return()`
-- Open position tracking needs fix
-- Stock dividends not handled
-
-**Data layer (Medium severity)**
-- `data_loader.py` is a 1,192-line monolith with mixed concerns
-- AWS creds loaded at module-level import — should be lazy-loaded
-- Date column naming inconsistency: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution)
-
-**Other (Low severity)**
-- `src/constants.py` only wired into `performance_analyzer.py` — other modules (risk, execution, validation) still accept `252` as parameter defaults rather than importing the constant
-- Low-volume tickers (>50 days zero volume) are skipped — see v0.1.0 notes
+**Factor Research (ongoing)**
+- More factors — cross-sectional momentum (12-1 month), short-term reversal, low-volatility, quality/earnings
+- Regime tagging — `src/data/regime.py` — bull/bear/sideways from rolling SPX returns
 
 ---
 
