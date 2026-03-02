@@ -254,37 +254,44 @@ def size_volatility_target(
 def size_half_kelly(
     signal: pl.DataFrame,
     returns_history: pl.DataFrame,
+    n_long: int = 10,
+    n_short: int = 10,
     lookback: int = 60,
     max_position: float = 0.10,
     max_leverage: float = 3.0,
 ) -> pl.DataFrame:
     """
-    Half-Kelly position sizing.
+    Half-Kelly position sizing with factor-directed stock selection.
 
-    Full Kelly maximizes long-run growth rate:
-        f* = μ / σ²   (single asset, diagonal approximation)
+    Two-stage process:
+        1. **Factor selection** — the factor signal determines *which* stocks
+           go long (top-N by signal) and which go short (bottom-N), exactly
+           like equal-weight.
+        2. **Kelly sizing** — within each leg, Kelly determines *how much*
+           to allocate to each stock: ``w_i = 0.5 × |μ_i| / σ_i²``.
+           Direction comes from the factor ranking (step 1), not from μ.
 
-    For a vector of assets (diagonal covariance approximation):
-        w_i = μ_i / σ_i²
-
-    Half-Kelly halves the raw weights for safety:
-        w_i = 0.5 × μ_i / σ_i²
-
-    Unlike equal-weight or inverse-vol, Kelly determines **both** the
-    direction (sign of μ_i) and the size.  The factor signal is only used
-    to select which stocks to consider, not to determine direction.
+    This separates alpha (factor) from risk management (Kelly).
+    The factor decides *what* to trade, Kelly decides *how much*.
 
     Leverage is **not** normalized to 1.  Kelly naturally uses less leverage
     when expected returns are low and more when they are high.  A
     ``max_leverage`` cap and per-position ``max_position`` cap are applied
     as safety guardrails.
 
+    Math (diagonal covariance approximation)::
+
+        f*_i = μ_i / σ_i²           (full Kelly)
+        w_i  = 0.5 × |μ_i| / σ_i²  (half-Kelly magnitude)
+        sign(w_i) from factor rank   (long top-N, short bottom-N)
+
     Args:
         signal: DataFrame with columns (date, ticker, value).
-                Used to select the stock universe on each date (stocks
-                present in the signal are candidates).
+                Factor signal used to rank stocks into long/short legs.
         returns_history: DataFrame with columns (date, ticker, return) —
                          historical daily returns for each stock.
+        n_long: Number of stocks in the long leg.
+        n_short: Number of stocks in the short leg.
         lookback: Number of trailing days for μ and σ estimation.
         max_position: Maximum absolute weight per stock (safety cap).
         max_leverage: Maximum gross leverage (sum of |w|) per date.
@@ -299,6 +306,28 @@ def size_half_kelly(
         window controls the bias-variance trade-off of these estimates.
     """
     _validate_signal(signal)
+
+    # Stage 1: Factor-directed stock selection (same as equal-weight)
+    positions = (
+        signal.sort(["date", "value"])
+        .with_columns(
+            pl.col("value")
+            .rank(method="ordinal", descending=False)
+            .over("date")
+            .alias("rank"),
+            pl.col("value").count().over("date").alias("n_stocks"),
+        )
+        .with_columns(
+            pl.when(pl.col("rank") <= n_short)
+            .then(pl.lit(-1))  # Short leg
+            .when(pl.col("rank") > (pl.col("n_stocks") - n_long))
+            .then(pl.lit(1))  # Long leg
+            .otherwise(pl.lit(0))
+            .alias("direction")
+        )
+        .filter(pl.col("direction") != 0)
+        .select(["date", "ticker", "direction"])
+    )
 
     # Compute rolling mean and variance of returns
     stats = (
@@ -322,16 +351,17 @@ def size_half_kelly(
         )
     )
 
-    # Join signal with stats — signal selects the universe, μ determines direction
+    # Stage 2: Kelly sizing — magnitude from |μ|/σ², direction from factor
     kelly = (
-        signal.join(
+        positions.join(
             stats.select(["date", "ticker", "mu", "var"]),
             on=["date", "ticker"],
             how="inner",
         )
         .with_columns(
-            # Half-Kelly: 0.5 * μ/σ², direction from μ (not signal)
-            (0.5 * pl.col("mu") / pl.col("var"))
+            # Half-Kelly magnitude: 0.5 * |μ| / σ²
+            # Direction from factor ranking (not μ sign)
+            (pl.col("direction") * (0.5 * pl.col("mu").abs() / pl.col("var")))
             .clip(lower_bound=-max_position, upper_bound=max_position)
             .alias("raw_weight")
         )

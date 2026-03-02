@@ -290,6 +290,8 @@ def build_sizing_methods(
         "Half-Kelly": size_half_kelly(
             composite,
             returns_for_kelly,
+            n_long=n_long,
+            n_short=n_short,
             lookback=kelly_lookback,
             max_position=kelly_max_position,
             max_leverage=kelly_max_leverage,

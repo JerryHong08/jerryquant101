@@ -106,17 +106,20 @@ class TestEqualWeight:
 
 
 class TestHalfKelly:
-    def test_direction_from_mu_not_signal(self, signal_df, returns_history):
-        """Direction should come from μ (return estimate), not signal value.
+    def test_direction_from_factor_ranking(self, signal_df, returns_history):
+        """Direction comes from factor ranking: top-N long, bottom-N short.
 
-        All signal values are positive, but D/E/F have negative μ,
-        so they should get negative (short) weights.
+        Signal values: A=10 < B=20 < C=30 < D=40 < E=50 < F=60.
+        With n_long=3, n_short=3: A,B,C are short; D,E,F are long.
+        Kelly only determines magnitude (from |μ|/σ²).
         """
         w = size_half_kelly(
             signal_df,
             returns_history,
+            n_long=3,
+            n_short=3,
             lookback=60,
-            max_position=1.0,  # high cap to see raw Kelly
+            max_position=1.0,
             max_leverage=100.0,
         )
         if w.shape[0] == 0:
@@ -124,19 +127,65 @@ class TestHalfKelly:
 
         day1 = w.filter(pl.col("date") == pl.lit("2024-12-20").str.to_date())
         for row in day1.iter_rows(named=True):
-            if row["ticker"] in ("A", "B", "C"):
-                assert row["weight"] > 0, f"{row['ticker']} should be long (μ > 0)"
-            elif row["ticker"] in ("D", "E", "F"):
-                assert row["weight"] < 0, f"{row['ticker']} should be short (μ < 0)"
+            if row["ticker"] in ("D", "E", "F"):
+                assert (
+                    row["weight"] > 0
+                ), f"{row['ticker']} should be long (top by signal)"
+            elif row["ticker"] in ("A", "B", "C"):
+                assert (
+                    row["weight"] < 0
+                ), f"{row['ticker']} should be short (bottom by signal)"
+
+    def test_different_signals_different_weights(self, returns_history):
+        """Different factor signals should produce different Kelly weights."""
+        dates = ["2024-12-20"] * 6
+        tickers = ["A", "B", "C", "D", "E", "F"]
+
+        signal_1 = pl.DataFrame(
+            {
+                "date": pl.Series(dates).str.to_date(),
+                "ticker": tickers,
+                "value": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
+            }
+        )
+        signal_2 = pl.DataFrame(
+            {
+                "date": pl.Series(dates).str.to_date(),
+                "ticker": tickers,
+                "value": [60.0, 50.0, 40.0, 30.0, 20.0, 10.0],  # reversed
+            }
+        )
+
+        w1 = size_half_kelly(
+            signal_1, returns_history, n_long=3, n_short=3, lookback=60
+        )
+        w2 = size_half_kelly(
+            signal_2, returns_history, n_long=3, n_short=3, lookback=60
+        )
+
+        if w1.shape[0] == 0 or w2.shape[0] == 0:
+            pytest.skip("No Kelly weights produced")
+
+        # Different signals should produce different stock selections
+        merged = w1.rename({"weight": "w1"}).join(
+            w2.rename({"weight": "w2"}),
+            on=["date", "ticker"],
+            how="inner",
+        )
+        # At least some weights should differ (directions should be opposite)
+        diffs = merged.filter((pl.col("w1") * pl.col("w2")) < 0)  # opposite signs
+        assert diffs.shape[0] > 0, "Reversed signals should flip some positions"
 
     def test_leverage_not_normalized_to_one(self, signal_df, returns_history):
         """Gross leverage should NOT be forced to 1.0."""
         w = size_half_kelly(
             signal_df,
             returns_history,
+            n_long=3,
+            n_short=3,
             lookback=60,
             max_position=1.0,
-            max_leverage=100.0,  # very high cap
+            max_leverage=100.0,
         )
         if w.shape[0] == 0:
             pytest.skip("No Kelly weights produced")
@@ -153,6 +202,8 @@ class TestHalfKelly:
         w = size_half_kelly(
             signal_df,
             returns_history,
+            n_long=3,
+            n_short=3,
             lookback=60,
             max_position=max_pos,
             max_leverage=100.0,
@@ -169,6 +220,8 @@ class TestHalfKelly:
         w = size_half_kelly(
             signal_df,
             returns_history,
+            n_long=3,
+            n_short=3,
             lookback=60,
             max_position=1.0,
             max_leverage=max_lev,
@@ -180,42 +233,23 @@ class TestHalfKelly:
         for row in gross.iter_rows(named=True):
             assert row["gross"] <= max_lev + 1e-10
 
-    def test_no_signal_sign_dependency(self, signal_df, returns_history):
-        """Flipping signal values should NOT change Kelly weight signs.
-
-        Kelly direction comes from μ, so negating signal should
-        not flip the weight sign.
-        """
-        w_pos = size_half_kelly(
+    def test_position_count(self, signal_df, returns_history):
+        """Kelly should select exactly n_long + n_short positions."""
+        w = size_half_kelly(
             signal_df,
             returns_history,
+            n_long=2,
+            n_short=2,
             lookback=60,
             max_position=1.0,
             max_leverage=100.0,
         )
-        # Negate all signal values
-        neg_signal = signal_df.with_columns(-pl.col("value"))
-        w_neg = size_half_kelly(
-            neg_signal,
-            returns_history,
-            lookback=60,
-            max_position=1.0,
-            max_leverage=100.0,
-        )
-        if w_pos.shape[0] == 0 or w_neg.shape[0] == 0:
+        if w.shape[0] == 0:
             pytest.skip("No Kelly weights produced")
 
-        # Join and compare signs
-        merged = w_pos.rename({"weight": "w_pos"}).join(
-            w_neg.rename({"weight": "w_neg"}),
-            on=["date", "ticker"],
-            how="inner",
-        )
-        for row in merged.iter_rows(named=True):
-            assert np.sign(row["w_pos"]) == np.sign(row["w_neg"]), (
-                f"Ticker {row['ticker']}: weight sign changed when signal "
-                f"was negated. Kelly should use μ, not signal."
-            )
+        per_date = w.group_by("date").agg(pl.col("weight").count().alias("n"))
+        for row in per_date.iter_rows(named=True):
+            assert row["n"] <= 4  # at most n_long + n_short
 
 
 # ── Validate Signal ───────────────────────────────────────────────────────────
