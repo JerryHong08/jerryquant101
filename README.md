@@ -7,7 +7,8 @@ processed with [Polars](https://pola.rs/), backtested with a custom engine, and
 documented as a learning journal in LaTeX.
 
 > **Current version**: 1.0.0 — See [CHANGELOG.md](CHANGELOG.md) for details.
-> **Detailed documentation**: See [docs/quant_lab.tex](docs/quant_lab.tex) for the full learning guide (59 pages).
+> **Detailed documentation**: See [docs/latex/quant_lab.pdf](docs/latex/quant_lab.pdf) for the full learning guide (59 pages).
+> **Online docs**: [https://jerryhong08.github.io/jerryquant101/](https://jerryhong08.github.io/jerryquant101/)
 
 ---
 
@@ -229,4 +230,4 @@ polygon_data/
 
 - **Live Trading**: [jerryib_trader](https://github.com/JerryHong08/jerryib_trader) — Market Mover Monitor + GridTrader (separated from this repo)
 - **Data Source**: [Polygon.io Flat Files](https://polygon.io/flat-files)
-- **Documentation**: [docs/quant_lab.tex](docs/quant_lab.tex) — detailed learning journal
+- **Documentation**: [docs/latex/quant_lab.pdf](docs/latex/quant_lab.pdf) — detailed learning journal

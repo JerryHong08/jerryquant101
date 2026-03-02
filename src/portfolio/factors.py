@@ -58,7 +58,7 @@ def _compute_bbiboll_factor(
         Preprocessed factor DataFrame (date, ticker, value).
     """
     fc = factor_config or FactorConfig()
-    from strategy.indicators.registry import get_indicator
+    from indicators.registry import get_indicator
 
     bbiboll_fn = get_indicator("bbiboll")
     ohlcv_bb = bbiboll_fn(ohlcv)

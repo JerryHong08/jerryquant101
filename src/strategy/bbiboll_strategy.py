@@ -11,7 +11,7 @@ import polars as pl
 
 from backtest.strategy_base import StrategyBase
 from data.loader.data_loader import TimestampGenerator
-from strategy.indicators.registry import get_indicator
+from indicators.registry import get_indicator
 
 
 class BBIBOLLStrategy(StrategyBase):
