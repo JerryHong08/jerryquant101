@@ -8,6 +8,22 @@
 
 ### Feat
 
+- **tests**: Full pytest suite — `tests/conftest.py` (shared fixtures: synthetic returns, factor DataFrames, weight DataFrames, turnover arrays), `test_validation.py` (34 tests), `test_execution.py` (25 tests), `test_risk.py` (26 tests), `test_alpha.py` (22 tests). **107 tests, all passing.**
+- **constants**: `src/constants.py` — single source of truth for `TRADING_DAYS_PER_YEAR=252`, column name conventions (`DATE_COL`, `TICKER_COL`, `VALUE_COL`, `WEIGHT_COL`, `RETURN_COL`, `OHLCV_DATE_COL`)
+
+### Fix
+
+- **backtest**: Fee calculation bug in `performance_analyzer.py` — old formula `len(trades) * end_value * fee_rate` (nonsensical: multiplied total portfolio by trade count) → fixed to per-position approximation `n_trades * avg_position_value * fee_rate`
+- **backtest**: Removed dead import `from config import all_tickers_dir` in `backtester.py`
+- **backtest**: Replaced 4 hardcoded `252` magic numbers with `TRADING_DAYS_PER_YEAR` constant in `performance_analyzer.py`
+
+### Refactor
+
+- **deps**: Pruned `pyproject.toml` — removed 13 unused dependencies from main (tensorflow, pytorch-tabnet, redis, flask, flask-socketio, igraph, influxdb-client, pydantic, lxml, anywidget, massive, prometheus-client, optuna). Added missing used deps (numpy, scipy, plotly). Created `[ml]` and `[infra]` optional dependency groups. Main deps: 35 → 25.
+- **config**: Updated pytest `testpaths` from `["src"]` to `["tests"]`
+
+### Feat (prior — Phase 4)
+
 - **validation**: `walk_forward.py` — `WalkForwardFold` dataclass, `walk_forward_split()` (rolling/anchored modes), `apply_folds_to_dates()`, `summarize_folds()`. Rolling 126d train / 63d test / 5d purged embargo.
 - **validation**: `statistical_tests.py` — `bootstrap_sharpe_ci()` (circular block bootstrap, 10K resamples), `sharpe_pvalue()` (Lo 2002 adjusted SE), `probabilistic_sharpe_ratio()` (Bailey & de Prado 2012), `deflated_sharpe_ratio()` (Bailey & de Prado 2014, adjusts for multiple trials)
 - **validation**: `multiple_testing.py` — `bonferroni()`, `holm_bonferroni()`, `benjamini_hochberg()`, `apply_all_corrections()`. FWER and FDR control for strategy sweeps.

@@ -4,7 +4,6 @@ import polars as pl
 
 from backtest.engine import BacktestEngine
 from backtest.visualizer import BacktestVisualizer
-from config import all_tickers_dir
 from data.loader.benchmark_loader import load_spx_benchmark
 from data.loader.data_loader import stock_load_process
 from data.loader.date_utils import generate_backtest_date

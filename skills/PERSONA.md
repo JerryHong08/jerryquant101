@@ -199,6 +199,7 @@ You are training a quantitative thinker.
 | Version control | Commitizen (`cz_conventional_commits`) |
 | Config | `basic_config.yaml` (gitignored, template at `.example`) |
 | LaTeX compiler | XeLaTeX at `/mnt/blackdisk/texlive/bin/x86_64-linux/xelatex` |
+| Python Env | 'source /home/jerryhong/.cache/pypoetry/virtualenvs/quant101-rQ2o9wWd-py3.12/bin/activate' |
 
 ---
 

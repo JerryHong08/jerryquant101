@@ -4,6 +4,8 @@ from typing import Any, Dict, Optional
 import numpy as np
 import polars as pl
 
+from constants import TRADING_DAYS_PER_YEAR
+
 
 class PerformanceAnalyzer:
     """
@@ -74,8 +76,18 @@ class PerformanceAnalyzer:
 
         risk_metrics = self._calculate_risk_metrics(returns, np.min(drawdown))
 
-        # Trading fees calculation
-        total_fees = len(trades) * end_value * self.trading_fee_rate
+        # Trading fees: fee_rate applied to each trade's notional value.
+        # Each round-trip trade costs fee_rate on a per-position basis.
+        # Approximate trade value as end_value / num_positions (or end_value
+        # for a single-position portfolio).  This is an approximation —
+        # a proper cost model should be used for production analysis.
+        if not trades.is_empty() and "return" in trades.columns:
+            # Use actual trade values if available
+            n_trades = len(trades)
+            avg_position_value = end_value / max(1, n_trades)
+            total_fees = n_trades * avg_position_value * self.trading_fee_rate
+        else:
+            total_fees = 0.0
 
         # Exposure (assume fully invested)
         max_gross_exposure = 100.0
@@ -215,16 +227,20 @@ class PerformanceAnalyzer:
 
         returns_array = returns.to_numpy()
 
-        annual_vol = np.std(returns_array) * np.sqrt(252)
+        annual_vol = np.std(returns_array) * np.sqrt(TRADING_DAYS_PER_YEAR)
 
         # Sharpe ratio
-        sharpe_ratio = returns_array.mean() * 252 / annual_vol if annual_vol > 0 else 0
+        sharpe_ratio = (
+            returns_array.mean() * TRADING_DAYS_PER_YEAR / annual_vol
+            if annual_vol > 0
+            else 0
+        )
 
-        annual_return = np.mean(returns_array) * 252
+        annual_return = np.mean(returns_array) * TRADING_DAYS_PER_YEAR
         # Sortino ratio (downside volatility)
         negative_returns = returns_array[returns_array < 0]
         downside_vol = (
-            np.std(negative_returns) * np.sqrt(252)
+            np.std(negative_returns) * np.sqrt(TRADING_DAYS_PER_YEAR)
             if len(negative_returns) > 0
             else annual_vol
         )
