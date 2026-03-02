@@ -22,6 +22,7 @@
 
 - **backtest**: `engine.py` `export_results()` — null benchmark crash fixed (guard added before `benchmark.with_columns(...)`)
 - **backtest**: `strategy_base.py` — `trade_rules` type hint fixed from 2-tuple to 3-tuple `tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]` to match actual usage in `run_backtest()`
+- **backtest**: `portfolio_tracker.py` — datetime resolution mismatch (`datetime[ns]` vs `datetime[μs]`) fixed with auto-cast before join in `run()`
 - **backtest**: `engine.py` — dead `datetime` import removed
 - **backtest**: `performance_analyzer.py` — dead `timedelta` import removed
 

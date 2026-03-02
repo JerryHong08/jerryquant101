@@ -116,6 +116,11 @@ class PortfolioTracker:
         # ── Apply transaction costs ──
         turnover_df = self._compute_turnover(weights, date_col, ticker_col, weight_col)
 
+        # Align datetime resolution (input data may be ns while turnover_df is μs)
+        port_dtype = daily_port[date_col].dtype
+        if turnover_df[date_col].dtype != port_dtype:
+            turnover_df = turnover_df.cast({date_col: port_dtype})
+
         if self.cost_bps > 0.0:
             cost_rate = self.cost_bps / 10_000
             daily_port = (

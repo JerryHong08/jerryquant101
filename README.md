@@ -153,18 +153,26 @@ polygon_data/
 - [x] **SQL injection fix**: `data_loader.py` — credential escaping in DuckDB SET statements
 - [x] **Demo notebook**: `notebooks/pipeline_demo.ipynb`
 
-### Phase 6 — Backtest Refactor
+### Phase 6 — Backtest Refactor (✅ Complete)
 
 > Targeted surgery on legacy code, not a full rewrite.
 
-- [ ] **Extract God class**: Split `engine.py` into composable pieces (data loading, position tracking, reporting)
-- [ ] **Accept portfolio weights**: Make `BacktestEngine` work with weight DataFrames directly, not just `StrategyBase` subclasses
-- [ ] **Fix open position tracking bug**
+- [x] **Extract God class**: `engine.py` split — export logic extracted to `result_exporter.py`, engine down from ~310 to ~150 lines
+- [x] **Accept portfolio weights**: `PortfolioTracker` + `WeightBacktester` — alpha→backtest bridge accepting weight DataFrames directly
+- [x] **Unified CLI**: `backtester.py` rewritten with `argparse` — `--mode strategy` (legacy) / `--mode pipeline` (new, default)
+- [x] **Fix open position tracking bug**: `trade_rules` type hint corrected (2-tuple → 3-tuple)
+- [x] **Fix datetime mismatch**: `portfolio_tracker.py` — auto-cast datetime resolution (ns ↔ μs) before join
+- [x] **Tests**: 32 new tests in `test_backtest_refactor.py`. **164 tests total, all passing.**
 
-### Phase 7 — Multi-Factor Alpha
+### Phase 7 — Alpha Config & Multi-Factor (🔄 In Progress)
 
+> Soft-code the alpha pipeline — make factor selection, params, and combination method fully configurable.
+
+- [ ] **`AlphaConfig` dataclass**: Single config object holding factor list with per-factor params (windows, preprocessing), portfolio construction params (`n_long`, `n_short`, `target_vol`), sizing params (`kelly_lookback`, `kelly_max_position`), combination method. Loadable from YAML.
+- [ ] **Refactor pipeline to accept config**: `run_alpha_pipeline(config: AlphaConfig)` replaces 10+ keyword args. Each factor function receives its own params from config.
+- [ ] **Wire full config through backtester**: `run_pipeline_backtest(config)` passes all params end-to-end (currently drops `n_long`, `n_short`, `target_vol`, `combination_method`)
+- [ ] **Wire IC-weighted combination**: `build_factor_pipeline()` computes IC series and passes to `combine_factors()` — currently dead code for `ic_weight`/`mean_variance`/`risk_parity` methods
 - [ ] **More factors**: Momentum (12-1 month), quality/earnings, mean reversion, value
-- [ ] **Factor registry**: `src/alpha/registry.py` — register factors by name, `get_factor("bbiboll_dev")`
 - [ ] **Regime tagging**: `src/data/regime.py` — bull/bear/sideways from rolling SPX returns
 
 ### Phase 8 — ML Integration (`src/ml/`)
@@ -184,17 +192,22 @@ polygon_data/
 
 > Issues are fixed as natural byproducts of each phase — no separate fix sprint needed.
 
-**Legacy backtest (High)** — fix in Phase 6
-- [ ] `engine.py` God class — mixes data loading, signal routing, position tracking, reporting → extract in Phase 6
-- [x] ~~No alpha→backtest bridge~~ → **resolved in Phase 5** (`portfolio/pipeline.py`)
-- [ ] Open position tracking bug → fix during Phase 6 refactor
+**Legacy backtest (High)** — ~~fix in Phase 6~~ mostly resolved
+- [x] ~~`engine.py` God class~~ → **resolved in Phase 6** (export extracted to `result_exporter.py`, engine now thin orchestrator)
+- [x] ~~No alpha→backtest bridge~~ → **resolved in Phase 5** (`portfolio/pipeline.py`) + **Phase 6** (`WeightBacktester`)
+- [x] ~~Open position tracking bug~~ → **resolved in Phase 6** (type hint fix)
 - [ ] Stock dividends not handled → fix in Phase 7 (needed for dividend yield factor)
 
-**Data layer (Medium)** — fix in Phase 6
-- [ ] `data_loader.py` 1,192-line monolith with mixed concerns → split gradually during Phase 6
-- [ ] AWS creds loaded at module-level import (should be lazy) → fix in Phase 6 when refactoring data loading
+**Alpha pipeline (High)** — fix in Phase 7
+- [ ] Per-factor params hardcoded inside private functions (winsorize, normalize, windows) → `AlphaConfig` in Phase 7
+- [ ] IC-weighted combination is dead code (`build_factor_pipeline` never computes IC series) → wire in Phase 7
+- [ ] `run_pipeline_backtest()` drops 6 of 10 `run_alpha_pipeline()` params → full config passthrough in Phase 7
+
+**Data layer (Medium)**
+- [ ] `data_loader.py` 1,192-line monolith with mixed concerns → split gradually
+- [ ] AWS creds loaded at module-level import (should be lazy)
 - [x] ~~SQL injection risk in DuckDB credential queries~~ → **fixed in Phase 5** (credential escaping)
-- [ ] Date column naming: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution) → enforce via `constants.py` in Phase 6
+- [ ] Date column naming: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution) → enforce via `constants.py`
 
 **Other (Low)**
 - [x] ~~No universe module~~ → **resolved in Phase 5** (`data/universe.py`)
