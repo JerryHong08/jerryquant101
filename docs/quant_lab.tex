@@ -1,0 +1,2578 @@
+\documentclass[a4paper, 11pt]{report}
+
+% ─── Packages ─────────────────────────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\hfuzz=13pt  % suppress overfull hbox warnings under 13pt (nested lists)
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{tocloft}
+
+% ─── Hyperref setup ───────────────────────────────────────────────────────────
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    urlcolor=blue!60!black,
+    citecolor=green!50!black,
+    pdftitle={Quant101 — A Quantitative Trader's Learning Lab},
+    pdfauthor={Jerry Hong}
+}
+
+% ─── Fix fancyhdr warning ────────────────────────────────────────────────────
+\setlength{\headheight}{14pt}
+\addtolength{\topmargin}{-2pt}
+
+% ─── Code listing style ──────────────────────────────────────────────────────
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{200,200,200}
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{codeframe},
+    breaklines=true,
+    showstringspaces=false,
+    keywordstyle=\color{blue!70!black}\bfseries,
+    commentstyle=\color{green!50!black}\itshape,
+    stringstyle=\color{red!60!black},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    tabsize=4,
+}
+
+% ─── Theorem environments ────────────────────────────────────────────────────
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[chapter]
+\newtheorem{example}{Example}[chapter]
+\newtheorem{labmod}{Lab Module}[chapter]
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}[chapter]
+\newtheorem{experiment}{Experiment}[chapter]
+\newtheorem{pitfall}{Common Pitfall}[chapter]
+
+% ─── Header/Footer ───────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{Quant101}
+\fancyfoot[C]{\thepage}
+
+% ─── Title ────────────────────────────────────────────────────────────────────
+\title{
+    \textbf{Quant101} \\[0.5em]
+    \Large A Quantitative Trader's Learning Lab \\[1em]
+    \normalsize From Beginner to Job-Market-Ready Quant Researcher
+}
+\author{Jerry Hong \\ {\small with AI-assisted authoring}}
+\date{Started September 2025 \\ Last updated: \today}
+
+\begin{document}
+\maketitle
+
+% ─── Preface ──────────────────────────────────────────────────────────────────
+\chapter*{Preface}
+\addcontentsline{toc}{chapter}{Preface}
+
+This document is a \textbf{learning lab notebook} --- not a textbook, not API
+documentation.  It records my path from a beginning trader to a quant researcher,
+maintained together with an AI agent who serves as a pair-programming partner and
+knowledge editor.
+
+The companion codebase, \texttt{quant101}, started in September~2025 as a
+backtesting experiment built on Polygon.io\footnote{Rebranded as Massive around
+October~2025: \url{https://massive.com/blog/polygon-is-now-massive}} flat-file
+data.  It has since grown into a data pipeline, backtest engine, strategy
+framework, and live-monitor system.
+
+\subsection*{What This Document Is}
+
+\begin{itemize}
+    \item A \textbf{guided build sequence}: each chapter asks you to build
+          something, then measure it, then learn the theory that explains the
+          measurement.
+    \item A \textbf{depth-first} exploration: fewer topics, deeper treatment,
+          real experiments on real data.
+    \item A \textbf{job-market bridge}: the skill progression follows what quant
+          interviews actually test --- not academic curriculum order.
+\end{itemize}
+
+\subsection*{What This Document Is Not}
+
+\begin{itemize}
+    \item Not a reference manual for current file paths or API signatures --- those
+          change with every refactor.
+    \item Not a textbook that front-loads 200 pages of theory before any code.
+    \item Not a survey of every quant topic --- Wikipedia exists.
+\end{itemize}
+
+\subsection*{How to Read}
+
+Every chapter follows the same \textbf{lab module} structure:
+
+\begin{enumerate}
+    \item \textbf{Motivation} --- Why this matters for the project and for interviews.
+    \item \textbf{Concepts} --- Just enough theory, introduced when you need it.
+    \item \textbf{Implementation} --- What to build, described at the interface level
+          (not hardcoded paths --- the architecture evolves).
+    \item \textbf{Experiment} --- Run it on real data.  Record what you find.
+    \item \textbf{Reflection} --- What worked, what broke, what to read next.
+\end{enumerate}
+
+Chapters are ordered by \textbf{build dependency}: you can read straight through
+and each chapter assumes only the previous ones.  Mathematical foundations live
+in Appendix~\ref{app:math} and are cross-referenced when needed --- flip there
+when a chapter says ``see Appendix~A.''
+
+\subsection*{Skill Progression}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Level} & \textbf{Parts} & \textbf{You Can\ldots} \\
+\midrule
+Beginner        & I, II       & Build a data pipeline, run a backtest, measure performance \\
+Intermediate    & III         & Construct \& evaluate alpha factors, think cross-sectionally \\
+Advanced        & IV, V       & Build portfolios, model risk, apply ML with proper validation \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Part~III is the \textbf{inflection point}: where a ``trader who codes'' becomes a
+``quant researcher.''  The document spends the most depth there.
+
+\tableofcontents
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+% PART I: DATA ENGINEERING
+% ══════════════════════════════════════════════════════════════════════════════
+
+\part{Data Engineering}
+\label{part:data}
+
+\begin{quote}
+\itshape
+All research starts from clean data.  No analysis is trustworthy if the data
+pipeline is broken.  This part covers the methodology of acquiring, cleaning, and
+organizing financial market data --- the foundation everything else rests on.
+\end{quote}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Data Pipeline Design}
+\label{ch:pipeline}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+Most quant tutorials skip straight to ``load a CSV and compute moving averages.''
+In practice, 60--80\% of a quant researcher's time is data work: downloading,
+parsing, validating, adjusting, and caching.  If you can't trust your data, every
+signal you build and every backtest you run is unreliable.
+
+This chapter covers the \emph{design} of a market data pipeline --- the stages,
+the tradeoffs, and the failure modes --- without prescribing a fixed directory
+layout (that evolves with the codebase).
+
+\textbf{Interview relevance}: ``Walk me through how you'd build a data pipeline
+for a factor research platform'' is a common quant infrastructure question.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{The Four-Stage Pipeline}
+
+Every market data system, whether at a hedge fund or on a personal laptop, follows
+the same logical stages:
+
+\begin{enumerate}
+    \item \textbf{Acquisition} --- Download raw data from external sources.
+    \item \textbf{Normalization} --- Parse, schema-map, and convert to an efficient
+          columnar format.
+    \item \textbf{Enrichment} --- Apply corporate actions (splits, dividends), map
+          identifiers, filter the universe.
+    \item \textbf{Serving} --- Load clean, adjusted data into research or backtest
+          code with minimal latency.
+\end{enumerate}
+
+\begin{remark}
+    The four stages are a logical decomposition.  In a small project they may
+    live in two scripts; at a fund they may be four separate services with
+    message queues between them.  The \emph{boundaries} matter more than the
+    implementation.
+\end{remark}
+
+\subsection{Columnar Storage}
+
+\begin{definition}[Columnar Format]
+    A storage layout where values for each column are stored contiguously on disk.
+    Examples: Apache Parquet, Apache Arrow, ORC\@.
+
+    For OHLCV data with $N$ rows and 6 columns, a row-oriented CSV reads all 6
+    columns even when you only need \texttt{close}.  Parquet reads only the
+    \texttt{close} column --- typically 5--10$\times$ faster for analytical queries.
+\end{definition}
+
+\begin{remark}
+    This project uses Parquet as the canonical on-disk format and Polars
+    (which reads Parquet natively via Arrow) as the in-memory engine.
+    The choice is deliberate: Polars' lazy evaluation and predicate pushdown
+    make it far more efficient than Pandas for the scan-filter-aggregate pattern
+    that dominates quant data work.
+\end{remark}
+
+\subsection{Incremental vs.\ Full Refresh}
+
+Two update strategies:
+
+\begin{itemize}
+    \item \textbf{Full refresh}: Re-download and re-process everything.  Simple
+          but wasteful.  Acceptable for small datasets or monthly rebuilds.
+    \item \textbf{Incremental update}: Only fetch new data since the last run.
+          Requires tracking watermarks (last processed date).  More complex
+          but essential when daily data grows to millions of rows.
+\end{itemize}
+
+The project uses incremental updates for daily aggregates (fetch only recent
+$N$ days) and full refresh for slowly-changing reference data (ticker lists,
+split events).
+
+% ── Implementation ────────────────────────────────────────────────────────────
+\section{Implementation Sketch}
+
+The pipeline is implemented as a sequence of idempotent scripts, orchestrated by
+a shell-based task runner.  The key design decisions:
+
+\begin{itemize}
+    \item \textbf{Configuration-driven}: A single YAML config file
+          (\texttt{basic\_config.yaml}) defines the data root directory, update
+          mode (standalone / server / client), and sync settings.  The config is
+          gitignored; a committed \texttt{.example} template documents the schema.
+    \item \textbf{Idempotent scripts}: Each script can be re-run safely.
+          Re-downloading an already-downloaded date is a no-op; re-converting an
+          already-converted file overwrites with identical output.
+    \item \textbf{Mode-aware orchestration}: A single entry-point script
+          detects the update mode and runs the appropriate task subset
+          (e.g., a client skips API fetches and syncs metadata from a server
+          instead).
+\end{itemize}
+
+\begin{labmod}
+    \textbf{Build it}: Set up the pipeline end-to-end for one asset class
+    (e.g., US equities daily aggregates).  Download $\to$ convert $\to$ verify
+    row counts $\to$ load into a Polars DataFrame and compute a 20-day SMA\@.
+    Time each stage.  Where is the bottleneck?
+\end{labmod}
+
+% ── Experiment ────────────────────────────────────────────────────────────────
+\section{Experiment: Pipeline Profiling}
+
+\begin{experiment}
+    \textbf{Goal}: Profile each stage of the pipeline for 7 days of US equity
+    daily aggregates ($\sim$10{,}000 tickers $\times$
+    7~days).
+
+    \textbf{Method}: Time each stage separately --- download, CSV.gz
+    $\to$~Parquet conversion, and Polars lazy scan + collect.
+
+    \textbf{Record}: Wall-clock time per stage, file sizes (CSV.gz vs.\ Parquet),
+    memory usage during conversion.
+
+    \textbf{Reflection space}: \emph{(fill in after running)}
+\end{experiment}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Data Quality and Corporate Actions}
+\label{ch:data-quality}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+Raw market data is \emph{never} clean.  Stock splits change historical prices,
+tickers get reused by different companies, and data vendors introduce errors.
+Ignoring these issues doesn't make them go away --- it makes your backtest return
+a fantasy number.
+
+This is the unglamorous foundation that separates a toy project from a usable
+research platform.
+
+\textbf{Interview relevance}: ``How do you handle stock splits in your data?''
+and ``What is survivorship bias at the data level?'' are standard screening
+questions.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Stock Splits and Adjustment}
+
+\begin{definition}[Split Adjustment]
+    A stock split with ratio $r$ (e.g., $r = 2$ for a 2-for-1 split) requires
+    adjusting all historical prices before the split date:
+    \[
+        P_{\text{adj}} = P_{\text{raw}} \cdot \frac{1}{r}
+    \]
+    Volume is adjusted inversely: $V_{\text{adj}} = V_{\text{raw}} \cdot r$.
+
+    Without adjustment, a 2-for-1 split looks like a 50\% crash in the price
+    series, which poisons every downstream calculation.
+\end{definition}
+
+\begin{pitfall}
+    \textbf{Split data has errors.}  Vendor-provided split tables contain
+    incorrect ratios, missing events, and duplicate entries.  The project
+    addresses this with a CSV-based error correction layer: a manually curated
+    file lists split IDs to remove (erroneous) and add (missing), applied as a
+    filter before adjustment.  This pattern --- \emph{override layer on top of
+    vendor data} --- is standard practice at production quant firms.
+\end{pitfall}
+
+\subsection{Ticker Identity Over Time}
+
+\begin{definition}[FIGI (Financial Instrument Global Identifier)]
+    A 12-character, alphanumeric identifier assigned to financial instruments.
+    Unlike ticker symbols, FIGIs are globally unique and persistent across name
+    changes, mergers, and exchange transfers.
+\end{definition}
+
+The ticker identity problem: company~A trades as \texttt{AAPL}, gets acquired,
+and later company~B is listed under the same symbol \texttt{AAPL}.  Using ticker
+strings alone conflates two unrelated entities.
+
+The solution is a \textbf{connected-component algorithm} on FIGI fields
+(\texttt{composite\_figi} and \texttt{share\_class\_figi}).  Two ticker records
+sharing any FIGI are the same instrument.  The algorithm runs on the full ticker
+universe and produces a canonical mapping from every historical ticker string to
+a unique entity ID\@.
+
+\subsection{The Low-Volume Ticker Problem}
+
+\begin{experiment}
+    \textbf{Observation}: Many tickers show extended zero-volume periods
+    ($>50$ consecutive trading days).  Investigation revealed these are mostly
+    relisted instruments or ticker-symbol reuse by shell companies.
+
+    \textbf{Decision}: Skip these tickers in backtest universes.  This is a
+    documented data quality tradeoff --- not a silent exclusion.
+
+    \textbf{Lesson}: Every universe filter introduces a bias.  Documenting
+    \emph{why} you exclude something is as important as excluding it.
+\end{experiment}
+
+% ── Implementation ────────────────────────────────────────────────────────────
+\section{Implementation Sketch}
+
+\begin{itemize}
+    \item \textbf{Split adjustment}: Applied during the data-serving stage, not
+          during conversion.  This preserves raw data fidelity and allows
+          re-adjustment when corrections are added.
+    \item \textbf{Error correction}: A pair of CSV files per data type
+          (e.g., \texttt{splits\_error.csv}) with columns
+          \texttt{[id, error\_type, ...]}.  The loader reads vendor data, filters
+          by the error file, then serves the corrected result.
+    \item \textbf{Ticker mapping}: The FIGI connected-component algorithm runs
+          once per universe refresh and caches the mapping.  Downstream code
+          references entity IDs, not raw ticker strings.
+\end{itemize}
+
+\begin{labmod}
+    \textbf{Build it}: Take a known split event (e.g., NVDA 10-for-1, June~2024).
+    Load raw and adjusted price series.  Plot both on the same chart.  Verify the
+    adjustment formula by hand for one data point.
+\end{labmod}
+
+% ── Experiment ────────────────────────────────────────────────────────────────
+\section{Experiment: Split Adjustment Validation}
+
+\begin{experiment}
+    \textbf{Goal}: Validate the split adjustment pipeline against a known event.
+
+    \textbf{Method}: For NVDA's 10-for-1 split (2024-06-10):
+    \begin{enumerate}
+        \item Load unadjusted close prices around the split date.
+        \item Apply the split adjustment.
+        \item Compare adjusted close with the value from a trusted source
+              (e.g., Yahoo Finance adjusted close).
+        \item Compute the percentage difference --- it should be $< 0.01\%$.
+    \end{enumerate}
+
+    \textbf{Reflection space}: \emph{(fill in after running)}
+\end{experiment}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Universe Construction}
+\label{ch:universe}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+``What stocks do you include in your backtest?'' sounds simple.  It isn't.  The
+choice of universe determines whether your results generalize or are an artifact
+of selection.
+
+A universe that is too narrow (only FAANG stocks) overfits to a handful of names.
+A universe that is too broad (all 15{,}000 US tickers including OTC penny stocks)
+drowns signals in noise and introduces illiquidity artifacts.
+
+\textbf{Interview relevance}: ``How did you construct your backtest universe?'' is
+a question that separates candidates who understand survivorship bias from those
+who don't.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Survivorship Bias}
+
+\begin{definition}[Survivorship Bias]
+    The error of only including assets that \emph{survived} to the present date in
+    a historical analysis.  Delisted stocks (bankruptcies, acquisitions,
+    regulatory removals) are excluded, biasing aggregate returns upward.
+
+    A backtest universe must be constructed \textbf{as-of} each historical date,
+    including stocks that existed at that date even if they were later delisted.
+\end{definition}
+
+\subsection{Liquidity Filters}
+
+Common filters for a ``tradeable'' universe:
+
+\begin{itemize}
+    \item \textbf{Minimum price}: Exclude stocks below \$1--\$5 (penny stock noise).
+    \item \textbf{Minimum volume}: Exclude stocks with average daily volume below
+          a threshold (e.g., 100{,}000 shares) --- you can't trade what you can't
+          fill.
+    \item \textbf{Market cap}: Exclude micro-caps if your strategy can't handle
+          the illiquidity and volatility.
+    \item \textbf{Listing exchange}: Exclude OTC/pink-sheet stocks for most
+          strategies.
+\end{itemize}
+
+\begin{remark}
+    Every filter is a tradeoff.  Excluding small-caps removes noise but also
+    removes potential alpha.  The filter parameters should be \emph{explicit and
+    documented}, not buried in a data loader.
+\end{remark}
+
+\subsection{Sector and Industry Mapping}
+
+Cross-sectional analysis (Part~III) requires grouping stocks by sector.  Standard
+classifications:
+
+\begin{itemize}
+    \item \textbf{GICS} (Global Industry Classification Standard): 11 sectors,
+          24 industry groups --- the institutional standard.
+    \item \textbf{SIC / NAICS}: Older classification systems, still used in SEC
+          filings.
+\end{itemize}
+
+Sector membership is time-varying (companies change sectors after M\&A or
+business pivots).  A proper implementation uses point-in-time sector assignments.
+
+% ── Implementation ────────────────────────────────────────────────────────────
+\section{Implementation Sketch}
+
+A universe construction module should provide:
+
+\begin{lstlisting}
+def build_universe(
+    as_of_date: date,
+    min_price: float = 1.0,
+    min_avg_volume: int = 100_000,
+    exclude_otc: bool = True,
+) -> list[str]:
+    """
+    Return a list of tradeable tickers as-of a given date.
+    Point-in-time: includes stocks that were active on as_of_date,
+    even if they were later delisted.
+    """
+\end{lstlisting}
+
+The key constraint is \textbf{point-in-time correctness}: the function must not
+use information from after \texttt{as\_of\_date}.
+
+\begin{labmod}
+    \textbf{Build it}: Implement a minimal universe filter.  Compare the number
+    of tickers in the filtered universe vs.\ the full ticker list at several
+    historical dates.  How much does the universe size change over time?
+\end{labmod}
+
+% ── Experiment ────────────────────────────────────────────────────────────────
+\section{Experiment: Survivorship Bias Quantification}
+
+\begin{experiment}
+    \textbf{Goal}: Measure the impact of survivorship bias on a simple momentum
+    strategy.
+
+    \textbf{Method}:
+    \begin{enumerate}
+        \item Run a 12-month momentum strategy on today's S\&P~500 constituents
+              (survivorship-biased universe).
+        \item Run the same strategy on the point-in-time universe (historical
+              constituents at each rebalance date).
+        \item Compare CAGR and Sharpe ratio.
+    \end{enumerate}
+
+    \textbf{Expected}: The biased backtest will show higher returns (failed
+    companies excluded).  The difference is the ``survivorship premium.''
+
+    \textbf{Reflection space}: \emph{(fill in after running)}
+\end{experiment}
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+% PART II: STRATEGY & BACKTESTING
+% ══════════════════════════════════════════════════════════════════════════════
+
+\part{Strategy and Backtesting}
+\label{part:backtest}
+
+\begin{quote}
+\itshape
+A backtest is a simulation of what \emph{would have happened} if you had traded a
+strategy in the past.  It is the primary tool for evaluating ideas --- and the
+primary source of self-deception if done carelessly.  This part covers how to
+design strategies, measure performance, and avoid the biases that make bad
+strategies look good.
+\end{quote}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Technical Indicators and Signal Design}
+\label{ch:indicators}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+An indicator transforms raw price/volume data into a derived quantity that is
+(hopefully) easier to make trading decisions from.  Every rule-based strategy
+starts with indicators; every factor-based strategy (Part~III) is built from
+them.
+
+The engineering question is not ``which indicator is best'' --- it is ``how do I
+organize indicators so they are composable, testable, and reusable across
+strategies?''
+
+\textbf{Interview relevance}: You won't be asked to recite indicator formulas.
+You \emph{will} be asked: ``How is your indicator pipeline structured?  Can you
+add a new indicator without touching the strategy code?''
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Indicator Taxonomy}
+
+\begin{itemize}
+    \item \textbf{Trend}: Moving averages (SMA, EMA, BBI), MACD, ADX ---
+          capture the direction and strength of price movement.
+    \item \textbf{Mean reversion}: Bollinger Bands, RSI, z-score of price
+          relative to a moving average --- capture deviation from ``normal.''
+    \item \textbf{Volume}: OBV, VWAP, Accumulation/Distribution --- capture the
+          conviction behind price moves.
+    \item \textbf{Volatility}: ATR, Bollinger bandwidth, realized volatility ---
+          capture the magnitude of price fluctuations.
+\end{itemize}
+
+\subsection{The Registry Pattern}
+
+A clean indicator system uses a \textbf{registry}: each indicator registers
+itself via a decorator, and the strategy code requests indicators by name without
+knowing their implementation details.
+
+\begin{lstlisting}
+@register_indicator("bbiboll")
+def compute_bbiboll(df: pl.DataFrame) -> pl.DataFrame:
+    """Compute BBI + Bollinger deviation percentile rank."""
+    ...
+\end{lstlisting}
+
+Benefits:
+\begin{itemize}
+    \item Adding a new indicator requires zero changes to existing code.
+    \item Indicators can declare whether they need per-ticker grouping.
+    \item The registry enables bulk computation: ``apply all registered
+          indicators to this DataFrame.''
+\end{itemize}
+
+% ── Implementation ────────────────────────────────────────────────────────────
+\section{Implementation Sketch}
+
+The indicator subsystem has three layers:
+
+\begin{enumerate}
+    \item \textbf{Registry} --- a global dictionary mapping names to
+          functions, populated by decorator registration.
+    \item \textbf{Base applicator} --- a helper that applies a registered
+          indicator function over grouped data (group-by-ticker).
+    \item \textbf{Indicator modules} --- one file per indicator (or family),
+          each file auto-imported to trigger registration.
+\end{enumerate}
+
+\begin{labmod}
+    \textbf{Build it}: Implement a new indicator (e.g., RSI or ATR) using the
+    registry pattern.  Verify it works by applying it to a single ticker's OHLCV
+    DataFrame, then to the full universe via the group-by applicator.  Confirm
+    that no strategy code needed changes.
+\end{labmod}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Rule-Based Strategies}
+\label{ch:rule-strategy}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+Before building factor models or ML pipelines, every quant should build at least
+one rule-based strategy end to end: from signal definition through execution logic
+to PnL calculation.  This exercises the full stack and reveals problems
+(data bugs, look-ahead leaks, position tracking errors) that are invisible in
+theory.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Strategy as a State Machine}
+
+A rule-based strategy is a \textbf{state machine} with states
+\{Flat, Long, Short\} and transitions triggered by indicator conditions:
+
+\begin{itemize}
+    \item \textbf{Entry signal}: Condition that triggers opening a position
+          (e.g., BBI deviation crosses below the 10th percentile $\Rightarrow$
+          buy).
+    \item \textbf{Exit signal}: Condition that triggers closing
+          (e.g., deviation returns above the 50th percentile, or stop-loss
+          hit).
+    \item \textbf{Position sizing}: How much capital to allocate per trade
+          (equal weight, volatility-targeted, Kelly --- see Chapter~\ref{ch:portfolio}).
+\end{itemize}
+
+\subsection{The Strategy Base Class}
+
+An abstract base class enforces a contract:
+
+\begin{lstlisting}
+class StrategyBase(ABC):
+    @abstractmethod
+    def generate_signals(self, data: pl.DataFrame) -> pl.DataFrame:
+        """Return a DataFrame with a 'signal' column."""
+
+    def run(self, data: pl.DataFrame) -> pl.DataFrame:
+        """Apply signals, compute positions, return trades."""
+\end{lstlisting}
+
+Every concrete strategy inherits this interface.  The backtest engine only
+depends on the base class --- it doesn't know whether the strategy uses BBIBOLL,
+SMA crossover, or a neural network.
+
+\subsection{Case Study: BBIBOLL}
+
+The project's first complete strategy combines two ideas:
+
+\begin{enumerate}
+    \item \textbf{BBI (Bull and Bear Index)}: The average of four SMAs
+          (3, 6, 12, 24 periods).  Smoother than any single MA.
+    \item \textbf{Bollinger deviation}: The distance of price from BBI,
+          expressed as a percentile rank within a rolling window.  Low
+          percentile $=$ price is unusually far below the mean $=$ potential
+          mean-reversion buy signal.
+\end{enumerate}
+
+Entry: deviation percentile $<$ threshold.  Exit: percentile recovers, or
+stop-loss / take-profit triggers.
+
+\begin{remark}
+    BBIBOLL is a \textbf{time-series signal}: computed from each stock's own
+    history.  In Part~III, we will reframe it as a \textbf{cross-sectional
+    factor} by ranking the signal across all stocks at each date.  This
+    reframing is the key conceptual leap from ``strategy'' to ``alpha.''
+\end{remark}
+
+\begin{labmod}
+    \textbf{Build it}: Implement a minimal SMA-crossover strategy using
+    the strategy base class interface.  Run it on one ticker for one year.
+    Inspect the trades DataFrame: are entry/exit dates correct?  Does
+    position tracking handle edge cases (e.g., signal on the last day)?
+\end{labmod}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Backtest Engine and Performance Metrics}
+\label{ch:engine}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+The engine is the machinery that turns a strategy's signals into simulated
+equity curves.  The performance metrics are the language you use to describe
+whether the results are good, bad, or meaningless.
+
+Both are mechanical --- the intellectual challenge is in the \emph{next} chapter
+(bias and validation).  But you need the mechanics first.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{The Backtest Loop}
+
+At its core, a backtest iterates over time steps and applies:
+
+\begin{enumerate}
+    \item \textbf{Signal generation}: Run the strategy on data available up to
+          time $t$.
+    \item \textbf{Order creation}: Translate signals into hypothetical orders.
+    \item \textbf{Execution simulation}: Fill orders at assumed prices
+          (e.g., next-day open) with assumed costs.
+    \item \textbf{Portfolio update}: Update positions, cash, and equity.
+\end{enumerate}
+
+\begin{pitfall}
+    \textbf{Look-ahead in the loop.}  The most common backtest bug: using the
+    close price at time $t$ to generate a signal and then assuming you can
+    execute at that same close price.  In reality, you can only act on
+    information \emph{after} observing it --- execution should happen at
+    $t+1$ open at the earliest.
+\end{pitfall}
+
+\subsection{Return Metrics}
+
+\begin{definition}[Sharpe Ratio]
+    \[
+        SR = \frac{\mathbb{E}[r_p - r_f]}{\sigma(r_p - r_f)}
+    \]
+    Annualized: $SR_{\text{annual}} = SR_{\text{daily}} \times \sqrt{252}$.
+
+    The Sharpe ratio is the single most quoted performance metric.  It measures
+    \textbf{risk-adjusted return}: how much return you earn per unit of
+    volatility.  See Appendix~\ref{sec:math-stats} for the underlying
+    statistics.
+\end{definition}
+
+\begin{definition}[Sortino Ratio]
+    Like Sharpe, but only penalizes \textbf{downside} volatility:
+    \[
+        \text{Sortino} = \frac{\mathbb{E}[r_p - r_f]}{\sigma_{\text{downside}}}
+    \]
+    Preferred when returns are asymmetric (positive skew $\Rightarrow$ Sortino
+    $>$ Sharpe).
+\end{definition}
+
+\begin{definition}[Maximum Drawdown]
+    \[
+        MDD = \max_{t} \left( \frac{\text{Peak}_t - \text{Trough}_t}{\text{Peak}_t} \right)
+    \]
+    The largest peak-to-trough decline.  For a live trader, MDD is the metric
+    that determines whether you get fired or your fund gets redeemed.
+\end{definition}
+
+\begin{definition}[CAGR and Calmar Ratio]
+    \[
+        CAGR = \left( \frac{V_T}{V_0} \right)^{1/T} - 1
+        \qquad\qquad
+        \text{Calmar} = \frac{CAGR}{|MDD|}
+    \]
+\end{definition}
+
+\subsection{Trade-Level Metrics}
+
+\begin{definition}[Win Rate and Payoff Ratio]
+    \begin{align}
+        \text{Win Rate} &= \frac{\text{winning trades}}{\text{total trades}} \\[4pt]
+        \text{Payoff Ratio} &= \frac{\text{average win}}{\text{average loss}}
+    \end{align}
+    A strategy can be profitable with win rate $< 50\%$ if the payoff ratio is
+    high (trend following), or with low payoff ratio if win rate is high (mean
+    reversion).
+\end{definition}
+
+% ── Implementation ────────────────────────────────────────────────────────────
+\section{Implementation Sketch}
+
+The engine consists of three decoupled components:
+
+\begin{enumerate}
+    \item \textbf{Runner}: Wires strategy $+$ data $+$ analyzer; produces the
+          equity curve.
+    \item \textbf{PerformanceAnalyzer}: Computes all metrics from the equity
+          curve and trade log.
+    \item \textbf{Visualizer}: Plots equity curves, drawdowns, monthly
+          heatmaps, and candlestick charts with signal overlays.
+\end{enumerate}
+
+\begin{labmod}
+    \textbf{Build it}: Run the BBIBOLL strategy on a rolling set of weekly
+    start dates (60+ windows).  Collect the Sharpe ratio from each window.
+    Plot the distribution of Sharpe ratios.  Is the strategy consistently
+    positive, or does a few good windows dominate?
+\end{labmod}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Backtest Bias and Validation}
+\label{ch:bias}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+\textbf{This is the most important chapter in Part~II.}  A backtest that looks
+good but contains biases is worse than no backtest at all --- it gives false
+confidence that costs real money.
+
+Every quant interview will probe your understanding of backtest biases.  Saying
+``my backtest Sharpe is 2.5'' without being able to explain \emph{why it might be
+wrong} is a red flag.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{The Three Cardinal Biases}
+
+\begin{definition}[Look-Ahead Bias]
+    Using information at time $t$ that was not actually available at time $t$.
+
+    Examples:
+    \begin{itemize}
+        \item Using adjusted prices that incorporate \emph{future} splits.
+        \item Using the full-sample mean to normalize signals.
+        \item Generating a signal at close and executing at the same close.
+    \end{itemize}
+\end{definition}
+
+\begin{definition}[Survivorship Bias]
+    Only backtesting on assets that survived to the present day.  Delisted
+    stocks (often the worst performers) are excluded, biasing returns upward.
+
+    See Chapter~\ref{ch:universe} for how universe construction addresses this.
+\end{definition}
+
+\begin{definition}[Data Snooping / Overfitting]
+    Testing many parameter combinations on the same dataset and selecting the
+    best result.  The more combinations you test, the more likely one will
+    look good \emph{by chance}.
+
+    \textbf{Deflated Sharpe Ratio} (Bailey \& L\'{o}pez de Prado, 2014):
+    adjusts the Sharpe ratio for the number of strategies tested.
+\end{definition}
+
+\subsection{Walk-Forward Validation}
+
+\begin{definition}[Walk-Forward Optimization (WFO)]
+    \begin{enumerate}
+        \item Split data into rolling windows: $[\text{train} \mid \text{test}]$.
+        \item Optimize parameters on the train window.
+        \item Evaluate on the test window (\textbf{no re-optimization}).
+        \item Slide the window forward and repeat.
+        \item Concatenate all test-window results for the ``true'' out-of-sample
+              performance.
+    \end{enumerate}
+\end{definition}
+
+\begin{remark}
+    The project's rolling weekly backtest (60+ date windows with fixed
+    parameters) resembles walk-forward testing but is \emph{not} true WFO
+    because parameters are not re-optimized inside each training window.
+    Upgrading to true WFO is a planned enhancement.
+\end{remark}
+
+\subsection{Statistical Significance of Backtest Results}
+
+\begin{definition}[$t$-Statistic of the Sharpe Ratio]
+    Is the backtest Sharpe distinguishable from zero?
+    \[
+        t = SR \times \sqrt{n}
+    \]
+    where $n$ is the number of return periods.  A rule of thumb: $|t| > 2$
+    (equivalently, $p < 0.05$) suggests the result is unlikely due to chance
+    alone.
+
+    See Appendix~\ref{sec:math-stats} for the underlying hypothesis testing
+    framework.
+\end{definition}
+
+\begin{pitfall}
+    A statistically significant Sharpe does not mean an \textbf{economically}
+    significant strategy.  A Sharpe of 0.3 with $|t| = 2.5$ (from 20 years of
+    data) is ``real'' but may not cover transaction costs.
+\end{pitfall}
+
+% ── Experiment ────────────────────────────────────────────────────────────────
+\section{Experiment: How Fragile Is the BBIBOLL Sharpe?}
+
+\begin{experiment}
+    \textbf{Goal}: Stress-test the BBIBOLL strategy's reported Sharpe ratio.
+
+    \textbf{Method}:
+    \begin{enumerate}
+        \item Compute the Sharpe from the full sample.
+        \item Compute the $t$-statistic.  Is $|t| > 2$?
+        \item Remove the best 5 trading days.  How much does the Sharpe drop?
+        \item Run on a different time period (out-of-sample).  Does the Sharpe
+              survive?
+        \item Shuffle trade entry dates randomly (permutation test).  What
+              Sharpe do you get from pure randomness?
+    \end{enumerate}
+
+    \textbf{Reflection space}: \emph{(fill in after running)}
+\end{experiment}
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+% PART III: ALPHA RESEARCH
+% ══════════════════════════════════════════════════════════════════════════════
+
+\part{Alpha Research}
+\label{part:alpha}
+
+\begin{quote}
+\itshape
+This is the inflection point.  Parts~I and~II make you a ``trader who codes.''
+Part~III makes you a ``quant researcher.''  The core shift: from asking ``does
+this strategy make money?'' to asking ``does this signal predict returns, and
+how do I measure that rigorously?''
+\end{quote}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{From Rules to Factors}
+\label{ch:rules-to-factors}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+In Part~II you built a rule-based strategy: ``if deviation percentile $< 10$,
+buy.''  This works, but it has a problem: the threshold is arbitrary, the
+evaluation is binary (profitable or not), and there is no principled way to
+combine it with other ideas.
+
+The factor framework solves this.  Instead of asking ``should I buy?'', you ask:
+``across all 5{,}000 stocks today, does a higher deviation percentile predict
+higher future returns?''
+
+This reframing unlocks:
+\begin{itemize}
+    \item \textbf{Continuous evaluation}: IC measures the strength of the signal,
+          not just ``profitable or not.''
+    \item \textbf{Composability}: Multiple factors can be combined into a single
+          portfolio signal.
+    \item \textbf{Decomposition}: You can attribute portfolio returns to
+          individual factors.
+\end{itemize}
+
+\textbf{Interview relevance}: This chapter covers the exact vocabulary of quant
+researcher interviews.  ``What is the IC of your factor?'' is the first question.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Time-Series vs.\ Cross-Sectional Thinking}
+
+\begin{definition}[Time-Series Signal]
+    A signal computed from a single asset's own history.  Example: 20-day
+    momentum return for AAPL, BBIBOLL deviation for NVDA\@.  The signal value
+    for AAPL does not depend on any other stock.
+\end{definition}
+
+\begin{definition}[Cross-Sectional Signal (Factor)]
+    A signal that \textbf{ranks or normalizes} values across the entire stock
+    universe at each point in time.  Example: the z-score of PE ratio across
+    all stocks on a given date.
+
+    The key property: the factor value for stock $i$ on date $t$ depends on
+    \emph{all other stocks} on that date.
+\end{definition}
+
+The BBIBOLL deviation percentile is a time-series signal.  To use it
+cross-sectionally:
+\[
+    \text{factor}_{i,t} = \frac{\text{deviation}_{i,t} - \overline{\text{deviation}}_t}
+                               {\sigma(\text{deviation}_t)}
+\]
+where the mean and standard deviation are computed across all stocks $i$ at
+date $t$.  This produces a z-scored cross-sectional factor.
+
+\subsection{The Alpha Pipeline}
+
+The standard factor research workflow:
+
+\begin{enumerate}
+    \item \textbf{Signal construction}: Compute a raw signal for each stock at
+          each date.
+    \item \textbf{Normalization}: Z-score or rank-transform cross-sectionally.
+    \item \textbf{Evaluation}: Compute IC, IR, decay, turnover.
+    \item \textbf{Refinement}: Neutralize for sector, size, or other known
+          factors.
+    \item \textbf{Combination}: Blend with other factors into a composite
+          signal.
+    \item \textbf{Portfolio construction}: Map the composite signal to
+          positions (Part~IV).
+\end{enumerate}
+
+Each step is a separate module.  This chapter covers steps 1--2; the next three
+chapters cover steps 3--5.
+
+\begin{labmod}
+    \textbf{Build it}: Take the BBIBOLL deviation signal (a time-series signal)
+    and convert it to a cross-sectional factor.  At each date, z-score the
+    deviation across all stocks in the liquid universe (Chapter~\ref{ch:universe}).
+    Plot the distribution of factor values on a single date --- is it
+    approximately normal?
+\end{labmod}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Factor Evaluation}
+\label{ch:factor-eval}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+You've built a factor.  Is it any good?  ``Running a backtest'' is not the
+answer --- backtests conflate signal quality with portfolio construction,
+execution, and luck.  Factor evaluation isolates the question: \textbf{does
+this signal predict future returns?}
+
+This chapter covers the four metrics that every quant uses to answer that
+question.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Information Coefficient (IC)}
+
+\begin{definition}[IC]
+    The cross-sectional rank correlation (Spearman's $\rho$) between a factor's
+    signal values and subsequent forward returns:
+    \[
+        IC_t = \rho_{\text{rank}}\!\left(\text{signal}_{t},\; r_{t \to t+h}\right)
+    \]
+    where the correlation is computed across all stocks in the universe at
+    date~$t$, and $h$ is the forecast horizon (e.g., 5 trading days).
+\end{definition}
+
+\begin{remark}
+    Why Spearman (rank) and not Pearson?
+    \begin{itemize}
+        \item Robust to outliers (extreme returns, extreme signal values).
+        \item Does not assume a linear relationship.
+        \item Invariant to monotonic transformations of the signal.
+    \end{itemize}
+    In practice, you should compute \emph{both} and compare.  A large gap
+    between Pearson and Spearman IC suggests outlier sensitivity.
+\end{remark}
+
+\subsection{Information Ratio (IR)}
+
+\begin{definition}[IR]
+    \[
+        IR = \frac{\overline{IC}}{\sigma(IC)}
+    \]
+    where $\overline{IC}$ is the time-series mean of $IC_t$ and $\sigma(IC)$ is
+    its standard deviation.
+
+    IR measures the \textbf{consistency} of predictive power.  A factor with
+    $|\overline{IC}| = 0.03$ and $IR = 0.5$ is far more valuable than one with
+    $|\overline{IC}| = 0.05$ and $IR = 0.2$.  Consistency beats magnitude.
+\end{definition}
+
+\begin{remark}
+    Rule of thumb (Qian, Hua \& Sorensen):
+    \begin{center}
+    \begin{tabular}{@{}ll@{}}
+    \toprule
+    $|IR|$ & Interpretation \\
+    \midrule
+    $> 0.5$       & Strong, tradeable factor \\
+    $0.3$--$0.5$  & Decent, worth including in a composite \\
+    $< 0.3$       & Weak or unreliable \\
+    \bottomrule
+    \end{tabular}
+    \end{center}
+\end{remark}
+
+\subsection{IC Decay}
+
+\begin{definition}[IC Decay Curve]
+    Plot $\overline{IC}(h)$ for increasing forecast horizons
+    $h = 1, 2, 5, 10, 20$ days.  The shape reveals the signal's natural
+    trading frequency:
+    \begin{itemize}
+        \item \textbf{Fast decay} (IC drops sharply after 1--2 days):
+              short-term signal, requires frequent trading.
+        \item \textbf{Slow decay} (IC persists for weeks):
+              medium-frequency signal, lower turnover.
+        \item \textbf{Non-monotonic decay}: possible look-ahead bias or
+              seasonal effects --- investigate.
+    \end{itemize}
+\end{definition}
+
+\begin{definition}[Half-Life]
+    The number of periods until the IC drops to half its peak value.
+    Approximate from the AR(1) coefficient $\phi$ of the IC time series:
+    \[
+        t_{1/2} = -\frac{\ln 2}{\ln |\phi|}
+    \]
+\end{definition}
+
+\subsection{Turnover}
+
+\begin{definition}[Factor Turnover]
+    How much the factor's ranking changes from one period to the next:
+    \[
+        \text{Turnover}_t = \frac{1}{N} \sum_{i=1}^{N}
+            |w_{i,t} - w_{i,t-1}|
+    \]
+    where $w_{i,t}$ is the normalized factor weight for stock $i$ at time $t$.
+
+    High turnover $\Rightarrow$ high transaction costs $\Rightarrow$ the factor
+    needs a higher gross IC to be profitable after costs.
+\end{definition}
+
+\begin{definition}[Capacity]
+    The maximum AUM a factor can support before market impact erodes its alpha.
+    Small-cap momentum: high IC, low capacity.  Large-cap value: lower IC,
+    high capacity.  Capacity is a function of the liquidity of the stocks the
+    factor trades.
+\end{definition}
+
+% ── Implementation ────────────────────────────────────────────────────────────
+\section{Implementation Sketch}
+
+A factor evaluation module should provide:
+
+\begin{lstlisting}
+class FactorAnalyzer:
+    def __init__(self, signal: pl.DataFrame, returns: pl.DataFrame):
+        """
+        signal: (date, ticker, signal_value)
+        returns: (date, ticker, forward_return_1d, ..., forward_return_20d)
+        """
+
+    def ic_series(self, horizon: int = 5) -> pl.DataFrame:
+        """Cross-sectional Spearman IC at each date."""
+
+    def ir(self, horizon: int = 5) -> float:
+        """Mean IC / Std IC."""
+
+    def ic_decay(self, horizons: list[int]) -> pl.DataFrame:
+        """Mean IC at each horizon."""
+
+    def turnover(self) -> pl.DataFrame:
+        """Daily factor turnover."""
+\end{lstlisting}
+
+\begin{labmod}
+    \textbf{Build it}: Implement \texttt{FactorAnalyzer} with at least
+    \texttt{ic\_series()} and \texttt{ir()}.  Run it on the cross-sectional
+    BBIBOLL factor from Chapter~\ref{ch:rules-to-factors}.  Report the mean IC,
+    IR, and $t$-statistic (is $|t| > 2$?).
+\end{labmod}
+
+% ── Experiment ────────────────────────────────────────────────────────────────
+\section{Experiment: BBIBOLL Factor Evaluation}
+
+\begin{experiment}
+    \textbf{Goal}: Evaluate the BBIBOLL deviation signal as a cross-sectional
+    factor.
+
+    \textbf{Method}:
+    \begin{enumerate}
+        \item Compute the cross-sectional z-scored BBIBOLL deviation factor for
+              the liquid universe.
+        \item Compute the 5-day forward return for each stock at each date.
+        \item Run \texttt{FactorAnalyzer}: compute IC time series, mean IC, IR,
+              $t$-stat.
+        \item Plot the IC decay curve for horizons 1, 2, 5, 10, 20 days.
+        \item Compute daily turnover.
+    \end{enumerate}
+
+    \textbf{Questions to answer}:
+    \begin{itemize}
+        \item Is the mean IC positive or negative?  (Directional prediction.)
+        \item Is $|t| > 2$?  (Statistically significant?)
+        \item What is the natural horizon?  (Where IC peaks before decaying.)
+        \item Is turnover manageable?  (Can you trade this weekly?)
+    \end{itemize}
+
+    \textbf{Reflection space}: \emph{(fill in after running)}
+\end{experiment}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Factor Construction}
+\label{ch:factor-construction}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+A raw signal is rarely optimal.  Cross-sectional normalization, sector
+neutralization, and outlier handling can substantially improve IC and IR ---
+or reveal that the signal was just a proxy for a well-known risk factor.
+
+This chapter covers the standard transformations every factor goes through
+before it is ready for combination and portfolio construction.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Normalization}
+
+\begin{definition}[Z-Score Normalization]
+    \[
+        z_{i,t} = \frac{x_{i,t} - \bar{x}_t}{\sigma_{x,t}}
+    \]
+    Applied cross-sectionally: ensures zero mean, unit variance across the
+    stock universe at each date.
+\end{definition}
+
+\begin{definition}[Rank Normalization]
+    Replace raw values with their cross-sectional rank, then map to $[-1, 1]$
+    or to a standard normal via the inverse CDF\@.  More robust to outliers
+    than z-scoring.
+\end{definition}
+
+\begin{definition}[Winsorization]
+    Cap extreme values at a percentile threshold (e.g., 1st and 99th
+    percentiles).  Applied \emph{before} z-scoring to prevent outliers from
+    dominating the mean and standard deviation.
+\end{definition}
+
+\subsection{Neutralization}
+
+\begin{definition}[Sector Neutralization]
+    Demean the factor within each sector:
+    \[
+        z_{i,t}^{\text{neutral}} = z_{i,t} - \bar{z}_{\text{sector}(i),t}
+    \]
+    Purpose: remove sector-level effects so the factor captures stock-specific
+    alpha, not sector rotation.
+\end{definition}
+
+\begin{definition}[Size and Beta Neutralization]
+    Regress the factor on log-market-cap and/or market beta; use the residual:
+    \[
+        z^{\perp} = z - \hat{z}
+    \]
+    where $\hat{z}$ is the fitted value from the regression.  This isolates
+    alpha from well-known risk premiums.
+\end{definition}
+
+\subsection{Orthogonalization}
+
+\begin{definition}[Factor Orthogonalization]
+    Given existing factors $F_1, \ldots, F_k$, orthogonalize a new factor
+    $F_{k+1}$ by regressing it on the existing set and taking the residual:
+    \[
+        F_{k+1}^{\perp} = F_{k+1} - X(X^TX)^{-1}X^T F_{k+1}
+    \]
+    where $X = [F_1 \mid \cdots \mid F_k]$.
+
+    The residual $F_{k+1}^{\perp}$ contains only the information in $F_{k+1}$
+    that is \textbf{not} already captured by the existing factors.
+\end{definition}
+
+\begin{remark}
+    Orthogonalization order matters.  $F_2$ orthogonalized against $F_1$ is
+    different from $F_1$ orthogonalized against $F_2$.  The first factor in
+    the sequence ``wins'' more of the shared variance.
+\end{remark}
+
+% ── Implementation ────────────────────────────────────────────────────────────
+\section{Implementation Sketch}
+
+A factor preprocessing pipeline:
+
+\begin{lstlisting}
+def preprocess_factor(
+    raw_signal: pl.DataFrame,       # (date, ticker, value)
+    sectors: pl.DataFrame,          # (ticker, sector)
+    market_cap: pl.DataFrame,       # (date, ticker, log_mcap)
+    winsorize_pct: float = 0.01,
+    neutralize: list[str] = ["sector"],
+) -> pl.DataFrame:
+    """
+    1. Winsorize at (pct, 1-pct) cross-sectionally.
+    2. Z-score cross-sectionally.
+    3. Neutralize for specified factors (sector, size).
+    4. Return the preprocessed factor DataFrame.
+    """
+\end{lstlisting}
+
+\begin{labmod}
+    \textbf{Build it}: Implement \texttt{preprocess\_factor()} with at least
+    z-scoring and sector neutralization.  Compare the IC of the raw BBIBOLL
+    factor vs.\ the sector-neutralized version.  Does neutralization improve
+    IR?
+\end{labmod}
+
+% ── Experiment ────────────────────────────────────────────────────────────────
+\section{Experiment: Neutralization Impact}
+
+\begin{experiment}
+    \textbf{Goal}: Measure how sector neutralization affects the BBIBOLL
+    factor.
+
+    \textbf{Method}:
+    \begin{enumerate}
+        \item Compute the raw z-scored BBIBOLL factor.
+        \item Apply sector neutralization using GICS sector assignments.
+        \item Compute IC, IR, and turnover for both versions.
+        \item Compare.
+    \end{enumerate}
+
+    \textbf{Hypothesis}: If BBIBOLL is mostly capturing sector rotation
+    (e.g., ``tech is cheap relative to its own history''), neutralization will
+    \emph{destroy} the IC\@.  If it captures stock-specific mean reversion,
+    neutralization will \emph{preserve or improve} it.
+
+    \textbf{Reflection space}: \emph{(fill in after running)}
+\end{experiment}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Factor Combination}
+\label{ch:factor-combo}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+No single factor is strong enough to build a portfolio on.  The power of
+systematic investing comes from \textbf{combining} many weak signals into a
+composite that is more stable than any individual factor.
+
+This chapter covers the main combination methods, from the simplest
+(equal-weight) to the most sophisticated (mean-variance on IC covariance).
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Equal-Weight and IC-Weight}
+
+The simplest composite: $\text{composite}_{i,t} = \sum_k w_k \cdot f_{k,i,t}$
+where $f_k$ are z-scored factors.
+
+\begin{itemize}
+    \item \textbf{Equal-weight}: $w_k = 1/K$ for all factors.  No estimation
+          risk, but ignores differences in signal quality.
+    \item \textbf{IC-weight}: $w_k \propto \overline{IC}_k$.  Allocates more
+          weight to stronger factors.  Requires reliable IC estimates.
+\end{itemize}
+
+\subsection{Mean-Variance on Factor ICs}
+
+\begin{definition}[Factor Mean-Variance Combination]
+    Treat each factor's IC time series as a ``return stream.''  Apply
+    mean-variance optimization:
+    \[
+        w^* = \arg\max_w \left( w^T \mu_{IC} - \frac{\lambda}{2}
+              w^T \Sigma_{IC}\, w \right)
+    \]
+    where $\mu_{IC}$ is the vector of mean ICs and $\Sigma_{IC}$ is the
+    covariance matrix of IC time series.
+
+    This accounts for both factor quality (mean IC) and factor correlation
+    (diversification benefit from uncorrelated factors).
+\end{definition}
+
+\subsection{Risk Parity}
+
+\begin{definition}[Risk Parity Combination]
+    Weight factors so that each contributes equally to the composite signal's
+    variance:
+    \[
+        w_k \propto \frac{1}{\sigma_{IC,k}}
+    \]
+    Advantage: does not require estimating expected IC (only volatility), so it
+    is more robust to estimation error.
+\end{definition}
+
+\begin{remark}
+    In practice, start with equal-weight.  Only graduate to IC-weight or
+    mean-variance when you have enough factors ($\geq 5$) and enough history
+    ($\geq 2$ years of daily IC) to estimate the inputs reliably.
+\end{remark}
+
+\begin{labmod}
+    \textbf{Build it}: Once you have $\geq 2$ factors (e.g., BBIBOLL deviation
+    + 20-day momentum), implement equal-weight and IC-weight combination.
+    Compare the composite's IC and IR against each individual factor.  Does
+    combination improve IR?
+\end{labmod}
+
+% ── Experiment ────────────────────────────────────────────────────────────────
+\section{Experiment: Two-Factor Composite}
+
+\begin{experiment}
+    \textbf{Goal}: Build and evaluate a two-factor composite signal.
+
+    \textbf{Method}:
+    \begin{enumerate}
+        \item Factor A: Cross-sectional z-scored BBIBOLL deviation.
+        \item Factor B: 20-day momentum (cross-sectional z-scored).
+        \item Compute the Spearman correlation between A and B (across stocks,
+              averaged over time).  Are they diversifying?
+        \item Form composites: equal-weight and IC-weight.
+        \item Evaluate each with \texttt{FactorAnalyzer}: IC, IR, decay.
+    \end{enumerate}
+
+    \textbf{Expected}: If A and B are negatively correlated (mean-reversion vs.\
+    momentum), the composite's IR should be higher than either alone.
+
+    \textbf{Reflection space}: \emph{(fill in after running)}
+\end{experiment}
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+% PART IV: PORTFOLIO, RISK & EXECUTION
+% ══════════════════════════════════════════════════════════════════════════════
+
+\part{Portfolio, Risk, and Execution}
+\label{part:portfolio}
+
+\begin{quote}
+\itshape
+A signal is not a portfolio.  Turning alpha signals into actual positions
+requires risk management, position sizing, and realistic execution cost
+modeling.  This part covers the bridge from ``I have a good factor'' to
+``I have a tradeable strategy.''
+\end{quote}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Risk Measures}
+\label{ch:risk}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+Risk management answers the question: ``how bad can it get?''  Without it, a
+strategy with positive expected return can still bankrupt you via a single
+tail event.
+
+\textbf{Interview relevance}: ``What risk measures do you use?'' and
+``Explain the difference between VaR and CVaR'' are standard questions.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Value at Risk}
+
+\begin{definition}[VaR]
+    The maximum loss over a given time horizon at a given confidence level:
+    \[
+        P(L > \text{VaR}_\alpha) = 1 - \alpha
+    \]
+    Example: ``1-day 95\% VaR $= \$10{,}000$'' means there is a 5\% chance
+    of losing more than \$10{,}000 in one day.
+
+    Three estimation methods:
+    \begin{itemize}
+        \item \textbf{Historical}: Use the empirical return distribution.
+        \item \textbf{Parametric}: Assume a distribution (e.g., Gaussian)
+              and compute the quantile analytically.
+        \item \textbf{Monte Carlo}: Simulate many return paths and compute
+              the empirical quantile.
+    \end{itemize}
+\end{definition}
+
+\begin{definition}[CVaR (Expected Shortfall)]
+    \[
+        \text{CVaR}_\alpha = \mathbb{E}[L \mid L > \text{VaR}_\alpha]
+    \]
+    The expected loss \emph{given that} the loss exceeds VaR\@.  CVaR captures
+    tail risk better than VaR because it asks ``when things go bad, \emph{how}
+    bad?''
+\end{definition}
+
+\subsection{Distribution Properties of Returns}
+
+\begin{definition}[Skewness and Kurtosis]
+    \begin{itemize}
+        \item \textbf{Skewness}: $\gamma_1 = \mathbb{E}\!\left[\left(\frac{X-\mu}{\sigma}\right)^{\!3}\right]$.
+              Negative skew $=$ more extreme losses than gains.
+        \item \textbf{Excess Kurtosis}: $\kappa = \mathbb{E}\!\left[\left(\frac{X-\mu}{\sigma}\right)^{\!4}\right] - 3$.
+              Positive $\kappa$ $=$ fat tails.
+    \end{itemize}
+    Equity returns typically have \textbf{negative skewness} and \textbf{positive
+    excess kurtosis}.  Gaussian VaR underestimates tail risk.
+\end{definition}
+
+\begin{labmod}
+    \textbf{Build it}: Compute the daily return distribution of the BBIBOLL
+    strategy.  Plot the histogram against a fitted Gaussian.  Compute skewness,
+    excess kurtosis, 95\% VaR (historical and parametric), and CVaR\@.  How much
+    does the parametric VaR underestimate tail risk?
+\end{labmod}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Portfolio Construction}
+\label{ch:portfolio}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+A factor tells you \emph{which} stocks to favor.  Portfolio construction tells
+you \emph{how much} of each stock to hold.  The mapping from signal to position
+is where risk management and alpha research meet.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Factor Exposure and CAPM}
+
+\begin{definition}[Alpha and Beta]
+    From the CAPM regression: $r_i - r_f = \alpha_i + \beta_i (r_m - r_f) + \epsilon_i$
+    \begin{itemize}
+        \item $\beta_i$: sensitivity to the market.  $\beta = 1$ means the stock
+              moves with the market.
+        \item $\alpha_i$: excess return not explained by market movement.
+              \textbf{This is what we seek.}
+    \end{itemize}
+\end{definition}
+
+\begin{definition}[Market-Neutral Portfolio]
+    A portfolio with net $\beta \approx 0$: long stocks with positive alpha,
+    short stocks with negative alpha, weighted so that the net market exposure
+    cancels.  Returns are (approximately) independent of market direction.
+\end{definition}
+
+\subsection{Position Sizing}
+
+\begin{definition}[Equal-Weight]
+    Allocate $1/N$ of capital to each position.  Simple, no estimation risk,
+    but ignores differences in signal strength and risk.
+\end{definition}
+
+\begin{definition}[Volatility Targeting]
+    Scale position sizes inversely with each stock's recent volatility:
+    \[
+        w_i \propto \frac{\sigma_{\text{target}}}{\hat{\sigma}_i}
+    \]
+    This ensures each position contributes roughly equal risk to the portfolio.
+\end{definition}
+
+\begin{definition}[Kelly Criterion]
+    For a portfolio with expected excess return vector $\mu$ and covariance
+    matrix $\Sigma$:
+    \[
+        f^* = \Sigma^{-1} \mu
+    \]
+    Full Kelly maximizes long-run growth but has extreme drawdowns.
+    In practice, \textbf{half-Kelly} ($f^*/2$) or even quarter-Kelly is used.
+\end{definition}
+
+\begin{labmod}
+    \textbf{Build it}: Implement volatility-targeted position sizing.  Compare
+    equal-weight vs.\ vol-targeted performance for the BBIBOLL strategy.
+    Measure: Sharpe, MDD, Calmar.
+\end{labmod}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Execution and Transaction Costs}
+\label{ch:execution}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+A backtest without transaction costs is a fantasy.  The gap between ``paper
+alpha'' and ``live alpha'' is almost entirely explained by execution costs:
+commissions, bid-ask spread, slippage, and market impact.
+
+This chapter covers the mechanics of execution and how to model costs in a
+backtest.
+
+\textbf{Interview relevance}: ``How do you model transaction costs in your
+backtest?'' is a question that separates candidates who have thought about
+real trading from those who haven't.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Cost Components}
+
+\begin{definition}[Bid-Ask Spread]
+    $\text{Spread} = P_{\text{ask}} - P_{\text{bid}}$.  Crossing the spread to
+    execute a market order costs approximately half the spread per side.
+\end{definition}
+
+\begin{definition}[Slippage]
+    The difference between the expected execution price and the actual fill.
+    Caused by: order book depth, timing delays, stale quotes.
+\end{definition}
+
+\begin{definition}[Market Impact]
+    The price movement caused by your own order:
+    \begin{itemize}
+        \item \textbf{Temporary impact}: Price displacement during execution;
+              reverts afterward.
+        \item \textbf{Permanent impact}: Information leakage that shifts the
+              fair price.
+    \end{itemize}
+    Square-root model (empirical):
+    $\text{Impact} \approx \sigma \cdot \sqrt{V_{\text{order}} / V_{\text{daily}}}$
+\end{definition}
+
+\subsection{Execution Algorithms}
+
+\begin{definition}[VWAP and TWAP]
+    Algorithms that slice large orders to reduce impact:
+    \begin{itemize}
+        \item \textbf{VWAP}: Execute proportional to historical intraday volume
+              profile.
+        \item \textbf{TWAP}: Execute equally over fixed time intervals.
+    \end{itemize}
+\end{definition}
+
+\subsection{Cost Modeling in Backtests}
+
+Three levels of sophistication:
+
+\begin{enumerate}
+    \item \textbf{Fixed cost}: Deduct a fixed amount per trade (e.g., \$0.005/share).
+          Simple but unrealistic for large or illiquid orders.
+    \item \textbf{Spread model}: Deduct half the typical bid-ask spread per side.
+          Requires spread data (or estimates from Amihud illiquidity).
+    \item \textbf{Impact model}: Use the square-root model above.  Requires
+          volume data.  Most realistic, but adds complexity.
+\end{enumerate}
+
+\begin{pitfall}
+    Ignoring costs is the most common source of ``paper alpha'' that disappears
+    in live trading.  Even a simple fixed-cost model is infinitely better than
+    zero-cost.
+\end{pitfall}
+
+\begin{labmod}
+    \textbf{Build it}: Add a transaction cost model to the backtest engine.
+    Start with level~1 (fixed cost), then upgrade to level~2 (spread model).
+    Re-run the BBIBOLL backtest with costs.  How much does the Sharpe drop?
+    At what cost level does the strategy become unprofitable?
+\end{labmod}
+
+% ── Experiment ────────────────────────────────────────────────────────────────
+\section{Experiment: Cost Sensitivity Analysis}
+
+\begin{experiment}
+    \textbf{Goal}: Determine how sensitive the BBIBOLL strategy's performance
+    is to transaction costs.
+
+    \textbf{Method}:
+    \begin{enumerate}
+        \item Run the backtest with costs at 0, 1, 5, 10, 20 bps per side.
+        \item Plot Sharpe ratio as a function of cost.
+        \item Find the breakeven cost (where Sharpe $= 0$).
+    \end{enumerate}
+
+    \textbf{Interpretation}: If the breakeven cost is $< 5$ bps, the strategy
+    is probably not tradeable in practice.  If $> 20$ bps, it is robust.
+
+    \textbf{Reflection space}: \emph{(fill in after running)}
+\end{experiment}
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+% PART V: MACHINE LEARNING
+% ══════════════════════════════════════════════════════════════════════════════
+
+\part{Machine Learning in Quantitative Finance}
+\label{part:ml}
+
+\begin{quote}
+\itshape
+Machine learning in quant finance is not about model complexity.  It is about
+\textbf{feature engineering}, \textbf{proper validation}, and \textbf{respecting
+the time-series structure} of financial data.  If you get these three things
+right, a simple model will beat a complex one.
+\end{quote}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Feature Engineering for Finance}
+\label{ch:features}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+The gap between ``ML engineer'' and ``quant ML researcher'' is not modeling ---
+it is features.  A LightGBM model with 50 carefully engineered financial
+features will outperform a deep neural network fed raw OHLCV\@.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Feature Categories}
+
+\begin{definition}[Financial Feature Taxonomy]
+    \begin{itemize}
+        \item \textbf{Momentum}: Returns over multiple horizons
+              (1d, 5d, 20d, 60d, 252d).
+        \item \textbf{Mean reversion}: Distance from moving averages
+              (e.g., the BBIBOLL deviation signal).
+        \item \textbf{Volume}: Relative volume, OBV,
+              volume-price divergence, Amihud illiquidity.
+        \item \textbf{Volatility}: Realized vol (from intraday data), GARCH
+              residuals, vol-of-vol.
+        \item \textbf{Fundamental}: PE, PB, earnings yield, dividend yield,
+              revenue growth (requires fundamental data).
+        \item \textbf{Microstructure}: Bid-ask spread statistics, trade
+              imbalance, Kyle's lambda (requires tick data).
+    \end{itemize}
+\end{definition}
+
+\subsection{Feature Processing}
+
+\begin{itemize}
+    \item \textbf{Cross-sectional normalization}: Z-score or rank-transform
+          features across stocks at each date (same as factor preprocessing
+          in Chapter~\ref{ch:factor-construction}).
+    \item \textbf{Lag features}: Use the signal value from $t-1$, $t-2$, etc.\
+          as additional inputs.  Captures mean-reversion or momentum in the
+          signal itself.
+    \item \textbf{Interaction features}: Ratios or products of base features
+          (e.g., momentum $\times$ volume = ``confirmed momentum'').
+\end{itemize}
+
+\begin{pitfall}
+    \textbf{Leakage through normalization.}  If you z-score using the full
+    sample mean/std (including future dates), you introduce look-ahead bias.
+    Always normalize using only data available up to date $t$.
+\end{pitfall}
+
+\begin{labmod}
+    \textbf{Build it}: Construct a feature matrix with $\geq 10$ features
+    (momentum at 3 horizons, BBIBOLL deviation, OBV z-score, realized vol,
+    etc.) for the liquid universe.  Inspect the cross-sectional distribution
+    of each feature --- any extreme outliers?  Apply winsorization and z-scoring.
+\end{labmod}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Time-Series Validation}
+\label{ch:ts-validation}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+Standard $k$-fold cross-validation is \textbf{invalid} for time series because
+it uses future data to predict the past.  This is the single most common ML
+mistake in quant finance --- and the easiest way to produce a backtest that
+looks incredible on paper and fails immediately in live trading.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Validation Schemes}
+
+\begin{definition}[TimeSeriesSplit]
+    \begin{itemize}
+        \item \textbf{Expanding window}: Train on $[0, t]$, test on
+              $[t+1, t+h]$.  Increase $t$ each iteration.
+        \item \textbf{Rolling window}: Train on $[t-w, t]$, test on
+              $[t+1, t+h]$.  Fixed training window width $w$.
+        \item \textbf{Purged / Embargoed}: Remove $g$ days of data around
+              the train/test boundary to prevent label leakage from
+              overlapping forward-return windows.
+    \end{itemize}
+\end{definition}
+
+\begin{definition}[Walk-Forward Training]
+    The ML equivalent of walk-forward backtesting (Chapter~\ref{ch:bias}):
+    retrain the model periodically (e.g., monthly) on the most recent $N$
+    months, predict the next month, concatenate all out-of-sample predictions.
+\end{definition}
+
+\begin{pitfall}
+    \textbf{Hyperparameter tuning on the test set.}  If you tune
+    \texttt{max\_depth} or \texttt{learning\_rate} by looking at test-set
+    performance, you are overfitting to the test set.  Use a nested validation
+    scheme: train / validation / test.
+\end{pitfall}
+
+\begin{labmod}
+    \textbf{Build it}: Implement a \texttt{PurgedWalkForwardCV} class that
+    yields (train, test) index pairs with a configurable embargo gap.  Verify
+    that no test date appears in any training fold.
+\end{labmod}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Tree Models and Ensembles}
+\label{ch:trees}
+
+% ── Motivation ────────────────────────────────────────────────────────────────
+\section{Motivation}
+
+In quant ML, \textbf{gradient-boosted trees} (LightGBM, XGBoost) are the
+workhorse.  They handle tabular data naturally, capture nonlinear interactions,
+and provide built-in feature importance.  A well-tuned LightGBM with proper
+walk-forward validation is a strong baseline that is hard to beat with more
+complex models.
+
+% ── Concepts ──────────────────────────────────────────────────────────────────
+\section{Concepts}
+
+\subsection{Why Trees for Finance?}
+
+\begin{itemize}
+    \item \textbf{Tabular data}: Financial features are structured columns,
+          not images or text.  Trees excel on tabular data.
+    \item \textbf{Nonlinear interactions}: The relationship between momentum
+          and future return may depend on volatility.  Trees capture this
+          automatically via splits.
+    \item \textbf{Feature importance}: Built-in gain/split importance helps
+          with feature selection and factor discovery.
+    \item \textbf{Speed}: LightGBM trains on $10^6$ rows $\times$ 50 features
+          in seconds.
+\end{itemize}
+
+\subsection{Ensemble Methods}
+
+\begin{definition}[Bagging vs.\ Boosting]
+    \begin{itemize}
+        \item \textbf{Bagging} (Random Forest): Train many trees on bootstrap
+              samples; average predictions.  Reduces \emph{variance}.
+        \item \textbf{Boosting} (LightGBM, XGBoost): Train trees sequentially,
+              each correcting the previous one's errors.  Reduces \emph{bias}.
+    \end{itemize}
+    In practice, boosting dominates for tabular prediction tasks.
+\end{definition}
+
+\subsection{Hyperparameter Discipline}
+
+Key hyperparameters for LightGBM in a quant context:
+
+\begin{itemize}
+    \item \texttt{max\_depth}: Limit to 4--6 to prevent overfitting to noise.
+    \item \texttt{num\_leaves}: Control tree complexity (related to depth).
+    \item \texttt{min\_data\_in\_leaf}: At least 100--500 for noisy financial data.
+    \item \texttt{learning\_rate}: Small (0.01--0.05) with many boosting rounds
+          and early stopping.
+    \item \texttt{feature\_fraction}: Subsample features per tree (0.5--0.8)
+          for regularization.
+\end{itemize}
+
+\begin{remark}
+    The project already includes LightGBM as a dependency, but no ML-based
+    strategy has been implemented yet.  The recommended sequence: build the
+    factor evaluation framework (Part~III) first, then use ML to \emph{combine}
+    factors, not to \emph{replace} them.
+\end{remark}
+
+\begin{labmod}
+    \textbf{Build it}: Train a LightGBM model to predict 5-day forward return
+    \emph{direction} (binary classification) using the feature matrix from
+    Chapter~\ref{ch:features}.  Use \texttt{PurgedWalkForwardCV} from
+    Chapter~\ref{ch:ts-validation}.
+
+    \begin{enumerate}
+        \item Train on 12 months, predict the next month.  Slide monthly.
+        \item Report out-of-sample AUC and accuracy.
+        \item Extract feature importance.  Which features matter most?
+        \item Compare with a simple equal-weight factor composite (Part~III).
+              Does ML add incremental alpha?
+    \end{enumerate}
+\end{labmod}
+
+% ── Experiment ────────────────────────────────────────────────────────────────
+\section{Experiment: LightGBM vs.\ Linear Factor Model}
+
+\begin{experiment}
+    \textbf{Goal}: Determine whether ML adds value beyond a linear factor
+    composite.
+
+    \textbf{Method}:
+    \begin{enumerate}
+        \item Baseline: Equal-weight composite of 5+ factors (Part~III result).
+              Evaluate with IC/IR.
+        \item LightGBM: Same features, walk-forward trained.  Convert
+              predicted probabilities to a cross-sectional signal.  Evaluate
+              with IC/IR.
+        \item Compare IC, IR, and portfolio-level Sharpe.
+    \end{enumerate}
+
+    \textbf{Hypothesis}: ML will capture nonlinear interactions and improve IC
+    by 10--30\%, but at the cost of lower interpretability and higher turnover.
+
+    \textbf{Reflection space}: \emph{(fill in after running)}
+\end{experiment}
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+% APPENDICES
+% ══════════════════════════════════════════════════════════════════════════════
+
+\appendix
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Mathematical Reference}
+\label{app:math}
+
+This appendix collects the mathematical foundations referenced by the main
+chapters.  It is not meant to be read front-to-back --- flip here when a chapter
+says ``see Appendix~A.''
+
+
+\section{Probability and Statistics}
+\label{sec:math-stats}
+
+\begin{definition}[Random Variable]
+    A measurable function $X: \Omega \to \mathbb{R}$ from a sample space to the
+    reals.  In finance, $X$ typically represents a future return or a signal
+    value.
+\end{definition}
+
+\begin{definition}[Expected Value]
+    Discrete: $\mathbb{E}[X] = \sum_x x \cdot p(x)$.
+    Continuous: $\mathbb{E}[X] = \int x \, f(x)\, dx$.
+\end{definition}
+
+\begin{definition}[Variance and Standard Deviation]
+    \[
+        \text{Var}(X) = \mathbb{E}[(X - \mathbb{E}[X])^2]
+        \qquad
+        \sigma(X) = \sqrt{\text{Var}(X)}
+    \]
+    In finance, $\sigma$ of returns is the standard measure of
+    \textbf{volatility}.
+\end{definition}
+
+\begin{definition}[Covariance and Correlation]
+    \[
+        \text{Cov}(X,Y) = \mathbb{E}[(X-\mu_X)(Y-\mu_Y)]
+        \qquad
+        \rho(X,Y) = \frac{\text{Cov}(X,Y)}{\sigma_X \sigma_Y}
+    \]
+    Correlation measures \emph{linear} dependence only.
+\end{definition}
+
+\begin{definition}[Conditional Expectation]
+    $\mathbb{E}[X \mid Y = y]$: the expected value of $X$ given that $Y = y$.
+    This is the foundation of alpha research --- ``what is the expected return
+    conditional on observing this signal value?''
+\end{definition}
+
+\subsection{Key Theorems}
+
+\begin{definition}[Law of Large Numbers]
+    As $n \to \infty$: $\bar{X}_n \to \mathbb{E}[X]$.
+    \emph{Practical}: Your backtest's average return converges to the true
+    expected return --- if the process is stationary.
+\end{definition}
+
+\begin{definition}[Central Limit Theorem]
+    For i.i.d.\ $X_i$ with mean $\mu$, variance $\sigma^2$:
+    \[
+        \frac{\bar{X}_n - \mu}{\sigma/\sqrt{n}} \xrightarrow{d} \mathcal{N}(0,1)
+    \]
+    \emph{Practical}: Justifies $t$-tests on Sharpe ratios and IC values ---
+    but financial returns violate i.i.d.\ (autocorrelation, fat tails), so
+    apply with caution.
+\end{definition}
+
+\subsection{Hypothesis Testing}
+
+\begin{definition}[Hypothesis Test]
+    Test $H_0$ (e.g., ``IC $= 0$'') against $H_1$ (``IC $\neq 0$''):
+    \begin{enumerate}
+        \item Compute a test statistic (e.g., $t = \bar{x} / (s/\sqrt{n})$).
+        \item Find the $p$-value: probability of observing this extreme a value
+              under $H_0$.
+        \item Reject $H_0$ if $p < \alpha$ (typically $\alpha = 0.05$).
+    \end{enumerate}
+\end{definition}
+
+\subsection{Regression}
+
+\begin{definition}[OLS]
+    Minimize $\sum_i (y_i - x_i^T\beta)^2$.  Solution:
+    $\hat{\beta} = (X^TX)^{-1}X^Ty$.
+
+    In quant finance: cross-sectional regression of stock returns on factor
+    exposures yields \textbf{factor returns} at each date.
+\end{definition}
+
+\begin{definition}[Regularization]
+    When factors are correlated:
+    \begin{itemize}
+        \item \textbf{Ridge (L2)}: $+ \lambda\|\beta\|_2^2$.  Shrinks
+              coefficients.
+        \item \textbf{Lasso (L1)}: $+ \lambda\|\beta\|_1$.  Drives
+              irrelevant coefficients to zero (feature selection).
+    \end{itemize}
+\end{definition}
+
+
+\section{Time Series}
+\label{sec:math-ts}
+
+\begin{definition}[Stationarity]
+    A time series $\{X_t\}$ is weakly stationary if
+    $\mathbb{E}[X_t] = \mu$ for all~$t$ and
+    $\text{Cov}(X_t, X_{t+h})$ depends only on the lag~$h$.
+    Prices are non-stationary; returns are approximately stationary.
+\end{definition}
+
+\begin{definition}[Unit Root and ADF Test]
+    Unit root: $X_t = X_{t-1} + \epsilon_t$ (random walk).  The Augmented
+    Dickey--Fuller test tests $H_0$: unit root exists.  Reject $\Rightarrow$
+    the series is stationary.
+\end{definition}
+
+\begin{definition}[Cointegration]
+    Two non-stationary series $X_t$, $Y_t$ are cointegrated if
+    $\exists\,\beta$ such that $Y_t - \beta X_t$ is stationary.
+    Foundation of pairs trading / statistical arbitrage.
+\end{definition}
+
+\begin{definition}[ACF / PACF]
+    \begin{itemize}
+        \item ACF: $\rho(h) = \text{Corr}(X_t, X_{t+h})$.
+        \item PACF: Correlation between $X_t$ and $X_{t+h}$ after removing
+              linear effects of intermediate lags.
+    \end{itemize}
+    Diagnostic tools for identifying AR and MA order.
+\end{definition}
+
+\begin{definition}[ARIMA]
+    $\text{AR}(p)$: $X_t = \sum_{i=1}^p \phi_i X_{t-i} + \epsilon_t$. \quad
+    $\text{MA}(q)$: $X_t = \epsilon_t + \sum_{j=1}^q \theta_j \epsilon_{t-j}$. \quad
+    $\text{ARIMA}(p,d,q)$: ARMA on the $d$-th difference.
+\end{definition}
+
+\begin{definition}[GARCH(1,1)]
+    \[
+        \sigma_t^2 = \omega + \alpha\,\epsilon_{t-1}^2 + \beta\,\sigma_{t-1}^2
+    \]
+    Captures volatility clustering: today's variance depends on yesterday's
+    shock and variance.
+\end{definition}
+
+\begin{definition}[Realized Volatility]
+    $RV_t = \sum_{i=1}^N r_{t,i}^2$ where $r_{t,i}$ are intraday returns
+    (e.g., 5-minute).  Uses high-frequency data to estimate daily vol more
+    accurately than daily close-to-close.
+\end{definition}
+
+
+\section{Stochastic Calculus}
+\label{sec:math-stoch}
+
+These are foundations for derivatives pricing and advanced risk modeling.  Not
+immediately needed for equity alpha research, but essential for a complete
+quant education.
+
+\begin{definition}[Brownian Motion]
+    A continuous-time process $W_t$ with $W_0 = 0$, independent Gaussian
+    increments ($W_t - W_s \sim \mathcal{N}(0, t-s)$), and continuous paths.
+\end{definition}
+
+\begin{definition}[Geometric Brownian Motion]
+    \[
+        dS_t = \mu S_t\,dt + \sigma S_t\,dW_t
+    \]
+    Solution: $S_t = S_0 \exp((\mu - \sigma^2/2)t + \sigma W_t)$.
+    The basis of the Black--Scholes model.
+\end{definition}
+
+\begin{definition}[It\^{o}'s Lemma]
+    For $f(S_t, t)$ where $S_t$ follows an It\^{o} process:
+    \[
+        df = \frac{\partial f}{\partial t}\,dt
+           + \frac{\partial f}{\partial S}\,dS
+           + \frac{1}{2}\frac{\partial^2 f}{\partial S^2}(dS)^2
+    \]
+    The $(dS)^2$ term distinguishes stochastic calculus from ordinary calculus.
+\end{definition}
+
+\begin{definition}[Martingale]
+    $\{M_t\}$ is a martingale if
+    $\mathbb{E}[M_t \mid \mathcal{F}_s] = M_s$ for all $s \leq t$.
+    Under the risk-neutral measure, discounted asset prices are martingales.
+\end{definition}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Quant Notes}
+\label{app:notes}
+
+This appendix records key insights discovered during development and study.
+Each entry captures the date, the question that arose, the finding,
+and why it matters.  Entries are ordered chronologically.
+
+% ── Entry 1 ──────────────────────────────────────────────────────────────────
+\bigskip\noindent\rule{\textwidth}{0.4pt}
+
+\paragraph{Entry 1 --- Individual Factor IR Is Weak by Design}
+\label{exp:weak-ir}
+\begin{description}[style=nextline, leftmargin=1.8cm]
+    \item[Date] 2026-03-02 \quad (from \texttt{alpha\_iteration.ipynb})
+    \item[Question]
+        All four factors (BBIBOLL, STR, VPD, Vol~Ratio) showed
+        $|\mathrm{IR}|$ in the $0.05$--$0.12$ range.
+        Are these signals too weak to be useful?
+    \item[Finding]
+        No --- this is \emph{normal}.
+        In practice, single-factor IRs rarely exceed $0.3$;
+        values above $0.5$ are exceptional.
+        The practical ranges are roughly:
+        \begin{itemize}[nosep]
+            \item $|\mathrm{IR}| < 0.05$: noise, not tradeable.
+            \item $0.05 \le |\mathrm{IR}| < 0.15$: weak but real ---
+                  the typical range for individual alpha factors.
+            \item $0.15 \le |\mathrm{IR}| < 0.30$: solid single factor.
+            \item $|\mathrm{IR}| \ge 0.50$: suspicious --- likely overfitted
+                  or measured in-sample.
+        \end{itemize}
+
+    \item[Why It Matters]
+        The \textbf{Fundamental Law of Active Management}
+        (Grinold \& Kahn) explains how weak signals become useful:
+        \[
+            \mathrm{IR}_{\text{portfolio}}
+            \;\approx\; \mathrm{IR}_{\text{single}} \times \sqrt{N}
+        \]
+        where $N$ is the number of \emph{independent} bets (signals $\times$
+        rebalance periods).
+        Combining 10 orthogonal factors each with $\mathrm{IR} = 0.10$ gives
+        a portfolio-level $\mathrm{IR} \approx 0.10 \times \sqrt{10} \approx 0.32$,
+        well into the ``strong'' range.
+        The game is not finding one brilliant factor; it is combining many
+        weak-but-orthogonal signals.
+\end{description}
+
+% ── Entry 2 ──────────────────────────────────────────────────────────────────
+\bigskip\noindent\rule{\textwidth}{0.4pt}
+
+\paragraph{Entry 2 --- Anti-Correlation Requires Aligned IC Signs}
+\label{exp:ic-sign-anticorr}
+\begin{description}[style=nextline, leftmargin=1.8cm]
+    \item[Date] 2026-03-02 \quad (from \texttt{alpha\_iteration.ipynb})
+    \item[Question]
+        BBIBOLL and STR have strongly anti-correlated daily IC
+        ($\rho = -0.80$).
+        Anti-correlation should be great for diversification ---
+        why did equal-weight combination \emph{dilute} the signal instead?
+    \item[Finding]
+        Anti-correlation in the IC \emph{series} means the two factors
+        ``take turns being right.''
+        But whether that helps depends on whether they agree on
+        \textbf{direction}:
+        \begin{itemize}[nosep]
+            \item \textbf{Same IC sign + anti-correlated $\boldsymbol{\to}$ great.}
+                  Both factors predict the same direction (e.g.\ both negative IC).
+                  On days factor~A is strong, factor~B is weak --- but they still
+                  point the same way.  The composite mean IC is preserved while the
+                  variance drops, so IR rises.
+            \item \textbf{Opposite IC sign + anti-correlated $\boldsymbol{\to}$ cancellation.}
+                  BBIBOLL has $\mathrm{IC} = -0.022$ and STR has
+                  $\mathrm{IC} = +0.013$.
+                  When BBIBOLL fires strongly ($\mathrm{IC} \approx -0.05$),
+                  the anti-correlation means STR also fires strongly ---
+                  but in the \emph{opposite} direction ($\mathrm{IC} \approx +0.04$).
+                  Equal-weight averaging: $(-0.05 + 0.04)/2 \approx -0.005$.
+                  The signals cancel, collapsing the mean IC.
+        \end{itemize}
+
+    \item[The Math]
+        For two equal-weight factors with IC means $\mu_A, \mu_B$,
+        IC standard deviations $\sigma_A, \sigma_B$, and IC correlation $\rho$:
+        \begin{align*}
+            \mu_{\text{combo}}   &= \tfrac{1}{2}(\mu_A + \mu_B) \\
+            \sigma^2_{\text{combo}} &= \tfrac{1}{4}
+                \bigl(\sigma_A^2 + \sigma_B^2 + 2\rho\,\sigma_A\sigma_B\bigr)
+        \end{align*}
+        Anti-correlation ($\rho < 0$) always shrinks $\sigma^2_{\text{combo}}$
+        (the denominator of IR).
+        But if $\mu_A$ and $\mu_B$ have opposite signs,
+        $\mu_{\text{combo}}$ also shrinks (the numerator of IR).
+        The net effect on $\mathrm{IR} = \mu/\sigma$ depends on which
+        shrinks faster.  In the BBIBOLL $\times$ STR case, the numerator
+        collapsed more than the denominator --- so IR fell.
+
+    \item[Experimental Evidence]
+        \begin{itemize}[nosep]
+            \item BBIBOLL + Vol~Ratio ($\rho = 0.02$, same IC sign):
+                  composite $|\mathrm{IR}| = 0.136 > 0.122$ (best individual).
+                  \textbf{Diversification confirmed.}
+            \item BBIBOLL + STR ($\rho = -0.80$, opposite IC sign):
+                  composite IR diluted.  Anti-correlation \emph{hurt}.
+        \end{itemize}
+
+    \item[Why It Matters]
+        The analogy is portfolio construction: two negatively correlated
+        assets reduce portfolio volatility only if you are \textbf{long both}.
+        If you are long one and short the other, negative correlation means
+        they move together --- more risk, not less.
+        Similarly, combining factors with opposite IC signs is like going
+        long one alpha and short the other; the anti-correlation amplifies
+        cancellation rather than providing stability.
+
+        \medskip
+        \textbf{Interview one-liner:}
+        \emph{``Anti-correlated ICs reduce tracking error, but only improve IR
+        if the factors agree on direction.
+        Opposite IC signs turn anti-correlation from a hedge into
+        a cancellation.''}
+\end{description}
+
+% ── Entry 3 ──────────────────────────────────────────────────────────────────
+\bigskip\noindent\rule{\textwidth}{0.4pt}
+
+\paragraph{Entry 3 --- Strategy-Based vs.\ Alpha-Pipeline Backtesting}
+\label{exp:strategy-vs-pipeline}
+\begin{description}[style=nextline, leftmargin=1.8cm]
+    \item[Date] 2026-03-02 \quad (architecture comparison)
+    \item[Question]
+        The codebase offers two backtest paths:
+        \begin{itemize}[nosep,topsep=2pt]
+            \item \texttt{BBIBOLLStrategy} $\to$
+                  \texttt{BacktestEngine}
+                  (in \texttt{src/strategy/})
+            \item \texttt{pipeline.py} $\to$
+                  \texttt{WeightBacktester}
+                  (in \texttt{src/portfolio/})
+        \end{itemize}
+        What is the fundamental difference, and when should
+        each be used?
+
+    \item[Finding]
+        They embody two distinct mental models of systematic investing.
+
+        \medskip
+        \textbf{Strategy approach --- ``I Trade.''}
+        \begin{enumerate}[nosep]
+            \item Calculate indicators (BBI + Bollinger Bands) per ticker.
+            \item Generate signals by iterating \emph{row by row},
+                  tracking stateful holding logic via
+                  \texttt{is\_holding} and \texttt{buy\_price}.
+                  Emit buy$(+1)$/sell$(-1)$ on threshold triggers.
+            \item Match buy$\to$sell pairs via \texttt{join\_asof};
+                  compute per-trade P\&L.
+            \item Expand trades into daily holdings; equal-weight
+                  average $\to$ equity curve.
+        \end{enumerate}
+        Key properties: \emph{stateful} (sell decision depends on entry
+        price), \emph{discrete events} (in or out), \emph{single-asset
+        logic} (each ticker processed independently),
+        \emph{trade-centric output} (``bought AAPL at \$150,
+        sold at \$165, return $= +10\%$'').
+
+        \medskip
+        \textbf{Pipeline approach --- ``I Allocate.''}
+        \begin{enumerate}[nosep]
+            \item Compute factors (bbiboll deviation, volatility ratio,
+                  momentum) for \emph{all} stocks simultaneously.
+            \item Rank cross-sectionally on each rebalance date;
+                  assign portfolio weights (top-ranked $\to$ equal weight,
+                  rest $\to$ zero).
+            \item Portfolio return:
+                  $r_t = \sum_i w_{i,t}\, r_{i,t}$
+                  --- no explicit trades, just weights $\times$ returns.
+        \end{enumerate}
+        Key properties: \emph{stateless} (today's weight depends only on
+        today's factor values), \emph{continuous allocation} (how much,
+        not whether), \emph{cross-sectional} (all stocks compete for
+        capital), \emph{portfolio-centric output} (daily portfolio
+        return, Sharpe ratio).
+
+    \item[Summary Table]~\\[-\baselineskip]
+        \begin{tabular}{@{}lll@{}}
+        \toprule
+        \textbf{Dimension} & \textbf{Strategy} & \textbf{Pipeline} \\
+        \midrule
+        Unit of analysis & Individual trade   & Portfolio weight \\
+        State            & Entry price, holding flag & None (recomputed fresh) \\
+        Decision         & Buy/sell \emph{this} stock? & Allocate across \emph{all} stocks? \\
+        Output           & Trade list + P\&L   & Weight matrix + return series \\
+        Rebalance        & Signal-triggered    & Calendar-based (weekly/monthly) \\
+        Typical role      & Trader / execution  & Researcher / PM \\
+        \bottomrule
+        \end{tabular}
+
+    \item[Why It Matters]
+        Most quant interview questions and institutional workflows assume
+        the \textbf{pipeline worldview}: ``describe an alpha factor'',
+        ``construct a long-short portfolio'', ``what is your Sharpe?''
+        The strategy approach is valuable for execution-level or
+        high-frequency work, but the pipeline is closer to how
+        firms like Citadel, Two~Sigma, and AQR structure research.
+
+        \medskip
+        The bridge between the two is \texttt{WeightBacktester}:
+        it accepts pipeline output~(weights) and produces the equity
+        curve $+$ Sharpe that connect the ``I allocate'' mindset to
+        concrete performance metrics.  In the codebase,
+        \texttt{backtester.py --mode strategy} runs the trade-level path
+        and \texttt{--mode pipeline} runs the portfolio-level path,
+        allowing direct comparison on the same data.
+
+        \medskip
+        \textbf{Learning path:} start with the strategy approach (it is
+        intuitive --- you can inspect individual trades), then graduate
+        to the pipeline (it forces you to think in portfolios:
+        factors $\to$ ranking $\to$ allocation $\to$ rebalancing).
+        The key insight from the \textbf{Fundamental Law of Active
+        Management} (Entry~\ref{exp:weak-ir}) is that the pipeline
+        naturally maximises the number of independent bets~$N$, which
+        is how weak individual signals become a strong portfolio.
+\end{description}
+
+% ── Entry 4 ──────────────────────────────────────────────────────────────────
+\bigskip\noindent\rule{\textwidth}{0.4pt}
+
+\paragraph{Entry 4 --- Kelly Criterion Is a Leverage Tool, Not an Allocation Tool}
+\label{exp:kelly-lesson}
+\begin{description}[style=nextline, leftmargin=1.8cm]
+    \item[Date] 2026-03-02 \quad (from \texttt{pipeline\_demo.ipynb} ablation study)
+
+    \item[Question]
+        We implemented ``Half-Kelly'' position sizing:
+        $w_i \propto \mu_i / \sigma_i^2$, normalized to unit gross leverage.
+        Every configuration using it produced \emph{worse} Sharpe than
+        equal-weight.  Three successive bug fixes failed to improve it.
+        What is fundamentally wrong?
+
+    \item[Background --- The Kelly Formula]
+        The Kelly criterion solves: \emph{``What fraction of my bankroll
+        should I wager on a bet with known edge $\mu$ and variance
+        $\sigma^2$?''}
+        \[
+            f^* = \frac{\mu}{\sigma^2}
+        \]
+        This is optimal for a \textbf{single repeated bet} with
+        independent outcomes, maximizing the long-run geometric growth
+        rate $G = \mathbb{E}[\log(1 + f \cdot r)]$.
+
+        Half-Kelly ($f^*/2$) is a common practitioner adjustment that
+        sacrifices roughly $25\%$ of growth for substantially lower
+        drawdown.  The key property: \emph{Kelly tells you how much
+        total capital to risk}, not how to split capital across
+        multiple simultaneous bets.
+
+    \item[The Three Bugs We Hit (and Fixed)]~
+        \begin{enumerate}[nosep]
+            \item \textbf{Normalization destroyed the leverage signal.}
+                  We normalized $\sum|w_i| = 1$, which discards Kelly's
+                  answer to ``how much to bet.''  After normalization,
+                  only the \emph{relative} sizing remains --- but that
+                  was never Kelly's purpose.
+                  \emph{Fix:} let leverage float (partly undone by
+                  needing comparable backtest results).
+            \item \textbf{Using $\mu_i$ from returns made Kelly ignore
+                  the factor.}
+                  Historical mean return over 60 days is dominated by
+                  noise (SNR $\approx 0.02$); the factor signal was
+                  unused.  All \texttt{AlphaConfig} variants produced
+                  identical Sharpe $= 0.343$ regardless of factor
+                  choice.
+                  \emph{Fix:} two-stage design --- factor selects
+                  stocks, Kelly sizes by $|\mu_i| / \sigma_i^2$.
+            \item \textbf{Historical $\mu$ is stealth momentum.}
+                  Even after the two-stage fix, $\mu_i$ from a 60-day
+                  window injects a momentum bias.  For a mean-reversion
+                  signal like BBIBOLL, this conflicts with the factor
+                  direction.
+                  \emph{Fix:} replace $\mu_i$ with $z_i$, the
+                  cross-sectional z-score of the factor signal itself.
+        \end{enumerate}
+
+    \item[The Ablation Study]
+        After all three fixes, we ran a $2 \times 2$ experiment
+        isolating sizing and rebalancing frequency:
+        \begin{center}
+        \begin{tabular}{@{}llcc@{}}
+        \toprule
+        & & \multicolumn{2}{c}{\textbf{Rebalance}} \\
+        \cmidrule(l){3-4}
+        & & Daily & Weekly \\
+        \midrule
+        \multirow{2}{*}{\textbf{Sizing}}
+        & Equal-Weight      & $+0.814$ & $+0.417$ \\
+        & Signal-Weighted   & $+0.137$ & $-0.393$ \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+
+        \medskip\noindent
+        Two independent sources of Sharpe degradation:
+        \begin{itemize}[nosep]
+            \item \textbf{Weekly rebalancing} $\to$ $-0.40$ Sharpe
+                  (mean-reversion alpha decays intraweek).
+            \item \textbf{Signal-weighted sizing} $\to$ $-0.68$ Sharpe
+                  (concentration penalty).
+        \end{itemize}
+
+    \item[Root Cause --- Why ``Kelly Sizing'' Hurts]
+        The $z_i / \sigma_i^2$ formula concentrates weight into
+        low-volatility, high-conviction names.  But for BBIBOLL
+        (a mean-reversion signal), the strongest alpha comes from
+        \emph{high-volatility} stocks that have deviated far from
+        their bands.  Signal-weighted sizing systematically
+        \textbf{under-weights the best opportunities}.
+
+        \medskip
+        Mathematically: $w_i \propto z_i / \sigma_i^2$ penalizes
+        large $\sigma_i$ quadratically.  In cross-section, the stocks
+        with the largest $|z_i|$ (strongest signal) also tend to have
+        the largest $\sigma_i$ (that is what drove the deviation).
+        The penalty overwhelms the conviction signal.
+
+    \item[The Conceptual Error]
+        Kelly solves a fundamentally different problem than what
+        we asked it to do:
+        \begin{center}
+        \begin{tabular}{@{}lp{5.5cm}p{5.5cm}@{}}
+        \toprule
+        & \textbf{Kelly's Actual Problem} & \textbf{What We Used It For} \\
+        \midrule
+        Question & How much total capital to deploy?
+                 & How to split capital across $N$ stocks? \\
+        Input    & Edge and variance of \emph{one} bet
+                 & Cross-sectional factor signal \\
+        Output   & Portfolio-level leverage $f^*$
+                 & Relative stock weights $w_i$ \\
+        Regime   & Independent repeated bets
+                 & Correlated concurrent positions \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+
+        \medskip
+        In a multi-asset portfolio, the correct Kelly generalization
+        is the \textbf{multivariate Kelly}:
+        \[
+            \mathbf{f}^* = \Sigma^{-1}\,\boldsymbol{\mu}
+        \]
+        where $\Sigma$ is the covariance matrix and $\boldsymbol{\mu}$
+        is the expected return vector.  This accounts for
+        cross-correlations and produces a single leverage-scaled
+        portfolio.  Our per-stock $\mu_i / \sigma_i^2$ ignores
+        correlations entirely.
+
+    \item[Resolution]
+        \begin{enumerate}[nosep]
+            \item \textbf{Renamed} \texttt{size\_half\_kelly} $\to$
+                  \texttt{size\_signal\_weighted} with docstring
+                  explicitly stating ``Not true Kelly.''
+            \item \textbf{Formula kept} as
+                  $w_i \propto \mathrm{direction}_i \times |z_i| / \sigma_i^2$
+                  --- it is a valid conviction~$\times$~inverse-variance
+                  sizing method, just not Kelly.
+            \item \textbf{True Kelly deferred} to a future portfolio-level
+                  leverage module that would answer: ``given my
+                  composite alpha signal, should I deploy 0.5$\times$
+                  or 1.5$\times$ capital today?''
+        \end{enumerate}
+
+    \item[Why It Matters]
+        \begin{enumerate}[nosep]
+            \item \textbf{Naming matters.}  Calling something ``Kelly''
+                  imports assumptions (independent bets, known $\mu$)
+                  that do not hold.  Honest names prevent honest mistakes.
+            \item \textbf{Position sizing is not ``just implementation.''}
+                  With the \emph{same} signal, Sharpe ranged from
+                  $-0.39$ to $+0.81$ --- a 1.2 swing.  Sizing is
+                  a core part of the strategy, not a post-hoc detail.
+            \item \textbf{Kelly requires reliable $\mu$ estimates.}
+                  With $|\mathrm{IC}| \approx 0.02$, the expected
+                  return signal is noise.  Kelly amplifies noise.
+                  It becomes useful only when $\mathrm{IC} > 0.05$
+                  and preferably with multivariate correlations.
+        \end{enumerate}
+
+        \medskip
+        \textbf{Interview one-liner:}
+        \emph{``Kelly tells you how much to bet, not how to split
+        the bet.  Using scalar Kelly for cross-sectional allocation
+        ignores correlations and concentrates into low-vol names ---
+        exactly the wrong thing for a volatility-driven alpha.''}
+\end{description}
+
+\bigskip\noindent\rule{\textwidth}{0.4pt}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Glossary}
+\label{app:glossary}
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Term} & \textbf{Definition} \\
+\midrule
+ADF       & Augmented Dickey--Fuller test for stationarity \\
+BBI       & Bull and Bear Index (average of multiple SMAs) \\
+CAGR      & Compound Annual Growth Rate \\
+CVaR      & Conditional Value at Risk (Expected Shortfall) \\
+FIGI      & Financial Instrument Global Identifier \\
+GARCH     & Generalized Autoregressive Conditional Heteroskedasticity \\
+GICS      & Global Industry Classification Standard \\
+IC        & Information Coefficient \\
+IR        & Information Ratio \\
+MDD       & Maximum Drawdown \\
+OBV       & On-Balance Volume \\
+OHLCV     & Open, High, Low, Close, Volume \\
+OLS       & Ordinary Least Squares \\
+RV        & Realized Volatility \\
+VaR       & Value at Risk \\
+VWAP      & Volume-Weighted Average Price \\
+WFO       & Walk-Forward Optimization \\
+\bottomrule
+\end{tabular}
+\caption{Common abbreviations used in this document}
+\end{table}
+
+
+% ──────────────────────────────────────────────────────────────────────────────
+\chapter{Learning Priority and Reading List}
+\label{app:priority}
+
+\section{Recommended Order}
+
+\begin{enumerate}
+    \item \textbf{Data Pipeline} (Part~I): Get clean data flowing first.
+          Nothing else works without it.
+    \item \textbf{Backtest \& Bias} (Part~II): Build a strategy, measure it,
+          understand why the measurement might be wrong.
+    \item \textbf{Factor IC/IR Analysis} (Part~III, Ch.~\ref{ch:factor-eval}):
+          The core language of quant interviews.
+    \item \textbf{Factor Construction} (Part~III, Ch.~\ref{ch:factor-construction}):
+          Normalization, neutralization --- the preprocessing that makes or
+          breaks a factor.
+    \item \textbf{Execution \& Costs} (Part~IV, Ch.~\ref{ch:execution}):
+          Makes your backtest realistic.
+    \item \textbf{Machine Learning} (Part~V): Only after the linear factor
+          framework is solid.
+    \item \textbf{Stochastic Calculus} (App.~\ref{sec:math-stoch}): For
+          derivatives and advanced risk; not urgent for equity alpha.
+\end{enumerate}
+
+\section{Suggested Reading}
+
+\begin{itemize}
+    \item Qian, Hua \& Sorensen, \textit{Quantitative Equity Portfolio
+          Management} --- the standard reference for factor investing.
+    \item Grinold \& Kahn, \textit{Active Portfolio Management} --- the
+          ``Fundamental Law of Active Management'' and IC/IR framework.
+    \item L\'{o}pez de Prado, \textit{Advances in Financial Machine Learning}
+          --- purged cross-validation, meta-labeling, feature importance.
+    \item Chan, \textit{Quantitative Trading} --- practical guide for
+          independent quant traders.
+    \item Shreve, \textit{Stochastic Calculus for Finance I \& II} --- the
+          mathematical foundations if you want derivatives pricing.
+\end{itemize}
+
+
+\end{document}
