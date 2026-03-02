@@ -76,15 +76,18 @@ class StrategyBase(ABC):
         pass
 
     @abstractmethod
-    def trade_rules(self, signals: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
+    def trade_rules(
+        self, signals: pl.DataFrame
+    ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
         """
         Args:
             signals: Signal DataFrame
 
         Returns:
-            tuple: (trades_df, portfolio_daily_df)
+            tuple: (trades_df, portfolio_daily_df, open_positions_df)
                 - trades_df: Individual trade records
                 - portfolio_daily_df: Daily portfolio performance
+                - open_positions_df: Currently open positions
         """
         pass
 

@@ -423,6 +423,11 @@ def resample_weights(
 
     mapping_df = pl.DataFrame(date_mapping)
 
+    # Cast mapping columns to match the original date dtype (e.g. datetime[ns] vs [μs])
+    orig_dtype = weights.schema[date_col]
+    if mapping_df.schema[date_col] != orig_dtype:
+        mapping_df = mapping_df.cast({date_col: orig_dtype, "_rebal_date": orig_dtype})
+
     # Join: for each (date, _rebal_date), get the weights from the rebalance date
     result = (
         mapping_df.join(

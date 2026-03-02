@@ -1184,11 +1184,11 @@ if __name__ == "__main__":
 
     print(result.collect())
 
-    from visualizer.plotter import plot_candlestick
+    # from visualizer.plotter import plot_candlestick
 
-    if plot:
-        plot_candlestick(
-            result.filter(pl.col("ticker") == ticker_plot).collect().to_pandas(),
-            ticker_plot,
-            timeframe,
-        )
+    # if plot:
+    #     plot_candlestick(
+    #         result.filter(pl.col("ticker") == ticker_plot).collect().to_pandas(),
+    #         ticker_plot,
+    #         timeframe,
+    #     )

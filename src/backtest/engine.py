@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -199,23 +198,34 @@ class BacktestEngine:
         portfolio_daily = results["portfolio_daily"]
         if not portfolio_daily.is_empty():
             benchmark = results.get("benchmark_data")
-            benchmark = benchmark.with_columns(
-                (pl.col("close") / pl.col("close").shift(1) - 1).alias("daily_return")
-            )
-            benchmark = benchmark.with_columns(
-                pl.col("date").cast(pl.Date).alias("date")
-            )
-            benchmark = pd.Series(benchmark["daily_return"], index=benchmark["date"])
+
             portfolio_daily = portfolio_daily.with_columns(
                 pl.col("date").cast(pl.Date).alias("date")
             )
-
             qs_returns = pd.Series(
                 portfolio_daily["portfolio_return"], index=portfolio_daily["date"]
             )
+
+            benchmark_series = None
+            if benchmark is not None and not benchmark.is_empty():
+                benchmark = benchmark.with_columns(
+                    (pl.col("close") / pl.col("close").shift(1) - 1).alias(
+                        "daily_return"
+                    )
+                )
+                benchmark = benchmark.with_columns(
+                    pl.col("date").cast(pl.Date).alias("date")
+                )
+                benchmark_series = pd.Series(
+                    benchmark["daily_return"], index=benchmark["date"]
+                )
+
             html_path = f"{output_dir}/{strategy_name}_report.html"
             qs.reports.html(
-                qs_returns, benchmark=benchmark, output=html_path, benchmark_title="SPY"
+                qs_returns,
+                benchmark=benchmark_series,
+                output=html_path,
+                benchmark_title="SPY",
             )
 
         # export trades and open positions

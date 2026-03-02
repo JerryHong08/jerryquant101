@@ -6,6 +6,21 @@
 > quant trader & researcher learning project. Incremental restructuring — add new
 > modules without breaking existing ones.
 
+### Feat (Phase 6 — Backtest Refactor)
+
+- **backtest**: `src/backtest/portfolio_tracker.py` — `PortfolioTracker` class: pure-computation portfolio simulator from weight + return DataFrames. Outputs `TrackingResult` (frozen dataclass) with `portfolio_daily`, `turnover`, `position_count`, compatible with `PerformanceAnalyzer`. Supports optional transaction cost via `cost_bps` parameter.
+- **backtest**: `src/backtest/weight_backtester.py` — `WeightBacktester` class: **alpha→backtest bridge** that accepts portfolio weight DataFrames (output of `portfolio.pipeline.run_alpha_pipeline()`) and produces full backtest analytics. Methods: `run()`, `run_from_pipeline()`, `compare()`, `export()`, `print_summary()`. Returns `BacktestResult` container with convenience properties (`sharpe`, `total_return`, `max_drawdown`). Auto-preprocesses benchmark (close→benchmark_return).
+- **backtest**: `src/backtest/result_exporter.py` — `export_legacy_results()` function extracted from `BacktestEngine.export_results()`. Standalone — no engine instance required. Handles quantstats HTML, trades CSV, open positions CSV, portfolio daily CSV, metrics TXT, config TXT. Null benchmark no longer crashes.
+- **backtest**: Updated `__init__.py` — exports `PortfolioTracker`, `TrackingResult`, `WeightBacktester`, `BacktestResult`, `export_legacy_results`. Version bumped to 2.0.0.
+- **tests**: `tests/test_backtest_refactor.py` — 32 tests: `TestPortfolioTracker` (9), `TestWeightBacktester` (7), `TestResultExporter` (4), `TestBugFixes` (3), `TestBacktestExports` (9). **164 tests total, all passing.**
+
+### Fix (Phase 6)
+
+- **backtest**: `engine.py` `export_results()` — null benchmark crash fixed (guard added before `benchmark.with_columns(...)`)
+- **backtest**: `strategy_base.py` — `trade_rules` type hint fixed from 2-tuple to 3-tuple `tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]` to match actual usage in `run_backtest()`
+- **backtest**: `engine.py` — dead `datetime` import removed
+- **backtest**: `performance_analyzer.py` — dead `timedelta` import removed
+
 ### Feat (Phase 5 — Portfolio Pipeline)
 
 - **portfolio**: `src/portfolio/pipeline.py` — 7-stage signal→weights→returns pipeline: `compute_daily_returns()`, `compute_next_day_returns()`, `build_factor_pipeline()` (with extensible factor registry: bbiboll, vol_ratio, momentum), `build_sizing_methods()` (all 4 sizing methods), `resample_weights()`, `compute_portfolio_return()`, `run_alpha_pipeline()` (all-in-one). Replaces ~80 lines of boilerplate duplicated across 4 notebooks.
