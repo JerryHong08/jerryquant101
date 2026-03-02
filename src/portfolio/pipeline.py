@@ -31,13 +31,10 @@ Reference: docs/quant_lab.tex — Part III–IV
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Literal, Optional
-
 import numpy as np
 import polars as pl
 
 from alpha.combination import combine_factors
-from alpha.preprocessing import preprocess_factor
 from constants import (
     DATE_COL,
     OHLCV_DATE_COL,
@@ -47,6 +44,8 @@ from constants import (
     VALUE_COL,
     WEIGHT_COL,
 )
+from portfolio.alpha_config import AlphaConfig, FactorConfig
+from portfolio.factors import get_factor_fn, list_factors, register_factor
 
 # ── Stage 1: Daily Returns ────────────────────────────────────────────────────
 
@@ -117,155 +116,16 @@ def compute_next_day_returns(
 
 
 # ── Stage 3: Factor Pipeline ─────────────────────────────────────────────────
-
-
-def _compute_bbiboll_factor(
-    ohlcv: pl.DataFrame,
-    ohlcv_date_col: str = OHLCV_DATE_COL,
-) -> pl.DataFrame:
-    """Extract BBIBOLL deviation factor from OHLCV data.
-
-    Computes (close - BBI) / deviation as the raw signal, then
-    winsorizes and z-scores cross-sectionally.
-
-    Returns:
-        Preprocessed factor DataFrame (date, ticker, value).
-    """
-    from strategy.indicators.registry import get_indicator
-
-    bbiboll_fn = get_indicator("bbiboll")
-    ohlcv_bb = bbiboll_fn(ohlcv)
-
-    raw = (
-        ohlcv_bb.with_columns(
-            ((pl.col("close") - pl.col("bbi")) / pl.col("dev")).alias(VALUE_COL)
-        )
-        .filter(
-            pl.col(VALUE_COL).is_not_null()
-            & pl.col(VALUE_COL).is_not_nan()
-            & pl.col(VALUE_COL).is_finite()
-        )
-        .select(
-            [
-                pl.col(ohlcv_date_col).alias(DATE_COL),
-                pl.col(TICKER_COL),
-                pl.col(VALUE_COL),
-            ]
-        )
-    )
-    return preprocess_factor(raw, winsorize_pct=0.01, method="zscore", neutralize=[])
-
-
-def _compute_vol_ratio_factor(
-    ohlcv: pl.DataFrame,
-    short_window: int = 5,
-    long_window: int = 20,
-    ohlcv_date_col: str = OHLCV_DATE_COL,
-) -> pl.DataFrame:
-    """Compute volatility ratio factor: vol_5d / vol_20d.
-
-    High ratio = recent vol spike relative to trend → contrarian signal.
-
-    Returns:
-        Preprocessed factor DataFrame (date, ticker, value).
-    """
-    raw = (
-        ohlcv.sort([TICKER_COL, ohlcv_date_col])
-        .with_columns(
-            (pl.col("close") / pl.col("close").shift(1).over(TICKER_COL))
-            .log()
-            .alias("log_ret")
-        )
-        .with_columns(
-            [
-                pl.col("log_ret")
-                .rolling_std(window_size=short_window)
-                .over(TICKER_COL)
-                .alias("vol_short"),
-                pl.col("log_ret")
-                .rolling_std(window_size=long_window)
-                .over(TICKER_COL)
-                .alias("vol_long"),
-            ]
-        )
-        .with_columns((pl.col("vol_short") / pl.col("vol_long")).alias(VALUE_COL))
-        .filter(
-            pl.col(VALUE_COL).is_not_null()
-            & pl.col(VALUE_COL).is_not_nan()
-            & pl.col(VALUE_COL).is_finite()
-        )
-        .select(
-            [
-                pl.col(ohlcv_date_col).alias(DATE_COL),
-                pl.col(TICKER_COL),
-                pl.col(VALUE_COL),
-            ]
-        )
-    )
-    return preprocess_factor(raw, winsorize_pct=0.01, method="zscore", neutralize=[])
-
-
-def _compute_momentum_factor(
-    ohlcv: pl.DataFrame,
-    lookback: int = 20,
-    ohlcv_date_col: str = OHLCV_DATE_COL,
-) -> pl.DataFrame:
-    """Compute momentum factor: lookback-day log return.
-
-    Returns:
-        Preprocessed factor DataFrame (date, ticker, value).
-    """
-    raw = (
-        ohlcv.sort([TICKER_COL, ohlcv_date_col])
-        .with_columns(
-            (pl.col("close") / pl.col("close").shift(lookback).over(TICKER_COL))
-            .log()
-            .alias(VALUE_COL)
-        )
-        .filter(
-            pl.col(VALUE_COL).is_not_null()
-            & pl.col(VALUE_COL).is_not_nan()
-            & pl.col(VALUE_COL).is_finite()
-        )
-        .select(
-            [
-                pl.col(ohlcv_date_col).alias(DATE_COL),
-                pl.col(TICKER_COL),
-                pl.col(VALUE_COL),
-            ]
-        )
-    )
-    return preprocess_factor(raw, winsorize_pct=0.01, method="zscore", neutralize=[])
-
-
-# Factor registry: name → compute function
-_FACTOR_REGISTRY: dict[str, Callable[..., pl.DataFrame]] = {
-    "bbiboll": _compute_bbiboll_factor,
-    "vol_ratio": _compute_vol_ratio_factor,
-    "momentum": _compute_momentum_factor,
-}
-
-
-def register_factor(name: str, fn: Callable[..., pl.DataFrame]) -> None:
-    """Register a custom factor computation function.
-
-    Args:
-        name: Factor name (lowercase).
-        fn: Callable that takes ``(ohlcv, **kwargs)`` and returns a
-            preprocessed factor DataFrame ``(date, ticker, value)``.
-    """
-    _FACTOR_REGISTRY[name.lower()] = fn
-
-
-def list_factors() -> list[str]:
-    """Return names of all registered factors."""
-    return sorted(_FACTOR_REGISTRY.keys())
+# Factor functions live in ``portfolio.factors``.
+# ``register_factor`` and ``list_factors`` are re-exported for convenience.
 
 
 def build_factor_pipeline(
     ohlcv: pl.DataFrame,
     factor_names: list[str] | None = None,
     combination_method: str = "equal_weight",
+    config: AlphaConfig | None = None,
+    next_day_returns: pl.DataFrame | None = None,
     **kwargs,
 ) -> pl.DataFrame:
     """Build a composite factor signal from OHLCV data.
@@ -276,29 +136,85 @@ def build_factor_pipeline(
             Default: ``["bbiboll", "vol_ratio"]``.
         combination_method: Method for ``combine_factors()`` —
             "equal_weight", "ic_weight", "mean_variance", "risk_parity".
+        config: ``AlphaConfig`` — if provided, ``factor_names`` and
+            ``combination_method`` are taken from it, and per-factor
+            preprocessing params are passed through.
+        next_day_returns: Next-day returns DataFrame (date, ticker,
+            next_day_return).  Required for IC-based combination methods.
 
     Returns:
         Composite factor DataFrame with columns (date, ticker, value).
     """
+    if config is not None:
+        factor_names = config.factor_names
+        combination_method = config.combination_method
+
     if factor_names is None:
         factor_names = ["bbiboll", "vol_ratio"]
 
     factors = []
     for name in factor_names:
-        key = name.lower()
-        if key not in _FACTOR_REGISTRY:
-            available = ", ".join(sorted(_FACTOR_REGISTRY.keys()))
-            raise KeyError(
-                f"Unknown factor '{name}'. Available: {available}. "
-                f"Use register_factor() to add custom factors."
-            )
-        factor_fn = _FACTOR_REGISTRY[key]
-        factors.append(factor_fn(ohlcv, **kwargs))
+        factor_fn = get_factor_fn(name)
+        fc = config.get_factor_config(name.lower()) if config else None
+        factors.append(factor_fn(ohlcv, factor_config=fc, **kwargs))
 
     if len(factors) == 1:
         return factors[0]
 
-    return combine_factors(factors=factors, method=combination_method)
+    # ── IC-based combination: compute IC series per factor ──
+    ic_series_list = None
+    if combination_method != "equal_weight":
+        ic_series_list = _compute_ic_series_list(factors, next_day_returns, config)
+
+    risk_aversion = config.risk_aversion if config else 1.0
+
+    return combine_factors(
+        factors=factors,
+        method=combination_method,
+        ic_series_list=ic_series_list,
+        risk_aversion=risk_aversion,
+    )
+
+
+def _compute_ic_series_list(
+    factors: list[pl.DataFrame],
+    next_day_returns: pl.DataFrame | None,
+    config: AlphaConfig | None,
+) -> list[pl.DataFrame]:
+    """Compute IC time series for each factor (needed for non-equal-weight combination).
+
+    IC_t = rank_corr(factor_t, next_day_return_t) across tickers.
+    """
+    if next_day_returns is None:
+        raise ValueError(
+            "IC-based combination methods (ic_weight, mean_variance, risk_parity) "
+            "require next_day_returns. Pass it via run_alpha_pipeline() or "
+            "build_factor_pipeline(next_day_returns=...)."
+        )
+
+    ic_series_list = []
+    for factor_df in factors:
+        # Join factor values with next-day returns on (date, ticker)
+        merged = factor_df.join(
+            next_day_returns,
+            on=[DATE_COL, TICKER_COL],
+            how="inner",
+        )
+
+        # Compute rank correlation per date
+        ic_per_date = (
+            merged.group_by(DATE_COL)
+            .agg(
+                pl.corr(
+                    pl.col(VALUE_COL).rank(), pl.col("next_day_return").rank()
+                ).alias("ic")
+            )
+            .sort(DATE_COL)
+            .filter(pl.col("ic").is_not_null() & pl.col("ic").is_finite())
+        )
+        ic_series_list.append(ic_per_date)
+
+    return ic_series_list
 
 
 # ── Stage 4: Portfolio Weights ────────────────────────────────────────────────
@@ -314,6 +230,7 @@ def build_sizing_methods(
     kelly_lookback: int = 60,
     kelly_max_position: float = 0.10,
     vol_window: int = 20,
+    config: AlphaConfig | None = None,
 ) -> dict[str, pl.DataFrame]:
     """Build all 4 sizing method weight DataFrames.
 
@@ -338,6 +255,15 @@ def build_sizing_methods(
         size_inverse_volatility,
         size_volatility_target,
     )
+
+    # Pull params from config if provided, else use function defaults
+    if config is not None:
+        n_long = config.n_long
+        n_short = config.n_short
+        target_vol = config.target_vol
+        kelly_lookback = config.kelly_lookback
+        kelly_max_position = config.kelly_max_position
+        vol_window = config.vol_window
 
     vol_estimates = compute_realized_volatility(ohlcv, window=vol_window)
     returns_for_kelly = daily_returns.rename({RETURN_COL: "return"})
@@ -477,6 +403,9 @@ def compute_portfolio_return(
 
 def run_alpha_pipeline(
     ohlcv: pl.DataFrame,
+    config: AlphaConfig | None = None,
+    *,
+    # ── Legacy kwargs (used if config is None) ──
     factor_names: list[str] | None = None,
     sizing_method: str = "Half-Kelly",
     combination_method: str = "equal_weight",
@@ -492,8 +421,12 @@ def run_alpha_pipeline(
     duplicated across cost_analysis.ipynb, validation.ipynb, and
     risk_analysis.ipynb.
 
+    Accepts either an ``AlphaConfig`` object (preferred) or individual
+    keyword arguments (backward-compatible).
+
     Args:
         ohlcv: Raw OHLCV DataFrame (must have timestamps, ticker, close).
+        config: ``AlphaConfig`` — if provided, all other kwargs are ignored.
         factor_names: Factors to compute. Default: ["bbiboll", "vol_ratio"].
         sizing_method: Which sizing to use. One of:
             "Equal-Weight", "Inverse-Vol", "Vol-Target (10%)", "Half-Kelly".
@@ -517,7 +450,21 @@ def run_alpha_pipeline(
             - annual_return: Annualized mean return
             - annual_vol: Annualized volatility
             - n_days: Number of trading days
+            - config: The AlphaConfig used (for reproducibility)
     """
+    # ── Build config from kwargs if not provided ──
+    if config is None:
+        config = AlphaConfig(
+            factor_names=factor_names or ["bbiboll", "vol_ratio"],
+            combination_method=combination_method,
+            sizing_method=sizing_method,
+            rebal_every_n=rebal_every_n,
+            n_long=n_long,
+            n_short=n_short,
+            target_vol=target_vol,
+            annualization=annualization,
+        )
+
     # --- Stage 1-2: Returns ---
     daily_returns = compute_daily_returns(ohlcv)
     next_day_returns = compute_next_day_returns(daily_returns)
@@ -525,8 +472,8 @@ def run_alpha_pipeline(
     # --- Stage 3: Factor ---
     composite = build_factor_pipeline(
         ohlcv,
-        factor_names=factor_names,
-        combination_method=combination_method,
+        config=config,
+        next_day_returns=next_day_returns,
     )
 
     # --- Stage 4: Sizing ---
@@ -534,21 +481,19 @@ def run_alpha_pipeline(
         composite,
         ohlcv,
         daily_returns,
-        n_long=n_long,
-        n_short=n_short,
-        target_vol=target_vol,
+        config=config,
     )
 
-    if sizing_method not in sizing_methods:
+    if config.sizing_method not in sizing_methods:
         available = ", ".join(sorted(sizing_methods.keys()))
         raise KeyError(
-            f"Unknown sizing method '{sizing_method}'. Available: {available}"
+            f"Unknown sizing method '{config.sizing_method}'. Available: {available}"
         )
 
-    weights = sizing_methods[sizing_method]
+    weights = sizing_methods[config.sizing_method]
 
     # --- Stage 5: Rebalance ---
-    weights = resample_weights(weights, rebal_every_n=rebal_every_n)
+    weights = resample_weights(weights, rebal_every_n=config.rebal_every_n)
 
     # --- Stage 6: Portfolio returns ---
     port_returns = compute_portfolio_return(weights, next_day_returns)
@@ -557,7 +502,7 @@ def run_alpha_pipeline(
     # --- Metrics ---
     mu = float(np.mean(returns_array))
     sigma = float(np.std(returns_array, ddof=1))
-    sharpe = mu / sigma * np.sqrt(annualization) if sigma > 1e-10 else 0.0
+    sharpe = mu / sigma * np.sqrt(config.annualization) if sigma > 1e-10 else 0.0
 
     return {
         "composite": composite,
@@ -568,7 +513,8 @@ def run_alpha_pipeline(
         "portfolio_returns": port_returns,
         "returns_array": returns_array,
         "sharpe": float(sharpe),
-        "annual_return": float(mu * annualization),
-        "annual_vol": float(sigma * np.sqrt(annualization)),
+        "annual_return": float(mu * config.annualization),
+        "annual_vol": float(sigma * np.sqrt(config.annualization)),
         "n_days": len(returns_array),
+        "config": config,
     }

@@ -18,14 +18,14 @@ Usage:
     )
 """
 
+from portfolio.alpha_config import AlphaConfig, FactorConfig
+from portfolio.factors import get_factor_fn, list_factors, register_factor
 from portfolio.pipeline import (
     build_factor_pipeline,
     build_sizing_methods,
     compute_daily_returns,
     compute_next_day_returns,
     compute_portfolio_return,
-    list_factors,
-    register_factor,
     resample_weights,
     run_alpha_pipeline,
 )
@@ -35,12 +35,15 @@ from portfolio.walk_forward_runner import (
 )
 
 __all__ = [
+    "AlphaConfig",
+    "FactorConfig",
     "build_factor_pipeline",
     "build_sizing_methods",
     "compute_daily_returns",
     "compute_next_day_returns",
     "compute_portfolio_return",
     "fold_results_to_dataframe",
+    "get_factor_fn",
     "list_factors",
     "register_factor",
     "resample_weights",

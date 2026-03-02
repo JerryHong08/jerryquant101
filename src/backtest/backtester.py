@@ -119,13 +119,37 @@ def run_pipeline_backtest(config: Dict[str, Any]) -> None:
         tickers: list[str] — stock universe (or omit to use all common stocks)
         start_date: str — OHLCV start date
         end_date: str — OHLCV end date
+        alpha_config: AlphaConfig — full pipeline config (preferred)
         factor_names: list[str] — alpha factors (default: ["bbiboll", "vol_ratio"])
         sizing_method: str — sizing method (default: "Half-Kelly")
         rebal_every_n: int — rebalance frequency (default: 5)
+        combination_method: str — factor combination (default: "equal_weight")
+        n_long: int — number of long positions (default: 10)
+        n_short: int — number of short positions (default: 10)
+        target_vol: float — target annual vol (default: 0.10)
         cost_bps: float — transaction cost in bps (default: 5.0)
         output_dir: str — results directory (default: "backtest_output/pipeline")
+
+    If ``alpha_config`` is provided, it takes precedence over individual keys.
     """
+    from portfolio.alpha_config import AlphaConfig
     from portfolio.pipeline import run_alpha_pipeline
+
+    # ── Build or use AlphaConfig ──
+    alpha_config = config.get("alpha_config")
+    if alpha_config is None:
+        alpha_config = AlphaConfig(
+            factor_names=config.get("factor_names", ["bbiboll", "vol_ratio"]),
+            sizing_method=config.get("sizing_method", "Half-Kelly"),
+            rebal_every_n=config.get("rebal_every_n", 5),
+            combination_method=config.get("combination_method", "equal_weight"),
+            n_long=config.get("n_long", 10),
+            n_short=config.get("n_short", 10),
+            target_vol=config.get("target_vol", 0.10),
+            cost_bps=config.get("cost_bps", 5.0),
+            annualization=config.get("annualization", 252),
+            name=config.get("name", "AlphaPipeline"),
+        )
 
     # ── Load data ──
     tickers = config.get("tickers")
@@ -150,23 +174,18 @@ def run_pipeline_backtest(config: Dict[str, Any]) -> None:
 
     # ── Run alpha pipeline ──
     print("Running alpha pipeline...")
-    pipeline_result = run_alpha_pipeline(
-        ohlcv,
-        factor_names=config.get("factor_names", ["bbiboll", "vol_ratio"]),
-        sizing_method=config.get("sizing_method", "Half-Kelly"),
-        rebal_every_n=config.get("rebal_every_n", 5),
-    )
+    pipeline_result = run_alpha_pipeline(ohlcv, config=alpha_config)
     print(f"Pipeline Sharpe (simple): {pipeline_result['sharpe']:.3f}")
 
     # ── Load benchmark ──
     benchmark = load_spx_benchmark(config["start_date"], config.get("end_date"))
 
     # ── Run weight backtester ──
-    bt = WeightBacktester(cost_bps=config.get("cost_bps", 5.0))
+    bt = WeightBacktester(cost_bps=alpha_config.cost_bps)
     result = bt.run_from_pipeline(
         pipeline_result,
         benchmark_data=benchmark,
-        name=config.get("name", "AlphaPipeline"),
+        name=alpha_config.name,
     )
 
     # ── Print & export ──

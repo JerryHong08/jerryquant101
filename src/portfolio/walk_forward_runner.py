@@ -29,6 +29,7 @@ import numpy as np
 import polars as pl
 
 from constants import DATE_COL, OHLCV_DATE_COL, TICKER_COL, TRADING_DAYS_PER_YEAR
+from portfolio.alpha_config import AlphaConfig
 from portfolio.pipeline import run_alpha_pipeline
 from validation.walk_forward import (
     WalkForwardFold,
@@ -52,6 +53,9 @@ def _slice_ohlcv(
 
 def run_walk_forward(
     ohlcv: pl.DataFrame,
+    config: AlphaConfig | None = None,
+    *,
+    # ── Legacy kwargs (used if config is None) ──
     train_days: int = 126,
     test_days: int = 63,
     embargo_days: int = 5,
@@ -68,6 +72,9 @@ def run_walk_forward(
     verbose: bool = True,
 ) -> dict[str, Any]:
     """Run the alpha pipeline across walk-forward validation folds.
+
+    Accepts either an ``AlphaConfig`` object (preferred) or individual
+    keyword arguments (backward-compatible).
 
     For each fold:
         1. Slice OHLCV into training period → run pipeline → in-sample metrics.
@@ -102,6 +109,19 @@ def run_walk_forward(
             - sharpe_decay: Mean IS Sharpe minus mean OOS Sharpe (overfitting signal)
             - summary: walk_forward summary dict
     """
+    # ── Build config from kwargs if not provided ──
+    if config is None:
+        config = AlphaConfig(
+            factor_names=factor_names or ["bbiboll", "vol_ratio"],
+            combination_method=combination_method,
+            sizing_method=sizing_method,
+            rebal_every_n=rebal_every_n,
+            n_long=n_long,
+            n_short=n_short,
+            target_vol=target_vol,
+            annualization=annualization,
+        )
+
     # ── Get unique dates and generate folds ──
     unique_dates = ohlcv.select(date_col).unique().sort(date_col).to_series().to_numpy()
     n_dates = len(unique_dates)
@@ -123,19 +143,7 @@ def run_walk_forward(
             f"mode={summary['mode']}, embargo={embargo_days}d"
         )
 
-    # ── Pipeline kwargs shared across folds ──
-    pipeline_kwargs = dict(
-        factor_names=factor_names,
-        sizing_method=sizing_method,
-        combination_method=combination_method,
-        rebal_every_n=rebal_every_n,
-        n_long=n_long,
-        n_short=n_short,
-        target_vol=target_vol,
-        annualization=annualization,
-    )
-
-    # ── Execute pipeline per fold ──
+    # ── Execute pipeline per fold (using config) ──
     fold_results: list[dict] = []
     is_sharpes: list[float] = []
     oos_sharpes: list[float] = []
@@ -159,14 +167,14 @@ def run_walk_forward(
 
         # Run pipeline on IS / OOS separately
         try:
-            is_result = run_alpha_pipeline(ohlcv_is, **pipeline_kwargs)
+            is_result = run_alpha_pipeline(ohlcv_is, config=config)
         except Exception as e:
             if verbose:
                 print(f"  Fold {fid} IS failed: {e}")
             is_result = None
 
         try:
-            oos_result = run_alpha_pipeline(ohlcv_oos, **pipeline_kwargs)
+            oos_result = run_alpha_pipeline(ohlcv_oos, config=config)
         except Exception as e:
             if verbose:
                 print(f"  Fold {fid} OOS failed: {e}")
