@@ -10,7 +10,7 @@
 
 - **execution**: `cost_model.py` — ABC `CostModel` with `estimate()` + `estimate_array()`, 4 implementations: `FixedCostModel` (flat bps), `SpreadCostModel` (half bid-ask spread), `SqrtImpactCostModel` (Almgren-style η·σ·√(participation)), `CompositeCostModel` (sum of models)
 - **execution**: `cost_analysis.py` — `compute_turnover()` (weight-diff-based, full outer join), `compute_net_returns()`, `sharpe_vs_cost_curve()` (sweep), `breakeven_cost()` (binary search for Sharpe=0)
-- **notebook**: `cost_analysis.ipynb` — end-to-end cost analysis (11 code cells): turnover for 4 sizing methods, gross vs net Sharpe, Sharpe-vs-cost curves, breakeven cost, Fixed vs Spread+Impact cost model comparison. Key finding: all methods net-negative at 5 bps; Half-Kelly most efficient (breakeven 1.8 bps)
+- **notebook**: `cost_analysis.ipynb` — end-to-end cost analysis + rebalancing frequency experiment. Key findings: (1) all methods net-negative at 5 bps with daily rebalancing; Half-Kelly most efficient (breakeven 1.8 bps). (2) Weekly rebalancing transforms Half-Kelly from SR=−0.41 to SR=**1.04** net at 5 bps (breakeven 27.4 bps). Includes `resample_weights()` utility, 4×4 frequency×method sweep, efficiency frontier scatter
 - **risk**: `risk_metrics.py` — VaR (historical + parametric), CVaR (historical + parametric), drawdown series, max drawdown, skewness, excess kurtosis, tail ratio, `risk_summary()` all-in-one
 - **risk**: `return_analysis.py` — normality tests (Jarque-Bera + Shapiro-Wilk), QQ-plot data, Gaussian comparison histogram, multi-level tail analysis, `distribution_summary()` all-in-one
 - **risk**: `position_sizing.py` — equal-weight, inverse-volatility, volatility-target, half-Kelly long-short sizing; `compute_realized_volatility()` utility
