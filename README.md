@@ -6,7 +6,7 @@ Built around US equities data from [Massive(Polygon.io)](https://massive.com/) f
 processed with [Polars](https://pola.rs/), backtested with a custom engine, and
 documented as a learning journal in LaTeX.
 
-> **Current version**: 0.4.0 — See [CHANGELOG.md](CHANGELOG.md) for details.
+> **Current version**: 0.4.5 — See [CHANGELOG.md](CHANGELOG.md) for details.
 > **Detailed documentation**: See [docs/quant_lab.tex](docs/quant_lab.tex) for the full learning guide.
 
 ---
@@ -15,11 +15,12 @@ documented as a learning journal in LaTeX.
 
 ```bash
 src/
-├── config.py                  # Central config — data paths, asset loaders, lazy getters
-├── alpha/                     # Factor research — signals, evaluation, preprocessing, combination
-├── risk/                      # Risk & portfolio — VaR/CVaR, distribution analysis, position sizing
-├── execution/                 # Transaction costs — fixed, spread, sqrt-impact, composite models
-├── validation/                # Walk-forward, bootstrap CI, PSR/DSR, multiple-testing corrections
+├── constants.py                   # Shared constants — TRADING_DAYS_PER_YEAR, column name conventions
+├── config.py                      # Central config — data paths, asset loaders, lazy getters
+├── alpha/                         # Factor research — signals, evaluation, preprocessing, combination
+├── risk/                          # Risk & portfolio — VaR/CVaR, distribution analysis, position sizing
+├── execution/                     # Transaction costs — fixed, spread, sqrt-impact, composite models
+├── validation/                    # Walk-forward, bootstrap CI, PSR/DSR, multiple-testing corrections
 ├── data/
 │   ├── fetcher/               # Data acquisition — Polygon.io S3, FMP, yfinance, rsync
 │   └── loader/                # Data loading — OHLCV, split adjustment, resampling, caching
@@ -30,11 +31,18 @@ src/
 ├── longport/                  # Longport broker integration
 ├── examples/                  # Usage examples
 └── utils/                     # Logger, shared utilities
+
+tests/
+├── conftest.py                # Shared fixtures — synthetic returns, factors, weights, turnover
+├── test_validation.py         # 34 tests — walk-forward, bootstrap, p-values, multiple testing
+├── test_execution.py          # 25 tests — cost models, turnover, net returns, breakeven
+├── test_risk.py               # 26 tests — VaR, CVaR, drawdown, distribution stats
+└── test_alpha.py              # 22 tests — winsorize, z-score, rank, neutralize, combination
 ```
 
 **Target modules** (not yet built):
+- `src/portfolio/` — Signal→weights pipeline, universe registry
 - `src/ml/` — Feature engineering, time-series validation, tree models
-- `src/backtest/` — Engine rewrite (Polars ETL + numba core loop)
 
 ---
 
@@ -128,31 +136,66 @@ polygon_data/
 - [x] **Multiple testing**: Bonferroni, Holm-Bonferroni, Benjamini-Hochberg corrections
 - [x] **Validation notebook**: `notebooks/validation.ipynb` — 16-config gauntlet: walk-forward IS/OOS, bootstrap, PSR/DSR, p-value corrections. Verdict: 0/16 survive correction (DSR=34.2% for best config)
 
-### Phase 5 — Backtest Engine Rewrite
+### Phase 4.5 — Test Suite + Cleanup (✅ Complete)
 
-> LaTeX reference: Part II, Chapters 7–8
+- [x] **Test suite**: `tests/` — 107 pytest tests across 4 modules (validation, execution, risk, alpha), shared fixtures in `conftest.py`
+- [x] **Constants**: `src/constants.py` — `TRADING_DAYS_PER_YEAR`, column name conventions
+- [x] **Bug fix**: Fee calculation in `performance_analyzer.py` (was mathematically wrong)
+- [x] **Dependency pruning**: `pyproject.toml` main deps 35 → 25, unused moved to `[ml]`/`[infra]` optional groups
+- [x] **Cleanup**: Dead imports removed, hardcoded `252` → constant, `testpaths` fixed
 
-- [ ] **Engine rewrite**: Polars ETL + numba core loop
+### Phase 5 — Portfolio Pipeline (`src/portfolio/`)
 
-### Phase 6 — ML Integration (`src/ml/`)
+- [ ] **Signal→weights bridge**: `run_alpha_pipeline()` — replace 80-line duplicated pipeline across notebooks
+- [ ] **Universe registry**: `src/data/universe.py` — `SP500_TOP50`, `LIQUID_US`, etc.
+- [ ] **Walk-forward harness**: `run_walk_forward(pipeline_fn, folds)` — execute per fold, collect IS/OOS metrics
+
+### Phase 6 — Backtest Refactor
+
+> Targeted surgery on legacy code, not a full rewrite.
+
+- [ ] **Extract God class**: Split `engine.py` into composable pieces (data loading, position tracking, reporting)
+- [ ] **Accept portfolio weights**: Make `BacktestEngine` work with weight DataFrames directly, not just `StrategyBase` subclasses
+- [ ] **Fix open position tracking bug**
+
+### Phase 7 — Multi-Factor Alpha
+
+- [ ] **More factors**: Momentum (12-1 month), quality/earnings, mean reversion, value
+- [ ] **Factor registry**: `src/alpha/registry.py` — register factors by name, `get_factor("bbiboll_dev")`
+- [ ] **Regime tagging**: `src/data/regime.py` — bull/bear/sideways from rolling SPX returns
+
+### Phase 8 — ML Integration (`src/ml/`)
 
 > LaTeX reference: Part V, Chapters 17–19
 
 - [ ] **Feature engineering**: Factor values as features, lagged returns, volatility features
 - [ ] **Time-series validation**: Purged k-fold, embargo gap
-- [ ] **Tree models**: LightGBM/XGBoost return prediction, feature importance analysis
+- [ ] **Tree models**: LightGBM/XGBoost factor combination, feature importance analysis
 
-### Phase 7 — Infrastructure
+### Phase 9 — Infrastructure
 
 - [ ] **Universe construction**: Liquid universe module, sector/industry mapping (GICS)
 - [ ] **CLI**: Unified `typer` entry point (backtest, alpha, data-update)
 - [ ] **Research notebooks**: Templated workflow — factor exploration → signal → backtest → report
 
-### Open Bugs
+### Known Issues
 
-- [ ] Backtest open position tracking
+**Legacy backtest (High)**
+- [ ] `engine.py` God class — mixes data loading, signal routing, position tracking, reporting
+- [ ] No alpha→backtest bridge — notebooks use inline workaround
+- [ ] Open position tracking bug
 - [ ] Stock dividends not handled
+
+**Data layer (Medium)**
+- [ ] `data_loader.py` 1,192-line monolith with mixed concerns
+- [ ] AWS creds loaded at module-level import (should be lazy)
+- [ ] SQL injection risk in DuckDB credential queries
+- [ ] Date column naming: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution)
+
+**Other (Low)**
+- [ ] `src/constants.py` only wired into `performance_analyzer.py` — other modules use `252` as parameter default
 - [ ] Low-volume tickers skipped (>50 days zero volume)
+- [ ] No universe module — stock universe hardcoded in every notebook
 
 ---
 

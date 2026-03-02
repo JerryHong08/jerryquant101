@@ -61,24 +61,49 @@
 
 ### Planned
 
-**Phase 5 — Backtest Engine Rewrite**
-- **backtest**: Engine rewrite — Polars ETL + numba core loop
+**Phase 5 — Portfolio Pipeline** (`src/portfolio/`)
+- **portfolio**: Signal→weights→backtest bridge — `run_alpha_pipeline(ohlcv, factors, sizing_method, rebal_freq, cost_model)`. Currently this 80-line pipeline is duplicated across `cost_analysis.ipynb` and `validation.ipynb`
+- **portfolio**: Universe registry — `src/data/universe.py` with `SP500_TOP50`, `LIQUID_US`, etc. Replace copy-pasted ticker lists in every notebook
+- **portfolio**: Walk-forward harness — `run_walk_forward(pipeline_fn, folds, dates)` that executes per fold and collects IS/OOS metrics (currently `walk_forward.py` only splits dates)
 
-**Phase 6 — ML Integration** (`src/ml/`)
+**Phase 6 — Backtest Refactor** (targeted surgery, not full rewrite)
+- **backtest**: Extract God class — `engine.py` is a monolithic class mixing data loading, signal routing, position tracking, and reporting. Split into composable pieces
+- **backtest**: Make `BacktestEngine` accept portfolio weights directly (not just `StrategyBase` subclasses) — bridge the alpha→backtest gap
+- **backtest**: Fix open position tracking bug
+
+**Phase 7 — Multi-Factor Alpha**
+- **alpha**: More factors — momentum (12-1 month), quality/earnings, mean reversion, value
+- **alpha**: Factor registry — `src/alpha/registry.py` — register factor functions by name (like indicator registry), so you can do `get_factor("bbiboll_dev")` instead of 30 lines of setup per notebook
+- **alpha**: Regime tagging — `src/data/regime.py` — tag each date as bull/bear/sideways using rolling SPX returns; walk-forward should report per-regime stats
+
+**Phase 8 — ML Integration** (`src/ml/`)
 - **ml**: Feature engineering — factor values as features, lagged returns, volatility features
 - **ml**: Time-series validation — purged k-fold, embargo gap
-- **ml**: Tree models — LightGBM/XGBoost return prediction, feature importance analysis
+- **ml**: Tree models — LightGBM/XGBoost factor combination, feature importance analysis
 
-**Phase 7 — Infrastructure**
+**Phase 9 — Infrastructure**
 - **data**: Universe construction — liquid universe module, sector/industry mapping (GICS)
 - **cli**: Unified `typer` entry point (backtest, alpha, data-update)
 - **research**: Templated research notebooks — factor exploration → signal → backtest → report
 
-### Known Issues (Carried Forward)
+### Known Issues
 
-- Backtest open position tracking needs fix
+**Legacy backtest (High severity)**
+- `engine.py` is a God class (~400 lines) mixing data loading, signal routing, position tracking, and reporting
+- No alpha→backtest bridge — alpha module produces signals, backtest module accepts `StrategyBase` subclasses; notebooks work around this with inline `compute_portfolio_return()`
+- Open position tracking needs fix
 - Stock dividends not handled
-- Low-volume tickers (max_duration_days > 50) are skipped — see v0.1.0 notes
+
+**Data layer (Medium severity)**
+- `data_loader.py` is a 1,192-line monolith with mixed concerns
+- AWS creds loaded at module-level import — should be lazy-loaded
+- SQL injection risk in DuckDB credential queries — use parameterized queries
+- Date column naming inconsistency: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution)
+
+**Other (Low severity)**
+- `src/constants.py` only wired into `performance_analyzer.py` — other modules (risk, execution, validation) still accept `252` as parameter defaults rather than importing the constant
+- Low-volume tickers (>50 days zero volume) are skipped — see v0.1.0 notes
+- No universe module — stock universe is hardcoded as a list literal in every notebook
 
 ---
 
