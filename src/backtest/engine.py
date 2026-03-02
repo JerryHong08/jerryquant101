@@ -1,24 +1,27 @@
 import os
 from typing import Any, Dict, List, Optional
 
-import pandas as pd
 import polars as pl
-import quantstats as qs
 
 from .performance_analyzer import PerformanceAnalyzer
+from .result_exporter import export_legacy_results
 from .strategy_base import StrategyBase
 from .visualizer import BacktestVisualizer
 
 
 class BacktestEngine:
+    """Orchestrator for StrategyBase backtests.
+
+    Thin wrapper: delegates metrics to PerformanceAnalyzer,
+    plotting to BacktestVisualizer, export to result_exporter.
+    """
 
     def __init__(self, initial_capital: float = 100.0):
         self.initial_capital = initial_capital
         self.performance_analyzer = PerformanceAnalyzer(initial_capital)
         self.visualizer = BacktestVisualizer()
-        self.results = {}
+        self.results: Dict[str, Dict[str, Any]] = {}
 
-        # ignore matplotlib font error warnings
         import logging
 
         logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
@@ -180,104 +183,25 @@ class BacktestEngine:
         return self.results
 
     def export_results(
-        self, strategy_config, strategy_name: str, output_dir: str = "backtest_results"
+        self,
+        strategy_config,
+        strategy_name: str,
+        output_dir: str = "backtest_results",
     ):
-        """
-        Args:
-            strategy_name:
-            output_dir:
-        """
+        """Export results to disk.  Delegates to ``result_exporter``."""
         if strategy_name not in self.results:
             print(f"not found {strategy_name} backtest result")
             return
 
-        results = self.results[strategy_name]
-        os.makedirs(output_dir, exist_ok=True)
-
-        # export quantstats report
-        portfolio_daily = results["portfolio_daily"]
-        if not portfolio_daily.is_empty():
-            benchmark = results.get("benchmark_data")
-
-            portfolio_daily = portfolio_daily.with_columns(
-                pl.col("date").cast(pl.Date).alias("date")
-            )
-            qs_returns = pd.Series(
-                portfolio_daily["portfolio_return"], index=portfolio_daily["date"]
-            )
-
-            benchmark_series = None
-            if benchmark is not None and not benchmark.is_empty():
-                benchmark = benchmark.with_columns(
-                    (pl.col("close") / pl.col("close").shift(1) - 1).alias(
-                        "daily_return"
-                    )
-                )
-                benchmark = benchmark.with_columns(
-                    pl.col("date").cast(pl.Date).alias("date")
-                )
-                benchmark_series = pd.Series(
-                    benchmark["daily_return"], index=benchmark["date"]
-                )
-
-            html_path = f"{output_dir}/{strategy_name}_report.html"
-            qs.reports.html(
-                qs_returns,
-                benchmark=benchmark_series,
-                output=html_path,
-                benchmark_title="SPY",
-            )
-
-        # export trades and open positions
-        trades_path = f"{output_dir}/{strategy_name}_trades.csv"
-        open_positions_path = f"{output_dir}/{strategy_name}_open_positions.csv"
-
-        open_positions = (
-            pl.DataFrame(results.get("open_positions", []))
-            .with_columns(
-                pl.col("buy_date").dt.date().alias("buy_date"),
-            )
-            .sort("buy_date")
+        export_legacy_results(
+            results=self.results[strategy_name],
+            strategy_name=strategy_name,
+            output_dir=output_dir,
+            strategy_config=strategy_config,
         )
-        open_positions.write_csv(open_positions_path)
-        print(f"open positions exported: {open_positions_path}")
 
-        trades = (
-            pl.DataFrame(results["trades"])
-            .with_columns((pl.col("return") * 100).round(2).alias("return %"))
-            .sort("return %", descending=True)
-            .drop("return")
-        ).with_columns(
-            pl.col("buy_date").dt.date().alias("buy_date"),
-            pl.col("sell_date").dt.date().alias("sell_date"),
-        )
-        trades.write_csv(trades_path)
-        print(f"trades exported: {trades_path}")
-
-        portfolio_path = f"{output_dir}/{strategy_name}_portfolio_daily.csv"
-        results["portfolio_daily"].with_columns(
-            pl.col("date").dt.date().alias("date"),
-        ).write_csv(portfolio_path)
-        print(f"daily portfolio performance exported: {portfolio_path}")
-
-        metrics_path = f"{output_dir}/{strategy_name}_metrics.txt"
-        with open(metrics_path, "w", encoding="utf-8") as f:
-            f.write(f"{strategy_name} backtest performance metrics\n")
-            f.write("=" * 50 + "\n\n")
-            for key, value in results["performance_metrics"].items():
-                f.write(f"{key}: {value}\n")
-        print(f"backtest performance metrics exported: {metrics_path}")
-
-        # export strategy_config
-        strategy_config_path = f"{output_dir}/{strategy_name}_config.txt"
-        with open(strategy_config_path, "w", encoding="utf-8") as f:
-            f.write(f"{strategy_name} strategy config\n")
-            f.write("=" * 50 + "\n\n")
-            for key, value in strategy_config.items():
-                f.write(f"{key}: {value}\n")
-        print(f"Strategy config exported: {strategy_config_path}")
-
-    def _print_strategy_comparison(self, all_results: Dict[str, Dict[str, Any]]):
+    @staticmethod
+    def _print_strategy_comparison(all_results: Dict[str, Dict[str, Any]]):
         if len(all_results) < 2:
             return
 

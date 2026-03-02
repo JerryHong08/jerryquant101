@@ -1,18 +1,51 @@
+"""
+Backtest runner — unified entry point for all backtest modes.
+
+Supports two modes:
+    1. **Strategy mode** (legacy): ``run_strategy_backtest(strategy, config)``
+       Uses ``StrategyBase`` subclass (e.g. BBIBOLLStrategy).
+    2. **Pipeline mode** (new): ``run_pipeline_backtest(config)``
+       Uses ``portfolio.pipeline`` → ``WeightBacktester``.
+
+Both modes load data, run the backtest, export results, and print metrics.
+
+Usage — Strategy mode (existing)::
+
+    cd src && python -m backtest.backtester --mode strategy
+
+Usage — Pipeline mode (new, default)::
+
+    cd src && python -m backtest.backtester
+    cd src && python -m backtest.backtester --mode pipeline --sizing Half-Kelly
+
+Reference: docs/quant_lab.tex
+"""
+
+from __future__ import annotations
+
 import os
+from typing import Any, Dict
 
 import polars as pl
 
 from backtest.engine import BacktestEngine
 from backtest.visualizer import BacktestVisualizer
+from backtest.weight_backtester import WeightBacktester
 from data.loader.benchmark_loader import load_spx_benchmark
 from data.loader.data_loader import stock_load_process
 from data.loader.date_utils import generate_backtest_date
 from data.loader.ticker_utils import get_common_stocks
 
+# ══════════════════════════════════════════════════════════════════════
+# Mode 1: Strategy-based backtest (legacy — StrategyBase subclass)
+# ══════════════════════════════════════════════════════════════════════
 
-def run_backtest(strategy, strategy_config=None):
-    """MAIN BACKTEST PROCESSION"""
 
+def run_strategy_backtest(strategy, strategy_config: Dict[str, Any]) -> None:
+    """Run a full backtest using a StrategyBase subclass.
+
+    Steps: load data → run strategy → plot → export → print metrics.
+    """
     print("Load data...")
     tickers = get_common_stocks(
         filter_date=strategy_config["data_start_date"]
@@ -25,14 +58,11 @@ def run_backtest(strategy, strategy_config=None):
                 timeframe=strategy_config["timeframe"],
                 start_date=strategy_config["data_start_date"],
                 end_date=strategy_config["end_date"],
-                # use_cache=False,
             )
             .filter(pl.col("volume") != 0)
             .collect()
         )
-
         print(f"tickers number: {ohlcv_data.select('ticker').n_unique()}")
-
     except Exception as e:
         print(f"data load failed: {e}")
         return
@@ -43,7 +73,6 @@ def run_backtest(strategy, strategy_config=None):
     )
 
     engine = BacktestEngine(initial_capital=strategy_config["initial_capital"])
-
     engine.add_strategy(strategy, ohlcv_data, tickers)
 
     print("start backtest...")
@@ -62,13 +91,126 @@ def run_backtest(strategy, strategy_config=None):
     )
     os.makedirs(output_dir, exist_ok=True)
 
-    print("generating backtest plot...")
-    selected_ticker = strategy_config["selected_tickers"][0]
+    # Plot
+    if not strategy_config.get("silent", False):
+        _plot_strategy_results(
+            engine, strategy_name, strategy_config, ohlcv_data, results, output_dir
+        )
+
+    # Export
+    print("export backtest result...")
     try:
-        if (
+        engine.export_results(strategy_config, strategy_name, output_dir=output_dir)
+    except Exception as e:
+        print(f"backtest result export failed: {e}")
+
+    _print_key_metrics(results["performance_metrics"], output_dir)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Mode 2: Pipeline-based backtest (new — weight DataFrames)
+# ══════════════════════════════════════════════════════════════════════
+
+
+def run_pipeline_backtest(config: Dict[str, Any]) -> None:
+    """Run a backtest using the portfolio pipeline → WeightBacktester.
+
+    Config keys:
+        tickers: list[str] — stock universe (or omit to use all common stocks)
+        start_date: str — OHLCV start date
+        end_date: str — OHLCV end date
+        factor_names: list[str] — alpha factors (default: ["bbiboll", "vol_ratio"])
+        sizing_method: str — sizing method (default: "Half-Kelly")
+        rebal_every_n: int — rebalance frequency (default: 5)
+        cost_bps: float — transaction cost in bps (default: 5.0)
+        output_dir: str — results directory (default: "backtest_output/pipeline")
+    """
+    from portfolio.pipeline import run_alpha_pipeline
+
+    # ── Load data ──
+    tickers = config.get("tickers")
+    if tickers is None:
+        print("Load common stocks...")
+        tickers_df = get_common_stocks(filter_date=config["start_date"]).collect()
+        tickers = tickers_df.to_series().to_list()
+
+    print(f"Loading OHLCV for {len(tickers)} tickers...")
+    ohlcv = (
+        stock_load_process(
+            tickers=tickers,
+            start_date=config["start_date"],
+            end_date=config.get("end_date"),
+        )
+        .filter(pl.col("volume") != 0)
+        .collect()
+    )
+    print(
+        f"OHLCV: {ohlcv.shape[0]:,} rows, {ohlcv.select('ticker').n_unique()} tickers"
+    )
+
+    # ── Run alpha pipeline ──
+    print("Running alpha pipeline...")
+    pipeline_result = run_alpha_pipeline(
+        ohlcv,
+        factor_names=config.get("factor_names", ["bbiboll", "vol_ratio"]),
+        sizing_method=config.get("sizing_method", "Half-Kelly"),
+        rebal_every_n=config.get("rebal_every_n", 5),
+    )
+    print(f"Pipeline Sharpe (simple): {pipeline_result['sharpe']:.3f}")
+
+    # ── Load benchmark ──
+    benchmark = load_spx_benchmark(config["start_date"], config.get("end_date"))
+
+    # ── Run weight backtester ──
+    bt = WeightBacktester(cost_bps=config.get("cost_bps", 5.0))
+    result = bt.run_from_pipeline(
+        pipeline_result,
+        benchmark_data=benchmark,
+        name=config.get("name", "AlphaPipeline"),
+    )
+
+    # ── Print & export ──
+    bt.print_summary(result)
+
+    output_dir = config.get("output_dir", "backtest_output/pipeline")
+    bt.export(result, output_dir=output_dir)
+    _print_key_metrics(result.metrics, output_dir)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Helpers
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _print_key_metrics(metrics: Dict[str, Any], output_dir: str) -> None:
+    """Print key metrics summary."""
+    print("\nKey Metrics:")
+    print("-" * 40)
+    key_items = [
+        ("Total Return [%]", f"{metrics.get('Total Return [%]', 0):.2f}%"),
+        ("Benchmark Return [%]", f"{metrics.get('Benchmark Return [%]', 0):.2f}%"),
+        ("Max Drawdown [%]", f"{metrics.get('Max Drawdown [%]', 0):.2f}%"),
+        ("Sharpe Ratio", f"{metrics.get('Sharpe Ratio', 0):.4f}"),
+        ("Win Rate [%]", f"{metrics.get('Win Rate [%]', 0):.2f}%"),
+        ("Total Trades", f"{metrics.get('Total Trades', 0)}"),
+    ]
+    for name, value in key_items:
+        print(f"  {name:<25}: {value}")
+    print(f"\nResults exported to {output_dir}/")
+
+
+def _plot_strategy_results(
+    engine, strategy_name, strategy_config, ohlcv_data, results, output_dir
+):
+    """Plot equity curves and candlestick charts for strategy backtests."""
+    selected_ticker = strategy_config.get("selected_tickers", ["random"])[0]
+    try:
+        many_tickers = (
             len(strategy_config.get("selected_tickers", [])) > 2000
             or selected_ticker == "random"
-        ) and not strategy_config["silent"]:
+        )
+
+        if many_tickers:
             engine.plot_results(
                 strategy_name=strategy_name,
                 plot_equity=True,
@@ -80,14 +222,7 @@ def run_backtest(strategy, strategy_config=None):
 
         visualizer = BacktestVisualizer()
 
-        if (
-            (
-                len(strategy_config.get("selected_tickers", [])) > 2000
-                or selected_ticker == "random"
-            )
-            and (strategy_config["plot_all"] == False)
-            and not strategy_config["silent"]
-        ):
+        if many_tickers and not strategy_config.get("plot_all", False):
             selected_ticker = (
                 results["trades"].select("ticker").unique().to_series().sample(1)[0]
             )
@@ -100,101 +235,91 @@ def run_backtest(strategy, strategy_config=None):
                 start_date=strategy_config["trade_start_date"],
                 end_date=strategy_config["end_date"],
                 indicators=results.get("indicators"),
-                # line=False,
                 save_path=f"{output_dir}/{selected_ticker}_signals.png",
             )
-
-        elif strategy_config["plot_all"] and not strategy_config["silent"]:
-            for selected_ticker in strategy_config.get("selected_tickers", []):
-                print(f"plot {selected_ticker} k-line and trade signal...")
+        elif strategy_config.get("plot_all", False):
+            for t in strategy_config.get("selected_tickers", []):
+                print(f"plot {t} k-line and trade signal...")
                 visualizer.plot_candlestick_with_signals(
                     ohlcv_data=ohlcv_data,
-                    ticker=selected_ticker,
+                    ticker=t,
                     trades=results["trades"],
                     open_positions=results["open_positions"],
                     start_date=strategy_config["trade_start_date"],
                     end_date=strategy_config["end_date"],
                     indicators=results.get("indicators"),
                     line=False,
-                    save_path=f"{output_dir}/{selected_ticker}_signals.png",
+                    save_path=f"{output_dir}/{t}_signals.png",
                 )
-
     except Exception as e:
-        print(f"error occurs during plotting: {e}")
+        print(f"error during plotting: {e}")
 
-    print("export backtest result...")
-    try:
-        engine.export_results(strategy_config, strategy_name, output_dir=output_dir)
-    except Exception as e:
-        print(f"backtest result export failed: {e}")
 
-    print("\nkey metrics:")
-    print("-" * 40)
-    performance = results["performance_metrics"]
-
-    key_metrics = [
-        ("Total Return [%]", f"{performance.get('Total Return [%]', 0):.2f}%"),
-        ("Benchmark Return [%]", f"{performance.get('Benchmark Return [%]', 0):.2f}%"),
-        ("Max Drawdown [%]", f"{performance.get('Max Drawdown [%]', 0):.2f}%"),
-        ("Sharpe Ratio", f"{performance.get('Sharpe Ratio', 0):.4f}"),
-        ("Win Rate [%]", f"{performance.get('Win Rate [%]', 0):.2f}%"),
-        ("Total Trades", f"{performance.get('Total Trades', 0)}"),
-    ]
-
-    for metric, value in key_metrics:
-        print(f"{metric:<12}: {value}")
-
-    print(f"\nBacktest done! Results exported to {output_dir}")
+# ══════════════════════════════════════════════════════════════════════
+# CLI entry point
+# ══════════════════════════════════════════════════════════════════════
 
 
 if __name__ == "__main__":
-    from strategy.bbiboll_strategy import BBIBOLLStrategy
+    import argparse
 
-    print("BBIBOLL Strategy Backtest")
-    print("=" * 60)
-
-    strategy_config = {
-        "result_customized_name": "20251107",  # distinguish different config runs
-        "boll_length": 11,
-        "boll_multiple": 6,
-        "max_dev_pct": 1,
-        "loss_threshold": -0.15,
-        "profit_threshold": 0.1,
-        # "selected_tickers": ["QCLS"],
-        "selected_tickers": ["random"],  # change it to 'random' to select random stocks
-        "random_count": None,
-        # "min_turnover": 0,
-        # "plot_all": True,
-        "plot_all": False,
-        "timeframe": "1d",
-        "data_start_date": "2023-12-01",
-        "trade_start_date": "2024-12-01",
-        "end_date": "2026-02-27",
-        "initial_capital": 10000.0,
-        "add_risk_free_rate": True,
-        "silent": False,
-        # "silent": True,
-    }
-
-    # single backtest run
-    # strategy = BBIBOLLStrategy(config=strategy_config)
-    # run_backtest(strategy, strategy_config=strategy_config)
-
-    # multiple backtest runs with different end dates
-    backtest_dates = generate_backtest_date(
-        start_date="2026-02-27",
-        period="week",
-        reverse=True,
-        reverse_limit="2025-11-21",
-        # reverse_limit_count=2
+    parser = argparse.ArgumentParser(description="quant101 backtester")
+    parser.add_argument(
+        "--mode",
+        choices=["strategy", "pipeline"],
+        default="pipeline",
+        help="Backtest mode: 'strategy' (BBIBOLL) or 'pipeline' (alpha pipeline)",
     )
+    parser.add_argument("--start", default="2023-12-01", help="OHLCV start date")
+    parser.add_argument("--end", default="2026-02-27", help="End date")
+    parser.add_argument("--sizing", default="Half-Kelly", help="Sizing method")
+    parser.add_argument("--cost-bps", type=float, default=5.0, help="Cost in bps")
+    parser.add_argument(
+        "--factors",
+        nargs="+",
+        default=["bbiboll", "vol_ratio"],
+        help="Factor names",
+    )
+    args = parser.parse_args()
 
-    for backtest_date in backtest_dates:
-        # strategy_config["silent"] = True
-        print(f"info: backtesing: {backtest_date}")
+    if args.mode == "pipeline":
+        print("Pipeline-Based Backtest")
+        print("=" * 60)
+        run_pipeline_backtest(
+            {
+                "start_date": args.start,
+                "end_date": args.end,
+                "factor_names": args.factors,
+                "sizing_method": args.sizing,
+                "cost_bps": args.cost_bps,
+                "output_dir": "backtest_output/pipeline",
+            }
+        )
 
-        strategy_config["result_customized_name"] = backtest_date
-        strategy_config["end_date"] = backtest_date
+    else:
+        from strategy.bbiboll_strategy import BBIBOLLStrategy
+
+        print("BBIBOLL Strategy Backtest")
+        print("=" * 60)
+
+        strategy_config = {
+            "result_customized_name": "latest",
+            "boll_length": 11,
+            "boll_multiple": 6,
+            "max_dev_pct": 1,
+            "loss_threshold": -0.15,
+            "profit_threshold": 0.1,
+            "selected_tickers": ["random"],
+            "random_count": None,
+            "plot_all": False,
+            "timeframe": "1d",
+            "data_start_date": args.start,
+            "trade_start_date": args.start,
+            "end_date": args.end,
+            "initial_capital": 10000.0,
+            "add_risk_free_rate": True,
+            "silent": False,
+        }
 
         strategy = BBIBOLLStrategy(config=strategy_config)
-        run_backtest(strategy, strategy_config=strategy_config)
+        run_strategy_backtest(strategy, strategy_config)

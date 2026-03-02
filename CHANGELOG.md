@@ -3,16 +3,20 @@
 ### Project Direction
 
 > **v1.0.0 Goal**: Upgrade quant101 from a backtesting experiment into a structured
-> quant trader & researcher learning project. Incremental restructuring — add new
-> modules without breaking existing ones.
+> quant trader & researcher learning project.
 
-### Feat (Phase 6 — Backtest Refactor)
+### Feat (Phase 6 — Backtest Refactor) ⚠️ BREAKING
 
 - **backtest**: `src/backtest/portfolio_tracker.py` — `PortfolioTracker` class: pure-computation portfolio simulator from weight + return DataFrames. Outputs `TrackingResult` (frozen dataclass) with `portfolio_daily`, `turnover`, `position_count`, compatible with `PerformanceAnalyzer`. Supports optional transaction cost via `cost_bps` parameter.
 - **backtest**: `src/backtest/weight_backtester.py` — `WeightBacktester` class: **alpha→backtest bridge** that accepts portfolio weight DataFrames (output of `portfolio.pipeline.run_alpha_pipeline()`) and produces full backtest analytics. Methods: `run()`, `run_from_pipeline()`, `compare()`, `export()`, `print_summary()`. Returns `BacktestResult` container with convenience properties (`sharpe`, `total_return`, `max_drawdown`). Auto-preprocesses benchmark (close→benchmark_return).
 - **backtest**: `src/backtest/result_exporter.py` — `export_legacy_results()` function extracted from `BacktestEngine.export_results()`. Standalone — no engine instance required. Handles quantstats HTML, trades CSV, open positions CSV, portfolio daily CSV, metrics TXT, config TXT. Null benchmark no longer crashes.
 - **backtest**: Updated `__init__.py` — exports `PortfolioTracker`, `TrackingResult`, `WeightBacktester`, `BacktestResult`, `export_legacy_results`. Version bumped to 2.0.0.
 - **tests**: `tests/test_backtest_refactor.py` — 32 tests: `TestPortfolioTracker` (9), `TestWeightBacktester` (7), `TestResultExporter` (4), `TestBugFixes` (3), `TestBacktestExports` (9). **164 tests total, all passing.**
+
+### Breaking Changes (Phase 6)
+
+- **backtest**: `engine.py` — removed 90-line `export_results()` body, now delegates to `result_exporter.export_legacy_results()`. Removed `pandas` and `quantstats` imports from engine (moved to result_exporter). Engine is now a thin orchestrator (~150 lines, down from ~310).
+- **backtest**: `backtester.py` — rewritten with CLI (`argparse`). Default mode changed from BBIBOLL strategy to pipeline. Two modes: `--mode strategy` (legacy) and `--mode pipeline` (new). New `run_pipeline_backtest()` function wires `portfolio.pipeline` → `WeightBacktester` end-to-end.
 
 ### Fix (Phase 6)
 
