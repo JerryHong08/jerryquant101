@@ -180,22 +180,24 @@ polygon_data/
 
 ### Known Issues
 
-**Legacy backtest (High)**
-- [ ] `engine.py` God class — mixes data loading, signal routing, position tracking, reporting
-- [ ] No alpha→backtest bridge — notebooks use inline workaround
-- [ ] Open position tracking bug
-- [ ] Stock dividends not handled
+> Issues are fixed as natural byproducts of each phase — no separate fix sprint needed.
 
-**Data layer (Medium)**
-- [ ] `data_loader.py` 1,192-line monolith with mixed concerns
-- [ ] AWS creds loaded at module-level import (should be lazy)
-- [ ] SQL injection risk in DuckDB credential queries
-- [ ] Date column naming: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution)
+**Legacy backtest (High)** — fix in Phase 6
+- [ ] `engine.py` God class — mixes data loading, signal routing, position tracking, reporting → extract in Phase 6
+- [ ] No alpha→backtest bridge — notebooks use inline workaround → **resolved by Phase 5** (`pipeline.py`)
+- [ ] Open position tracking bug → fix during Phase 6 refactor
+- [ ] Stock dividends not handled → fix in Phase 7 (needed for dividend yield factor)
 
-**Other (Low)**
-- [ ] `src/constants.py` only wired into `performance_analyzer.py` — other modules use `252` as parameter default
-- [ ] Low-volume tickers skipped (>50 days zero volume)
-- [ ] No universe module — stock universe hardcoded in every notebook
+**Data layer (Medium)** — fix in Phase 5–6
+- [ ] `data_loader.py` 1,192-line monolith with mixed concerns → split gradually during Phase 6
+- [ ] AWS creds loaded at module-level import (should be lazy) → fix in Phase 6 when refactoring data loading
+- [ ] SQL injection risk in DuckDB credential queries → quick fix, do in Phase 5
+- [ ] Date column naming: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution) → enforce via `constants.py` in Phase 5
+
+**Other (Low)** — fix in Phase 5
+- [ ] `src/constants.py` only wired into `performance_analyzer.py` — wire into pipeline in Phase 5
+- [ ] No universe module — stock universe hardcoded in every notebook → **resolved by Phase 5** (`universe.py`)
+- [ ] Low-volume tickers skipped (>50 days zero volume) → keep as-is (conscious data quality tradeoff)
 
 ---
 
