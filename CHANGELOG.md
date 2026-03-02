@@ -116,21 +116,6 @@
 - **backtest**: `backtester.py` — fixed boolean precedence bug (`or` vs `and not`), fixed typo "isexported"
 - **scripts**: `write_overview_csv.py` — removed wrong unused `duckdb` import
 
-### Planned
-
-**Phase 8 — ML Integration** (`src/ml/`)
-- **ml**: Feature engineering — factor values as features, lagged returns, volatility features
-- **ml**: Time-series validation — purged k-fold, embargo gap
-- **ml**: Tree models — LightGBM/XGBoost factor combination, feature importance analysis
-
-**Phase 9 — Infrastructure**
-- **cli**: Unified `typer` entry point (backtest, alpha, data-update)
-- **research**: Templated research notebooks — factor exploration → signal → backtest → report
-
-**Factor Research (ongoing)**
-- More factors — cross-sectional momentum (12-1 month), short-term reversal, low-volatility, quality/earnings
-- Regime tagging — `src/data/regime.py` — bull/bear/sideways from rolling SPX returns
-
 ---
 
 ## 0.2.0 (2026-03-01)

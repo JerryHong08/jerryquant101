@@ -12,46 +12,6 @@ documented as a learning journal in LaTeX.
 
 ---
 
-## Architecture
-
-```bash
-src/
-├── constants.py                   # Shared constants — TRADING_DAYS_PER_YEAR, column name conventions
-├── config.py                      # Central config — data paths, asset loaders, lazy getters
-├── alpha/                         # Factor research — signals, evaluation, preprocessing, combination
-├── portfolio/                     # Alpha pipeline — AlphaConfig, factor registry, signal→weights→returns
-├── risk/                          # Risk & portfolio — VaR/CVaR, distribution analysis, position sizing
-├── execution/                     # Transaction costs — fixed, spread, sqrt-impact, composite models
-├── validation/                    # Walk-forward, bootstrap CI, PSR/DSR, multiple-testing corrections
-├── data/
-│   ├── fetcher/               # Data acquisition — Polygon.io S3, FMP, yfinance, rsync
-│   ├── loader/                # Data loading — OHLCV, split adjustment, resampling, caching
-│   └── universe.py            # Named stock universes (US_LARGE_CAP_50, etc.)
-├── backtest/                  # Backtesting — engine, weight backtester, portfolio tracker, exporter
-├── strategy/                  # Trading strategies & indicator registry
-│   └── indicators/            # Technical indicators (BBIBOLL, OBV, etc.)
-├── visualizer/                # Standalone charting
-├── longport/                  # Longport broker integration
-├── examples/                  # Usage examples
-└── utils/                     # Logger, shared utilities
-
-tests/
-├── conftest.py                # Shared fixtures — synthetic returns, factors, weights, turnover
-├── test_validation.py         # 34 tests — walk-forward, bootstrap, p-values, multiple testing
-├── test_execution.py          # 25 tests — cost models, turnover, net returns, breakeven
-├── test_risk.py               # 26 tests — VaR, CVaR, drawdown, distribution stats
-├── test_alpha.py              # 22 tests — winsorize, z-score, rank, neutralize, combination
-├── test_portfolio.py          # 25 tests — pipeline stages, universe registry
-├── test_alpha_config.py       # 24 tests — AlphaConfig/FactorConfig dataclasses
-├── test_position_sizing.py    # 13 tests — EW, signal-weighted, validation
-└── test_backtest_refactor.py  # 32 tests — PortfolioTracker, WeightBacktester, exporter
-```
-
-**Target modules** (not yet built):
-- `src/ml/` — Feature engineering, time-series validation, tree models
-
----
-
 ## Quick Start
 
 ### 1. Data Setup
@@ -92,102 +52,16 @@ polygon_data/
 
 ## Roadmap
 
-### Phase 0 — Foundation (✅ Complete)
+> Completed work is recorded in [CHANGELOG.md](CHANGELOG.md).  
+> Phases 0–7 are done (v1.0.0). Items below are what remains.
 
-- [x] Data pipeline: Polygon.io S3 flat files → Parquet, split adjustment, FIGI ticker mapping
-- [x] Backtest engine: Abstract `StrategyBase` → `BacktestEngine` → `PerformanceAnalyzer`
-- [x] BBIBOLL strategy: BBI + Bollinger Band deviation, indicator registry
-- [x] Data unification: Merged `data_fetcher/` + `data_supply/` into `src/data/` (fetcher + loader)
-- [x] Code quality: English-only codebase, dead code removed, 7 critical bugs fixed
-- [x] Documentation: LaTeX learning journal (55 pages, 5 Parts, 17 chapters)
-- [x] Config: `basic_config.yaml` with standalone/server/client modes
+### Factor Research (ongoing)
 
-### Phase 1 — Alpha Research Framework (`src/alpha/`) (✅ Complete)
-
-> LaTeX reference: Part III, Chapters 9–12
-
-- [x] **Factor base**: Factor abstraction — `(date, ticker, value)` signal DataFrame convention
-- [x] **Factor evaluation**: `FactorAnalyzer` — IC series, IR, IC decay curve, turnover, quantile returns
-- [x] **Factor preprocessing**: `preprocess_factor()` — winsorize, z-score, rank-normalize, sector neutralize
-- [x] **Factor construction**: Convert BBIBOLL deviation to cross-sectional factor, 20-day momentum factor
-- [x] **Factor combination**: Equal-weight, IC-weight, mean-variance, risk-parity on IC covariance
-- [x] **Forward returns**: Utility to compute 1/5/10/20-day forward returns for the universe
-- [x] **Validation notebook**: `notebooks/alpha_research.ipynb` — end-to-end BBIBOLL factor analysis (30 cells, all passing)
-- [x] **Alpha iteration**: `notebooks/alpha_iteration.ipynb` — STR, Volume-Price Divergence, Vol Ratio factors; IC correlation analysis; diversification confirmed (BBIBOLL + Vol Ratio composite |IR|=0.136 > best individual 0.122)
-
-### Phase 2 — Risk & Portfolio (`src/risk/`) (✅ Complete)
-
-> LaTeX reference: Part IV, Chapters 13–14
-
-- [x] **Risk measures**: VaR (historical + parametric), CVaR, drawdown, skewness, kurtosis, tail ratio
-- [x] **Return distribution analysis**: Normality tests (Jarque-Bera, Shapiro-Wilk), QQ-plot data, Gaussian comparison, tail analysis
-- [x] **Position sizing**: Equal-weight, inverse-volatility, volatility-target, signal-weighted
-- [ ] **Portfolio construction**: Market-neutral long-short, factor exposure targeting
-- [x] **Validation notebook**: `notebooks/risk_analysis.ipynb` — end-to-end risk analysis with BBIBOLL + Vol Ratio composite (14 code cells, all passing; 3 bugs found and fixed)
-
-### Phase 3 — Execution & Cost Modeling (`src/execution/`) (✅ Complete)
-
-> LaTeX reference: Part IV, Chapter 15
-
-- [x] **Cost model**: ABC `CostModel` + 4 implementations (Fixed, Spread, SqrtImpact, Composite)
-- [x] **Cost analysis**: Turnover computation, net returns, Sharpe-vs-cost curves, breakeven cost
-- [x] **Validation notebook**: `notebooks/cost_analysis.ipynb` — 4 sizing methods compared gross vs net, all methods net-negative at 5 bps, Signal-Weighted breakeven = 1.8 bps
-
-### Phase 4 — Walk-Forward Validation (`src/validation/`) (✅ Complete)
-
-> LaTeX reference: Part IV, Chapter 16
-
-- [x] **Walk-forward splitter**: Rolling/anchored modes, purged embargo gap, date mapping
-- [x] **Statistical tests**: Bootstrap Sharpe CI (circular block), Lo (2002) p-values, PSR (Bailey & de Prado 2012), DSR (Bailey & de Prado 2014)
-- [x] **Multiple testing**: Bonferroni, Holm-Bonferroni, Benjamini-Hochberg corrections
-- [x] **Validation notebook**: `notebooks/validation.ipynb` — 16-config gauntlet: walk-forward IS/OOS, bootstrap, PSR/DSR, p-value corrections. Verdict: 0/16 survive correction (DSR=34.2% for best config)
-
-### Phase 4.5 — Test Suite + Cleanup (✅ Complete)
-
-- [x] **Test suite**: `tests/` — 107 pytest tests across 4 modules (validation, execution, risk, alpha), shared fixtures in `conftest.py`
-- [x] **Constants**: `src/constants.py` — `TRADING_DAYS_PER_YEAR`, column name conventions
-- [x] **Bug fix**: Fee calculation in `performance_analyzer.py` (was mathematically wrong)
-- [x] **Dependency pruning**: `pyproject.toml` main deps 35 → 25, unused moved to `[ml]`/`[infra]` optional groups
-- [x] **Cleanup**: Dead imports removed, hardcoded `252` → constant, `testpaths` fixed
-
-### Phase 5 — Portfolio Pipeline (`src/portfolio/`) (✅ Complete)
-
-- [x] **Signal→weights bridge**: `pipeline.py` — 7-stage pipeline (`compute_daily_returns` → `run_alpha_pipeline`), extensible factor registry (bbiboll, vol_ratio, momentum), replaces ~80 lines duplicated across 4 notebooks
-- [x] **Universe registry**: `src/data/universe.py` — `US_LARGE_CAP_50` (50 tickers, sector-organized), `US_LARGE_CAP_52` (52 tickers), `get_universe()`, `register_universe()`
-- [x] **Walk-forward runner**: `walk_forward_runner.py` — `run_walk_forward()` executes pipeline per fold, collects IS/OOS Sharpe/return/vol, Sharpe decay metric
-- [x] **Tests**: `test_portfolio.py` — 25 tests (pipeline stages + universe)
-- [x] **SQL injection fix**: `data_loader.py` — credential escaping in DuckDB SET statements
-- [x] **Demo notebook**: `notebooks/pipeline_demo.ipynb`
-
-### Phase 6 — Backtest Refactor (✅ Complete)
-
-> Targeted surgery on legacy code, not a full rewrite.
-
-- [x] **Extract God class**: `engine.py` split — export logic extracted to `result_exporter.py`, engine down from ~310 to ~150 lines
-- [x] **Accept portfolio weights**: `PortfolioTracker` + `WeightBacktester` — alpha→backtest bridge accepting weight DataFrames directly
-- [x] **Unified CLI**: `backtester.py` rewritten with `argparse` — `--mode strategy` (legacy) / `--mode pipeline` (new, default)
-- [x] **Fix open position tracking bug**: `trade_rules` type hint corrected (2-tuple → 3-tuple)
-- [x] **Fix datetime mismatch**: `portfolio_tracker.py` — auto-cast datetime resolution (ns ↔ μs) before join
-- [x] **Tests**: 32 new tests in `test_backtest_refactor.py`
-
-### Phase 7 — Alpha Config & Multi-Factor (✅ Complete)
-
-> Soft-code the alpha pipeline — make factor selection, params, and combination method fully configurable.
-
-- [x] **`AlphaConfig` dataclass**: `alpha_config.py` — single config object with `FactorConfig` (per-factor winsorize/normalize/neutralize params, `direction: Literal[1, -1]`), sizing method, combination method, all portfolio construction params
-- [x] **Factor registry**: `factors.py` — `register_factor()` / `get_factor_fn()` / `list_factors()`. 3 built-in: bbiboll, vol_ratio, momentum. Extracted from inline lambdas
-- [x] **Refactor pipeline to accept config**: `run_alpha_pipeline(config: AlphaConfig)` replaces 10+ keyword args
-- [x] **Wire IC-weighted combination**: `build_factor_pipeline()` computes IC series and passes to `combine_factors()` — all 4 combination methods now functional
-- [x] **Signal-weighted sizing**: Renamed from "Half-Kelly" — `w_i ∝ direction × |z_i| / σ_i²` (conviction × inverse-variance, explicitly not Kelly)
-- [x] **Ablation study**: 2×2 (sizing × rebalancing) proving sizing accounts for 0.68 Sharpe swing; Kelly lesson documented in LaTeX Entry 4
-- [x] **Factor diagnostics notebook**: 8-section diagnostic with IC/IR, cumulative L/S, direction check, IC correlation, config comparison
-- [x] **Tests**: 24 AlphaConfig tests + 13 position-sizing tests. **201 tests total, all passing.**
 - [ ] **More factors**: Cross-sectional momentum (12-1 month), short-term reversal, low-volatility
 - [ ] **Regime tagging**: `src/data/regime.py` — bull/bear/sideways from rolling SPX returns
+- [ ] **Portfolio construction**: Market-neutral long-short, factor exposure targeting
 
 ### Phase 8 — ML Integration (`src/ml/`)
-
-> LaTeX reference: Part V, Chapters 17–19
 
 - [ ] **Feature engineering**: Factor values as features, lagged returns, volatility features
 - [ ] **Time-series validation**: Purged k-fold, embargo gap
@@ -200,27 +74,12 @@ polygon_data/
 
 ### Known Issues
 
-> Issues are fixed as natural byproducts of each phase — no separate fix sprint needed.
-
-**Legacy backtest** — ~~High~~ mostly resolved
-- [x] ~~`engine.py` God class~~ → **resolved in Phase 6** (export extracted to `result_exporter.py`)
-- [x] ~~No alpha→backtest bridge~~ → **resolved in Phase 5+6** (`pipeline.py` + `WeightBacktester`)
-- [x] ~~Open position tracking bug~~ → **resolved in Phase 6** (type hint fix)
+- [ ] Position Sizing method about long&short allocation is wrong, to be fixed.!!!
 - [ ] Stock dividends not handled (needed for dividend yield factor)
-
-**Alpha pipeline** — ~~High~~ mostly resolved
-- [x] ~~Per-factor params hardcoded~~ → **resolved in Phase 7** (`AlphaConfig` + `FactorConfig`)
-- [x] ~~IC-weighted combination dead code~~ → **resolved in Phase 7** (wired through `build_factor_pipeline`)
 - [ ] `run_pipeline_backtest()` does not pass full `AlphaConfig` yet (uses keyword args)
-
-**Data layer (Medium)**
 - [ ] `data_loader.py` 1,192-line monolith with mixed concerns → split gradually
 - [ ] AWS creds loaded at module-level import (should be lazy)
-- [x] ~~SQL injection risk~~ → **fixed in Phase 5** (credential escaping)
 - [ ] Date column naming: `"timestamps"` (OHLCV) vs `"date"` (alpha/risk/execution)
-
-**Other (Low)**
-- [x] ~~No universe module~~ → **resolved in Phase 5** (`data/universe.py`)
 - [ ] `src/constants.py` only wired into `performance_analyzer.py`
 - [ ] Low-volume tickers skipped (>50 days zero volume) — conscious data quality tradeoff
 
