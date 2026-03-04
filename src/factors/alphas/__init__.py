@@ -1,1 +1,1 @@
-from factors.alphas import bbiboll, momentum, vol_ratio
+from factors.alphas import basic101, momentum, vol_ratio
