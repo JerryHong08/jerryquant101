@@ -10,6 +10,7 @@ Methods:
     2. Inverse-volatility: Weight ∝ 1/σ_i.  Equal risk contribution.
     3. Volatility-target: Scale portfolio to a target volatility.
     4. Half-Kelly: Optimal growth rate, halved for safety.
+    5. Quantile-threshold: Select tails by signal percentile (supports long-only).
 
 All functions take a Polars DataFrame with factor signals and return
 a DataFrame with portfolio weights.
@@ -25,6 +26,7 @@ Usage:
 
     weights = size_equal_weight(signal_df, n_long=10, n_short=10)
     weights = size_volatility_target(signal_df, vol_df, target_vol=0.10)
+    weights = size_quantile_threshold(signal_df, long_quantile=0.8, short_quantile=0.2)
 
 Reference: docs/quant_lab.tex — Part IV, Chapter 14 (Portfolio Construction)
 """
@@ -340,6 +342,91 @@ def size_half_kelly(
     )
 
     return kelly
+
+
+def size_quantile_threshold(
+    signal: pl.DataFrame,
+    long_quantile: float = 0.8,
+    short_quantile: Optional[float] = 0.2,
+    weight_by_signal_strength: bool = False,
+) -> pl.DataFrame:
+    """
+    Quantile-threshold portfolio with adaptive position count.
+
+    Instead of fixed (n_long, n_short), this method selects names by
+    cross-sectional signal percentile each day:
+        - Long:  percentile rank >= long_quantile
+        - Short: percentile rank <= short_quantile (if enabled)
+
+    Set short_quantile=None for long-only signal construction.
+
+    Args:
+        signal: DataFrame with columns (date, ticker, value).
+        long_quantile: Long-entry percentile threshold in [0, 1].
+        short_quantile: Optional short-entry percentile threshold in [0, 1].
+            Use None to disable shorts (long-only).
+        weight_by_signal_strength: If True, weights are proportional to
+            abs(signal). If False, selected names are equal-weighted.
+
+    Returns:
+        DataFrame with columns (date, ticker, weight).
+        Weights are normalized so sum(|weight|) = 1.0 per date.
+    """
+    _validate_signal(signal)
+
+    if not (0.0 <= long_quantile <= 1.0):
+        raise ValueError("long_quantile must be in [0, 1].")
+    if short_quantile is not None:
+        if not (0.0 <= short_quantile <= 1.0):
+            raise ValueError("short_quantile must be in [0, 1] when provided.")
+        if long_quantile <= short_quantile:
+            raise ValueError("long_quantile must be greater than short_quantile.")
+
+    ranked = signal.with_columns(
+        [
+            pl.col("value").rank(method="ordinal", descending=False).over("date").alias("rank"),
+            pl.col("value").count().over("date").alias("n_stocks"),
+        ]
+    ).with_columns(
+        pl.when(pl.col("n_stocks") > 1)
+        .then((pl.col("rank") - 1) / (pl.col("n_stocks") - 1))
+        .otherwise(0.5)
+        .alias("pct_rank")
+    )
+
+    if short_quantile is not None:
+        side_expr = (
+            pl.when(pl.col("pct_rank") >= long_quantile)
+            .then(1)
+            .when(pl.col("pct_rank") <= short_quantile)
+            .then(-1)
+            .otherwise(0)
+        )
+    else:
+        side_expr = pl.when(pl.col("pct_rank") >= long_quantile).then(1).otherwise(0)
+
+    selected = ranked.with_columns(side_expr.alias("side")).filter(pl.col("side") != 0)
+
+    raw_weight_expr = (
+        (pl.col("side") * pl.col("value").abs())
+        if weight_by_signal_strength
+        else pl.col("side").cast(pl.Float64)
+    )
+
+    weights = (
+        selected.with_columns(raw_weight_expr.alias("raw_weight"))
+        .with_columns(pl.col("raw_weight").abs().sum().over("date").alias("gross"))
+        .with_columns(
+            pl.when(pl.col("gross") > 1e-10)
+            .then(pl.col("raw_weight") / pl.col("gross"))
+            .otherwise(0.0)
+            .alias("weight")
+        )
+        .select(["date", "ticker", "weight"])
+        .filter(pl.col("weight").abs() > 1e-10)
+    )
+
+    return weights
 
 
 # ── Utility: Compute Realized Volatility ──────────────────────────────────────

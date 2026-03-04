@@ -233,7 +233,7 @@ class BBIBOLLStrategy(StrategyBase):
 
         return signals_df
 
-    def trade_rules(self, signals: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
+    def trade_rules(self, signals: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
         """
         Execute trading rules based on signals
 
@@ -245,7 +245,34 @@ class BBIBOLLStrategy(StrategyBase):
         """
         if signals.is_empty():
             print("No trading signals generated")
-            return pl.DataFrame(), pl.DataFrame()
+            empty_trades = pl.DataFrame(
+                schema={
+                    "ticker": pl.Utf8,
+                    "buy_date": pl.Datetime,
+                    "buy_price": pl.Float64,
+                    "sell_date": pl.Datetime,
+                    "sell_open": pl.Float64,
+                    "return": pl.Float64,
+                }
+            )
+            empty_portfolio = pl.DataFrame(
+                schema={
+                    "date": pl.Datetime,
+                    "portfolio_return": pl.Float64,
+                    "n_positions": pl.Int32,
+                    "equity_curve": pl.Float64,
+                }
+            )
+            empty_open_positions = pl.DataFrame(
+                schema={
+                    "ticker": pl.Utf8,
+                    "buy_date": pl.Datetime,
+                    "sell_signal_date": pl.Datetime,
+                    "buy_price": pl.Float64,
+                    "sell_open": pl.Float64,
+                }
+            )
+            return empty_trades, empty_portfolio, empty_open_positions
 
         # Prepare price data
         prices = self.ohlcv_data.select(["ticker", "timestamps", "open", "close"]).sort(
@@ -277,8 +304,7 @@ class BBIBOLLStrategy(StrategyBase):
             strategy="forward",
         )
 
-        stil_holding = trades.filter(pl.col("sell_signal_date").is_null())
-        stil_holding.write_csv("stil_holding.csv")
+        # Keep open positions in-memory; avoid writing side-effect debug files.
 
         # Get buy price (close price on buy signal day)
         trades = trades.join(
@@ -299,7 +325,21 @@ class BBIBOLLStrategy(StrategyBase):
         )
 
         open_positions = trades.filter(pl.col("sell_signal_date").is_null())
-        print(f"open positions: {open_positions}")
+
+        if not open_positions.is_empty():
+            last_close = (
+                prices.sort(["ticker", "timestamps"])
+                .group_by("ticker")
+                .agg(pl.col("close").last().alias("last_close"))
+            )
+            open_positions = open_positions.join(last_close, on="ticker", how="left")
+            open_positions = open_positions.with_columns(
+                ((pl.col("last_close") / pl.col("buy_price")) - 1).alias(
+                    "unrealized_return"
+                )
+            )
+
+        print(f"open positions count: {open_positions.height}")
 
         # Filter valid trades (must have both buy and sell prices)
         trades = trades.filter(

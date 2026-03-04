@@ -19,6 +19,7 @@ class PerformanceAnalyzer:
         portfolio_daily: pl.DataFrame,
         trades: pl.DataFrame,
         benchmark_data: Optional[pl.DataFrame] = None,
+        open_positions: Optional[pl.DataFrame] = None,
     ) -> Dict[str, Any]:
         """
         Calculate detailed backtest performance metrics
@@ -68,14 +69,14 @@ class PerformanceAnalyzer:
         max_dd_duration = self._calculate_max_drawdown_duration(equity_curve)
 
         # Trading statistics
-        trade_stats = self._calculate_trade_stats(trades)
+        trade_stats = self._calculate_trade_stats(trades, open_positions)
 
         returns = portfolio_daily["portfolio_return"].drop_nulls()
 
         risk_metrics = self._calculate_risk_metrics(returns, np.min(drawdown))
 
-        # Trading fees calculation
-        total_fees = len(trades) * end_value * self.trading_fee_rate
+        # Trading fees calculation using per-trade notionals (entry + exit)
+        total_fees = self._estimate_total_fees(trades)
 
         # Exposure (assume fully invested)
         max_gross_exposure = 100.0
@@ -98,14 +99,16 @@ class PerformanceAnalyzer:
 
         return metrics
 
-    def _calculate_trade_stats(self, trades: pl.DataFrame) -> Dict[str, Any]:
+    def _calculate_trade_stats(
+        self, trades: pl.DataFrame, open_positions: Optional[pl.DataFrame] = None
+    ) -> Dict[str, Any]:
         """Calculate trading statistics"""
         if trades.is_empty():
             return {
                 "Total Trades": 0,
                 "Total Closed Trades": 0,
                 "Total Open Trades": 0,
-                "Open Trade PnL": 0.0,
+                "Open Trade PnL": self._calculate_open_trade_pnl(open_positions),
                 "Win Rate [%]": 0.0,
                 "Best Trade [%]": 0.0,
                 "Worst Trade [%]": 0.0,
@@ -137,7 +140,7 @@ class PerformanceAnalyzer:
                 "Total Trades": total_trades,
                 "Total Closed Trades": 0,
                 "Total Open Trades": total_open,
-                "Open Trade PnL": 0.0,
+                "Open Trade PnL": self._calculate_open_trade_pnl(open_positions),
                 "Win Rate [%]": 0.0,
                 "Best Trade [%]": 0.0,
                 "Worst Trade [%]": 0.0,
@@ -189,7 +192,7 @@ class PerformanceAnalyzer:
             "Total Trades": total_trades,
             "Total Closed Trades": total_closed,
             "Total Open Trades": total_open,
-            "Open Trade PnL": 0.0,  # Assume no unrealized PnL
+            "Open Trade PnL": self._calculate_open_trade_pnl(open_positions),
             "Win Rate [%]": win_rate,
             "Best Trade [%]": best_trade,
             "Worst Trade [%]": worst_trade,
@@ -200,6 +203,49 @@ class PerformanceAnalyzer:
             "Profit Factor": profit_factor,
             "Expectancy": expectancy,
         }
+
+    def _estimate_total_fees(self, trades: pl.DataFrame) -> float:
+        """Estimate total fees from trade notionals.
+
+        Uses available trade price columns:
+        - closed trades: buy_price + sell_open
+        - open trades:   buy_price only
+        Assumes 1-share notional per trade when quantity is absent.
+        """
+        if trades.is_empty() or "buy_price" not in trades.columns:
+            return 0.0
+
+        qty_expr = pl.col("quantity") if "quantity" in trades.columns else pl.lit(1.0)
+        fee_base = trades.with_columns(
+            [
+                (pl.col("buy_price").fill_null(0.0) * qty_expr).alias("buy_notional"),
+                (pl.col("sell_open").fill_null(0.0) * qty_expr).alias("sell_notional"),
+            ]
+        ).with_columns((pl.col("buy_notional") + pl.col("sell_notional")).alias("notional"))
+
+        total_notional = float(fee_base["notional"].sum()) if fee_base.height > 0 else 0.0
+        return total_notional * self.trading_fee_rate
+
+    def _calculate_open_trade_pnl(
+        self, open_positions: Optional[pl.DataFrame] = None
+    ) -> float:
+        """Aggregate unrealized PnL from open positions when available."""
+        if (
+            open_positions is None
+            or open_positions.is_empty()
+            or "unrealized_return" not in open_positions.columns
+        ):
+            return 0.0
+
+        qty_expr = (
+            pl.col("quantity") if "quantity" in open_positions.columns else pl.lit(1.0)
+        )
+        pnl = open_positions.select(
+            (pl.col("buy_price") * qty_expr * pl.col("unrealized_return")).sum().alias(
+                "pnl"
+            )
+        )["pnl"].item()
+        return float(pnl or 0.0)
 
     def _calculate_risk_metrics(
         self, returns: pl.Series, max_drawdown: float = 0.0

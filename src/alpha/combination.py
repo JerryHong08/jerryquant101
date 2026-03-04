@@ -130,18 +130,15 @@ def _compute_weights(
             f"Method '{method}' requires ic_series_list with {k} DataFrames."
         )
 
-    # Extract IC arrays
-    ic_arrays = []
-    for ic_df in ic_series_list:
-        arr = ic_df["ic"].drop_nulls().to_numpy()
-        ic_arrays.append(arr)
+    # Align IC series by date to avoid mixing non-overlapping periods
+    aligned_ic = _align_ic_series_by_date(ic_series_list)
 
     if method == "ic_weight":
-        return _ic_weight(ic_arrays)
+        return _ic_weight(aligned_ic)
     elif method == "mean_variance":
-        return _mean_variance_weight(ic_arrays, risk_aversion)
+        return _mean_variance_weight(aligned_ic, risk_aversion)
     elif method == "risk_parity":
-        return _risk_parity_weight(ic_arrays)
+        return _risk_parity_weight(aligned_ic)
     else:
         raise ValueError(
             f"Unknown method '{method}'. "
@@ -149,13 +146,30 @@ def _compute_weights(
         )
 
 
-def _ic_weight(ic_arrays: List[np.ndarray]) -> List[float]:
+def _align_ic_series_by_date(ic_series_list: List[pl.DataFrame]) -> np.ndarray:
+    """Align multiple IC series on common dates and return a dense matrix."""
+    aligned = None
+    for i, ic_df in enumerate(ic_series_list):
+        part = ic_df.select([pl.col("date"), pl.col("ic").alias(f"ic_{i}")]).drop_nulls()
+        aligned = part if aligned is None else aligned.join(part, on="date", how="inner")
+
+    if aligned is None or aligned.is_empty():
+        raise ValueError("IC alignment produced no overlapping dates.")
+
+    ic_cols = [f"ic_{i}" for i in range(len(ic_series_list))]
+    if any(aligned[c].len() < 2 for c in ic_cols):
+        raise ValueError("Need at least 2 aligned IC observations per factor.")
+
+    return aligned.select(ic_cols).to_numpy()
+
+
+def _ic_weight(aligned_ic: np.ndarray) -> List[float]:
     """
     Weight proportional to mean IC.
 
     w_k ∝ max(mean(IC_k), 0) — negative IC factors get zero weight.
     """
-    means = [max(float(np.mean(arr)), 0.0) for arr in ic_arrays]
+    means = [max(float(np.mean(aligned_ic[:, i])), 0.0) for i in range(aligned_ic.shape[1])]
     total = sum(means)
     if total == 0:
         # Fallback to equal weight if all ICs are non-positive
@@ -165,7 +179,7 @@ def _ic_weight(ic_arrays: List[np.ndarray]) -> List[float]:
 
 
 def _mean_variance_weight(
-    ic_arrays: List[np.ndarray], risk_aversion: float
+    aligned_ic: np.ndarray, risk_aversion: float
 ) -> List[float]:
     """
     Mean-variance optimization on IC covariance.
@@ -175,14 +189,10 @@ def _mean_variance_weight(
 
     Constrained to long-only (w_k >= 0), normalized to sum to 1.
     """
-    k = len(ic_arrays)
+    k = aligned_ic.shape[1]
 
-    # Align IC series to same length (trim to shortest)
-    min_len = min(len(arr) for arr in ic_arrays)
-    aligned = np.column_stack([arr[:min_len] for arr in ic_arrays])
-
-    mu = np.mean(aligned, axis=0)
-    sigma = np.cov(aligned, rowvar=False)
+    mu = np.mean(aligned_ic, axis=0)
+    sigma = np.cov(aligned_ic, rowvar=False)
 
     # Regularize: add ridge to diagonal for numerical stability
     sigma += np.eye(k) * 1e-6
@@ -204,7 +214,7 @@ def _mean_variance_weight(
     return (raw_weights / total).tolist()
 
 
-def _risk_parity_weight(ic_arrays: List[np.ndarray]) -> List[float]:
+def _risk_parity_weight(aligned_ic: np.ndarray) -> List[float]:
     """
     Risk parity: weight inversely proportional to IC volatility.
 
@@ -213,7 +223,7 @@ def _risk_parity_weight(ic_arrays: List[np.ndarray]) -> List[float]:
     Does not require estimating expected IC — only volatility.
     More robust than mean-variance when IC estimates are noisy.
     """
-    stds = [float(np.std(arr, ddof=1)) for arr in ic_arrays]
+    stds = [float(np.std(aligned_ic[:, i], ddof=1)) for i in range(aligned_ic.shape[1])]
 
     # Avoid division by zero
     inv_stds = [1.0 / s if s > 1e-10 else 0.0 for s in stds]

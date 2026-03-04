@@ -117,7 +117,7 @@ class StrategyBase(ABC):
         start_date = portfolio_daily["date"].min()
         end_date = portfolio_daily["date"].max()
         # 4. adjust portfolio returns with risk-free rate
-        if "add_risk_free_rate" in self.config:
+        if self.config.get("add_risk_free_rate", False):
             daily_irx = load_irx_data(
                 start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
             )

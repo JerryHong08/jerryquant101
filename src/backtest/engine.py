@@ -68,6 +68,7 @@ class BacktestEngine:
             portfolio_daily=strategy_results["portfolio_daily"],
             trades=strategy_results["trades"],
             benchmark_data=benchmark_data,
+            open_positions=strategy_results.get("open_positions"),
         )
 
         # 3. complete_results
@@ -199,13 +200,16 @@ class BacktestEngine:
         portfolio_daily = results["portfolio_daily"]
         if not portfolio_daily.is_empty():
             benchmark = results.get("benchmark_data")
-            benchmark = benchmark.with_columns(
-                (pl.col("close") / pl.col("close").shift(1) - 1).alias("daily_return")
-            )
-            benchmark = benchmark.with_columns(
-                pl.col("date").cast(pl.Date).alias("date")
-            )
-            benchmark = pd.Series(benchmark["daily_return"], index=benchmark["date"])
+            benchmark_series = None
+            if benchmark is not None and not benchmark.is_empty():
+                benchmark = benchmark.with_columns(
+                    (pl.col("close") / pl.col("close").shift(1) - 1).alias("daily_return")
+                )
+                benchmark = benchmark.with_columns(
+                    pl.col("date").cast(pl.Date).alias("date")
+                )
+                benchmark_series = pd.Series(benchmark["daily_return"], index=benchmark["date"])
+
             portfolio_daily = portfolio_daily.with_columns(
                 pl.col("date").cast(pl.Date).alias("date")
             )
@@ -215,20 +219,21 @@ class BacktestEngine:
             )
             html_path = f"{output_dir}/{strategy_name}_report.html"
             qs.reports.html(
-                qs_returns, benchmark=benchmark, output=html_path, benchmark_title="SPY"
+                qs_returns,
+                benchmark=benchmark_series,
+                output=html_path,
+                benchmark_title="SPY",
             )
 
         # export trades and open positions
         trades_path = f"{output_dir}/{strategy_name}_trades.csv"
         open_positions_path = f"{output_dir}/{strategy_name}_open_positions.csv"
 
-        open_positions = (
-            pl.DataFrame(results.get("open_positions", []))
-            .with_columns(
+        open_positions = pl.DataFrame(results.get("open_positions", []))
+        if (not open_positions.is_empty()) and ("buy_date" in open_positions.columns):
+            open_positions = open_positions.with_columns(
                 pl.col("buy_date").dt.date().alias("buy_date"),
-            )
-            .sort("buy_date")
-        )
+            ).sort("buy_date")
         open_positions.write_csv(open_positions_path)
         print(f"open positions exported: {open_positions_path}")
 

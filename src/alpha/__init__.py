@@ -16,10 +16,13 @@ from alpha.combination import combine_factors
 from alpha.factor_analyzer import FactorAnalyzer
 from alpha.forward_returns import compute_forward_returns
 from alpha.preprocessing import preprocess_factor
+from alpha.factor_backtest import run_factor_portfolio_backtest
 
 __all__ = [
     "compute_forward_returns",
     "FactorAnalyzer",
     "preprocess_factor",
     "combine_factors",
+    "run_factor_portfolio_backtest",
 ]
+

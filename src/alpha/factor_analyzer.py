@@ -262,12 +262,18 @@ class FactorAnalyzer:
             & pl.col(return_col).is_finite()
         )
 
-        # Assign quantiles cross-sectionally
+        # Assign quantiles cross-sectionally as integer bins for stable ordering
         quantiled = valid.with_columns(
-            pl.col("value")
-            .qcut(n_quantiles, labels=[str(i + 1) for i in range(n_quantiles)])
-            .over("date")
-            .alias("quantile")
+            (
+                (
+                    pl.col("value").rank(method="ordinal", descending=False).over("date")
+                    / pl.col("value").count().over("date")
+                    * n_quantiles
+                )
+                .ceil()
+                .clip(lower_bound=1, upper_bound=n_quantiles)
+                .cast(pl.Int32)
+            ).alias("quantile")
         )
 
         result = (

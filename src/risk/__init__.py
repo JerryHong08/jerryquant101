@@ -20,6 +20,7 @@ from risk.position_sizing import (
     size_equal_weight,
     size_half_kelly,
     size_inverse_volatility,
+    size_quantile_threshold,
     size_volatility_target,
 )
 from risk.return_analysis import (
@@ -65,5 +66,6 @@ __all__ = [
     "size_inverse_volatility",
     "size_volatility_target",
     "size_half_kelly",
+    "size_quantile_threshold",
     "compute_realized_volatility",
 ]

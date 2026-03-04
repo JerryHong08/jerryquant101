@@ -60,7 +60,7 @@ bash scripts/incremental_update/data_update.sh
 ### 2. Run a Backtest
 
 ```bash
-python src/backtest/run_backtest.py
+python src/backtest/backtester.py
 ```
 
 ### 3. Data Directory Structure
