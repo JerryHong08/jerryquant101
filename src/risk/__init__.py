@@ -12,7 +12,7 @@ Convention:
     - VaR/CVaR returned as positive numbers (loss magnitude)
     - Weights normalized: sum(|weight|) = 1.0 per date
 
-Reference: docs/quant_lab.tex — Part IV, Chapters 13–14
+Reference: guidance/quant_lab.pdf — Part IV, Chapters 13–14
 """
 
 from risk.position_sizing import (

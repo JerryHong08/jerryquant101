@@ -13,7 +13,7 @@ Convention:
     - p-values: dict[label, float] for multiple-testing input
     - All Sharpe ratios are annualized (×√252 by default)
 
-Reference: docs/quant_lab.tex — Part V, Chapter 16 (Validation)
+Reference: guidance/quant_lab.pdf — Part V, Chapter 16 (Validation)
 """
 
 from validation.multiple_testing import (

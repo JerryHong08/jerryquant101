@@ -124,4 +124,4 @@ overwhelms the signal.
     and concentrates into low-vol names — exactly the wrong thing for a
     volatility-driven alpha."*
 
-Full version: [docs/latex/quant_lab.tex — Entry 4](https://github.com/JerryHong08/jerryquant101/blob/master/docs/latex/quant_lab.pdf).
+Full version: [docs/latex/quant_lab.tex — Entry 4](https://github.com/JerryHong08/jerryquant101/blob/master/guidance/quant_lab.pdf).

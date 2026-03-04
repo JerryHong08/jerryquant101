@@ -12,7 +12,7 @@ Convention:
     - Costs returned as positive fractions (0.001 = 10 bps)
     - All analysis uses next-day returns to avoid look-ahead bias
 
-Reference: docs/quant_lab.tex — Part IV, Chapter 15 (Execution & Costs)
+Reference: guidance/quant_lab.pdf — Part IV, Chapter 15 (Execution & Costs)
 """
 
 from execution.cost_analysis import (

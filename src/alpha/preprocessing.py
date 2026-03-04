@@ -20,7 +20,7 @@ Usage:
         method="zscore",         # or "rank"
     )
 
-Reference: docs/quant_lab.tex — Part III, Chapter 11 (Factor Construction)
+Reference: guidance/quant_lab.pdf — Part III, Chapter 11 (Factor Construction)
 """
 
 from typing import List, Optional

@@ -20,7 +20,7 @@ Usage:
         ic_series_list=[ic_a, ic_b, ic_c],  # required for ic_weight / mv
     )
 
-Reference: docs/quant_lab.tex — Part III, Chapter 12 (Factor Combination)
+Reference: guidance/quant_lab.pdf — Part III, Chapter 12 (Factor Combination)
 """
 
 from typing import List, Optional

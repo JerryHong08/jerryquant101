@@ -20,7 +20,7 @@ Usage:
     be = breakeven_cost(gross_returns, turnover_series)
     print(f"Strategy breaks even at {be*10_000:.1f} bps")
 
-Reference: docs/quant_lab.tex — Part IV, Chapter 15 (Execution & Costs)
+Reference: guidance/quant_lab.pdf — Part IV, Chapter 15 (Execution & Costs)
 """
 
 from __future__ import annotations

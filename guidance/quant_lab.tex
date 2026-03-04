@@ -2502,6 +2502,164 @@ and why it matters.  Entries are ordered chronologically.
 \bigskip\noindent\rule{\textwidth}{0.4pt}
 
 
+% ── Entry 5 ──────────────────────────────────────────────────────────────────
+\bigskip\noindent\rule{\textwidth}{0.4pt}
+
+\paragraph{Entry 5 --- Position Sizing Is Portfolio Construction, Not Just Weighting}
+\label{exp:position-sizing-landscape}
+\begin{description}[style=nextline, leftmargin=1.8cm]
+    \item[Date] 2026-03-04
+
+    \item[Context]
+        After fixing the forced-short bug (Entry~5b below) and renaming
+        Half-Kelly $\to$ Signal-Weighted (Entry~4), we stepped back to
+        examine the position sizing module as a whole.  All four methods
+        share the same two-stage architecture:
+
+        \begin{enumerate}[nosep]
+            \item \textbf{Selection} --- rank stocks by signal, pick
+                  top-$N$ long and bottom-$N$ short (binary in/out).
+            \item \textbf{Sizing} --- within each leg, assign weights
+                  (equal, inverse-vol, vol-target, or signal-weighted).
+        \end{enumerate}
+
+        This is the standard \emph{rank-and-select} approach from
+        academic factor research (Fama--French quintile portfolios).
+
+    \item[The Forced-Short Problem]
+        Setting \texttt{n\_short=10} forces the portfolio to short 10
+        stocks even when the signal says they are merely \emph{weaker
+        longs}, not actual short candidates.  Our alpha signal is
+        directional (higher = better), not symmetric around zero.
+        Forcing shorts on a directional signal is a design error.
+
+        \medskip
+        \textbf{Fix applied:}  Added \texttt{portfolio\_mode} field to
+        \texttt{AlphaConfig} with validation:
+        \begin{itemize}[nosep]
+            \item \texttt{"long\_only"} (default): \texttt{n\_short=0}.
+            \item \texttt{"long\_short"}: requires \texttt{n\_short > 0}.
+        \end{itemize}
+        Long-only is the correct default for a directional alpha on a
+        50-stock universe.  Long-short makes sense only for
+        market-neutral strategies with a genuinely symmetric signal.
+
+    \item[Why Fixed $N$?]
+        Fixed $N$ has real advantages:
+        \begin{enumerate}[nosep]
+            \item \textbf{Stable risk profile} --- constant gross
+                  exposure, predictable diversification and capacity.
+            \item \textbf{No threshold to tune} --- avoids the
+                  hyperparameter ``what signal level is good enough?''
+            \item \textbf{Apples-to-apples} --- isolates sizing effect
+                  from selection effect when comparing methods.
+            \item \textbf{Academic convention} --- standard in factor
+                  evaluation (quintile L/S, decile spreads).
+        \end{enumerate}
+
+        \medskip
+        But it also has fundamental limitations:
+        \begin{itemize}[nosep]
+            \item Stock ranked \#11 gets zero weight regardless of
+                  signal strength (information discarded at selection).
+            \item Forced positions when fewer than $N$ stocks have
+                  genuinely positive signal.
+            \item Signal magnitude is lost at the selection stage
+                  (Signal-Weighted partially recovers it at sizing).
+        \end{itemize}
+
+    \item[The Portfolio Construction Spectrum]
+        The rank-and-select approach is one end of a spectrum.  The
+        other end is \textbf{optimization-based} construction, where
+        selection and sizing happen simultaneously:
+
+        \medskip
+        \begin{center}
+        \small
+        \begin{tabular}{@{}lll@{}}
+        \toprule
+        \textbf{Approach} & \textbf{Idea} & \textbf{Tradeoff} \\
+        \midrule
+        Equal-Weight   & $1/N$ each position      & Robust; ignores signal \& risk \\
+        Inverse-Vol    & $w_i \propto 1/\sigma_i$  & Equal risk; needs $\sigma$ estimates \\
+        Vol-Target     & Scale to $\sigma_{\text{target}}$ & Leverage varies; chases past vol \\
+        Signal-Weighted & $w_i \propto |z_i|/\sigma_i^2$ & Uses conviction; ignores correlations \\
+        \midrule
+        \textbf{MVO}   & $w^* = \arg\max (w^\top\mu - \frac{\lambda}{2} w^\top\Sigma w)$ & Optimal but fragile \\
+        Risk Parity    & Equal risk contribution   & Robust; ignores $\mu$ \\
+        Black-Litterman & Bayesian prior + views   & Principled; complex \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+
+    \item[Mean-Variance Optimization (MVO)]
+        The closed-form solution is:
+        \[
+            w^* = \frac{1}{\lambda}\,\Sigma^{-1}\,\mu
+        \]
+        where $\mu$ is the expected return vector (from the alpha
+        signal), $\Sigma$ is the covariance matrix, and $\lambda$
+        is risk aversion.
+
+        \medskip
+        \textbf{Key insight}: MVO solves selection and sizing
+        \emph{simultaneously}.  Every stock gets a weight proportional
+        to its signal strength, adjusted for correlation with the rest.
+        No fixed $N$, no arbitrary threshold.
+
+        \medskip
+        \textbf{Practical problems with MVO}:
+        \begin{enumerate}[nosep]
+            \item \textbf{Covariance estimation} --- 50 stocks
+                  $\Rightarrow$ 1,225 parameters in $\Sigma$.
+                  Mitigations: Ledoit--Wolf shrinkage, factor models.
+            \item \textbf{Extreme weights} --- $\Sigma^{-1}$ amplifies
+                  estimation error.  Must add constraints
+                  ($|w_i| \leq w_{\max}$, leverage cap).
+            \item \textbf{Sensitivity to $\mu$} --- small changes in
+                  expected return $\Rightarrow$ completely different
+                  portfolio.  Black-Litterman addresses this.
+            \item \textbf{Turnover explosion} --- optimal portfolio
+                  changes daily.  Add turnover penalty
+                  $\gamma \|w_t - w_{t-1}\|_1$ to the objective.
+        \end{enumerate}
+
+        \medskip
+        The classic quant aphorism: \emph{``MVO is the world's best
+        error maximizer''} --- it takes the noisiest input ($\mu$) and
+        amplifies it through the most unstable operation ($\Sigma^{-1}$).
+
+    \item[What This Means for Our Project]
+        Our Phase~3 cost analysis proved the BBIBOLL + Vol Ratio alpha
+        has a breakeven cost of $\sim$2\,bps.  MVO would not fix this
+        --- it would just allocate noise more ``efficiently.''
+
+        \medskip
+        \textbf{Priority order}:
+        \begin{enumerate}[nosep]
+            \item \textbf{Alpha improvement} (more factors, better
+                  combination) --- fixes the real bottleneck.
+            \item \textbf{MVO implementation} --- becomes worthwhile
+                  once the composite signal has breakeven $>$10\,bps.
+            \item \textbf{Turnover-aware optimization} --- internalize
+                  costs in the objective rather than analyzing post-hoc.
+        \end{enumerate}
+
+    \item[Interview Takeaway]
+        \emph{``Position sizing is portfolio construction, which sits
+        between alpha generation and execution.  Rank-and-select is
+        robust but throws away information.  MVO is theoretically
+        optimal but fragile --- it amplifies estimation error in
+        $\mu$ through $\Sigma^{-1}$.  The right approach depends on
+        signal quality: with IC $\approx$ 0.02, robust methods
+        dominate; with IC $>$ 0.05, optimization starts to pay off.
+        Either way, no portfolio construction method can rescue a
+        weak alpha.''}
+\end{description}
+
+\bigskip\noindent\rule{\textwidth}{0.4pt}
+
+
 % ──────────────────────────────────────────────────────────────────────────────
 \chapter{Glossary}
 \label{app:glossary}
@@ -2523,6 +2681,7 @@ GICS      & Global Industry Classification Standard \\
 IC        & Information Coefficient \\
 IR        & Information Ratio \\
 MDD       & Maximum Drawdown \\
+MVO       & Mean-Variance Optimization (Markowitz) \\
 OBV       & On-Balance Volume \\
 OHLCV     & Open, High, Low, Close, Volume \\
 OLS       & Ordinary Least Squares \\

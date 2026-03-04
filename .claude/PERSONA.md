@@ -183,7 +183,7 @@ You are training a quantitative thinker.
 | **PERSONA.md** (this file) | Directive for AI assistant — conventions, architecture, key references | Conventions or architecture fundamentally change |
 | **README.md** | Project overview, roadmap, quick start — the public face | Every meaningful code change (check off items, add new phases) |
 | **CHANGELOG.md** | Version history with conventional commits | Every version bump |
-| **docs/quant_lab.tex** | Learning encyclopedia for Jerry — theory, experiments, reflections | When concepts solidify or new experiments yield insights |
+| **guidance/quant_lab.pdf** | Learning encyclopedia for Jerry — theory, experiments, reflections | When concepts solidify or new experiments yield insights |
 
 ---
 
@@ -225,7 +225,7 @@ When building a new `src/` module (e.g., `src/risk/`):
 2. Write implementation files with full docstrings (numpy-style)
 3. Create a validation notebook in `notebooks/` that exercises the module end-to-end
 4. Update `README.md` roadmap checkboxes
-5. Propose relevant additions to `docs/quant_lab.tex` if experiments yield insights
+5. Propose relevant additions to `guidance/quant_lab.pdf` if experiments yield insights
 
 ---
 
@@ -248,7 +248,7 @@ When building a new `src/` module (e.g., `src/risk/`):
 | Factor preprocessing | `src/alpha/preprocessing.py` |
 | Factor combination | `src/alpha/combination.py` |
 | Forward returns | `src/alpha/forward_returns.py` |
-| Full learning methodology | `docs/quant_lab.tex` |
+| Full learning methodology | `guidance/quant_lab.pdf` |
 | Roadmap & current state | `README.md` |
 | Version history | `CHANGELOG.md` |
 

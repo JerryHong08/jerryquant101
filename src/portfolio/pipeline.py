@@ -26,7 +26,7 @@ Usage:
     portfolio_returns = results["portfolio_returns"]
     sharpe = results["sharpe"]
 
-Reference: docs/quant_lab.tex — Part III–IV
+Reference: guidance/quant_lab.pdf — Part III–IV
 """
 
 from __future__ import annotations
@@ -229,7 +229,7 @@ def build_sizing_methods(
     ohlcv: pl.DataFrame,
     daily_returns: pl.DataFrame,
     n_long: int = 10,
-    n_short: int = 10,
+    n_short: int = 0,
     target_vol: float = 0.10,
     kelly_lookback: int = 60,
     kelly_max_position: float = 0.10,

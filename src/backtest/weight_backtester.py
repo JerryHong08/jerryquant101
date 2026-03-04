@@ -18,7 +18,7 @@ Usage:
     bt.print_summary(result)
     bt.export(result, output_dir="results/signal_weighted")
 
-Reference: docs/quant_lab.tex — Part III, Chapter 12
+Reference: guidance/quant_lab.pdf — Part III, Chapter 12
 """
 
 from __future__ import annotations

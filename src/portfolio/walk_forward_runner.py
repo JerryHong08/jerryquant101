@@ -18,7 +18,7 @@ Usage:
     )
     print(results["oos_sharpe_mean"])
 
-Reference: docs/quant_lab.tex — Part V
+Reference: guidance/quant_lab.pdf — Part V
 """
 
 from __future__ import annotations
@@ -65,7 +65,7 @@ def run_walk_forward(
     combination_method: str = "equal_weight",
     rebal_every_n: int = 5,
     n_long: int = 10,
-    n_short: int = 10,
+    n_short: int = 0,
     target_vol: float = 0.10,
     annualization: int = TRADING_DAYS_PER_YEAR,
     date_col: str = OHLCV_DATE_COL,
@@ -112,6 +112,7 @@ def run_walk_forward(
     # ── Build config from kwargs if not provided ──
     if config is None:
         config = AlphaConfig(
+            portfolio_mode="long_short" if n_short > 0 else "long_only",
             factor_names=factor_names or ["bbiboll", "vol_ratio"],
             combination_method=combination_method,
             sizing_method=sizing_method,

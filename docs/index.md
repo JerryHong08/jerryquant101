@@ -52,5 +52,5 @@ and documented as a 59-page learning journal in LaTeX.
 The lab is built; now it needs experiments that produce real alpha signal.
 
 See the [Changelog](changelog.md) for version history,
-or the [LaTeX encyclopedia](https://github.com/JerryHong08/jerryquant101/blob/master/docs/latex/quant_lab.pdf)
+or the [LaTeX encyclopedia](https://github.com/JerryHong08/jerryquant101/blob/master/guidance/quant_lab.pdf)
 for the full learning journal.

@@ -17,7 +17,7 @@ Reference:
     - Bailey & de Prado (2012), "The Sharpe Ratio Efficient Frontier"
     - Bailey & de Prado (2014), "The Deflated Sharpe Ratio"
     - Ledoit & Wolf (2008), "Robust Performance Hypothesis Testing"
-    - docs/quant_lab.tex — Part V, Chapter 16 (Validation)
+    - guidance/quant_lab.pdf — Part V, Chapter 16 (Validation)
 """
 
 from __future__ import annotations

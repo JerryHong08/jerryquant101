@@ -10,7 +10,7 @@ Bugs fixed vs. the original ``engine.export_results()``:
     * ``strategy_config`` parameter was positional-before-keyword — now
       keyword-only with a default.
 
-Reference: docs/quant_lab.tex — Part III, Chapter 12
+Reference: guidance/quant_lab.pdf — Part III, Chapter 12
 """
 
 from __future__ import annotations

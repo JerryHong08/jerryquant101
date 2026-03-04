@@ -15,7 +15,7 @@ provides standard corrections:
 Reference:
     - Benjamini & Hochberg (1995), "Controlling the False Discovery Rate"
     - Harvey, Liu & Zhu (2016), "... and the Cross-Section of Expected Returns"
-    - docs/quant_lab.tex — Part V, Chapter 16 (Validation)
+    - guidance/quant_lab.pdf — Part V, Chapter 16 (Validation)
 """
 
 from __future__ import annotations

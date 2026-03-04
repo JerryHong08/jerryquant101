@@ -26,7 +26,7 @@ Usage:
     weights = size_equal_weight(signal_df, n_long=10, n_short=10)
     weights = size_volatility_target(signal_df, vol_df, target_vol=0.10)
 
-Reference: docs/quant_lab.tex — Part IV, Chapter 14 (Portfolio Construction)
+Reference: guidance/quant_lab.pdf — Part IV, Chapter 14 (Portfolio Construction)
 """
 
 from typing import Optional
@@ -267,13 +267,6 @@ def size_signal_weighted(
 
     A signal-tilted alternative to equal-weight that gives larger
     positions to high-conviction, low-risk stocks.
-
-    **Not true Kelly.**  Real Kelly determines *portfolio leverage*
-    (how much capital to deploy), not relative allocation.  This
-    function borrows Kelly's ``z / σ²`` formula for relative sizing
-    but normalizes to unit gross leverage, discarding the leverage
-    signal entirely.  The name was changed from "Half-Kelly" to
-    avoid the misleading implication.
 
     Two-stage process:
         1. **Factor selection** — rank stocks by signal, go long top-N

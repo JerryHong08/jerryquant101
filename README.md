@@ -7,7 +7,7 @@ processed with [Polars](https://pola.rs/), backtested with a custom engine, and
 documented as a learning journal in LaTeX.
 
 > **Current version**: 1.0.0 — See [CHANGELOG.md](CHANGELOG.md) for details.
-> **Detailed documentation**: See [docs/latex/quant_lab.pdf](docs/latex/quant_lab.pdf) for the full learning guide (59 pages).
+> **Detailed documentation**: See [guidance/quant_lab.pdf](guidance/quant_lab.pdf) for the full learning guide (59 pages).
 > **Online docs**: [https://jerryhong08.github.io/jerryquant101/](https://jerryhong08.github.io/jerryquant101/)
 
 ---
@@ -36,7 +36,7 @@ bash scripts/incremental_update/data_update.sh
 ### 2. Run a Backtest
 
 ```bash
-python src/backtest/run_backtest.py
+python src/backtest/backtest.py
 ```
 
 ### 3. Data Directory Structure
@@ -59,7 +59,7 @@ polygon_data/
 
 - [ ] **More factors**: Cross-sectional momentum (12-1 month), short-term reversal, low-volatility
 - [ ] **Regime tagging**: `src/data/regime.py` — bull/bear/sideways from rolling SPX returns
-- [ ] **Portfolio construction**: Market-neutral long-short, factor exposure targeting
+- [ ] **Portfolio construction**: Market-neutral long-short, factor exposure targeting, update the position_sizing method.(gradute to MVO when factors > 5)
 
 ### Phase 8 — ML Integration (`src/ml/`)
 
@@ -89,4 +89,4 @@ polygon_data/
 
 - **Live Trading**: [jerryib_trader](https://github.com/JerryHong08/jerryib_trader) — Market Mover Monitor + GridTrader (separated from this repo)
 - **Data Source**: [Polygon.io Flat Files](https://polygon.io/flat-files)
-- **Documentation**: [docs/latex/quant_lab.pdf](docs/latex/quant_lab.pdf) — detailed learning journal
+- **Documentation**: [guidance/quant_lab.pdf](guidance/quant_lab.pdf) — detailed learning journal

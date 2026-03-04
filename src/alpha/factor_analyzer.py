@@ -21,7 +21,7 @@ Usage:
     turnover = analyzer.turnover()
     analyzer.summary(horizon=5)
 
-Reference: docs/quant_lab.tex — Part III, Chapter 10 (Factor Evaluation)
+Reference: guidance/quant_lab.pdf — Part III, Chapter 10 (Factor Evaluation)
 """
 
 from typing import Dict, List, Optional

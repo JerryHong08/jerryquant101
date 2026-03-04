@@ -15,7 +15,7 @@ Key design choices:
 
 Reference:
     - de Prado, "Advances in Financial Machine Learning" (2018), Ch. 7–12
-    - docs/quant_lab.tex — Part V, Chapter 16 (Validation)
+    - guidance/quant_lab.pdf — Part V, Chapter 16 (Validation)
 """
 
 from __future__ import annotations

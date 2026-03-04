@@ -22,7 +22,7 @@ To add a new factor:
 Usage:
     from portfolio.factors import register_factor, list_factors
 
-Reference: docs/quant_lab.tex — Part III
+Reference: guidance/quant_lab.pdf — Part III
 """
 
 from __future__ import annotations

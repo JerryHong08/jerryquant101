@@ -65,11 +65,12 @@ class TestFactorConfig:
 class TestAlphaConfig:
     def test_defaults(self):
         cfg = AlphaConfig()
+        assert cfg.portfolio_mode == "long_only"
         assert cfg.factor_names == ["bbiboll", "vol_ratio"]
         assert cfg.combination_method == "equal_weight"
         assert cfg.sizing_method == "Signal-Weighted"
         assert cfg.n_long == 10
-        assert cfg.n_short == 10
+        assert cfg.n_short == 0
         assert cfg.target_vol == 0.10
         assert cfg.kelly_lookback == 60
         assert cfg.kelly_max_position == 0.10
@@ -89,11 +90,33 @@ class TestAlphaConfig:
             rebal_every_n=10,
             name="MomentumOnly",
         )
+        assert cfg.portfolio_mode == "long_only"
         assert cfg.factor_names == ["momentum"]
         assert cfg.combination_method == "ic_weight"
         assert cfg.n_long == 20
         assert cfg.n_short == 0
         assert cfg.name == "MomentumOnly"
+
+    def test_long_short_mode(self):
+        cfg = AlphaConfig(
+            portfolio_mode="long_short",
+            n_long=10,
+            n_short=10,
+        )
+        assert cfg.portfolio_mode == "long_short"
+        assert cfg.n_short == 10
+
+    def test_long_only_rejects_nonzero_n_short(self):
+        with pytest.raises(
+            ValueError, match="portfolio_mode='long_only' requires n_short=0"
+        ):
+            AlphaConfig(portfolio_mode="long_only", n_short=5)
+
+    def test_long_short_rejects_zero_n_short(self):
+        with pytest.raises(
+            ValueError, match="portfolio_mode='long_short' requires n_short > 0"
+        ):
+            AlphaConfig(portfolio_mode="long_short", n_short=0)
 
     def test_get_factor_config_registered(self):
         fc = FactorConfig(params={"lookback": 60})
@@ -119,6 +142,7 @@ class TestAlphaConfig:
             factor_configs={"momentum": FactorConfig(params={"lookback": 60})},
         )
         d = cfg.to_dict()
+        assert d["portfolio_mode"] == "long_only"
         assert d["factor_names"] == ["momentum"]
         assert d["factor_configs"]["momentum"]["params"] == {"lookback": 60}
         assert d["sizing_method"] == "Signal-Weighted"

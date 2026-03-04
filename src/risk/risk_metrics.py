@@ -18,7 +18,7 @@ Usage:
     cvar_95 = cvar_historical(returns, confidence=0.95)
     mdd = max_drawdown(returns)
 
-Reference: docs/quant_lab.tex — Part IV, Chapter 13 (Risk Measures)
+Reference: guidance/quant_lab.pdf — Part IV, Chapter 13 (Risk Measures)
 """
 
 from typing import Optional

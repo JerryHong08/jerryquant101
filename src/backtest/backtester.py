@@ -18,7 +18,7 @@ Usage — Pipeline mode (new, default)::
     cd src && python -m backtest.backtester
     cd src && python -m backtest.backtester --mode pipeline --sizing Signal-Weighted
 
-Reference: docs/quant_lab.tex
+Reference: guidance/quant_lab.pdf
 """
 
 from __future__ import annotations
@@ -139,12 +139,15 @@ def run_pipeline_backtest(config: Dict[str, Any]) -> None:
     alpha_config = config.get("alpha_config")
     if alpha_config is None:
         alpha_config = AlphaConfig(
+            portfolio_mode=(
+                "long_short" if config.get("n_short", 0) > 0 else "long_only"
+            ),
             factor_names=config.get("factor_names", ["bbiboll", "vol_ratio"]),
             sizing_method=config.get("sizing_method", "Signal-Weighted"),
             rebal_every_n=config.get("rebal_every_n", 5),
             combination_method=config.get("combination_method", "equal_weight"),
-            n_long=config.get("n_long", 10),
-            n_short=config.get("n_short", 10),
+            n_long=config.get("n_long", 20),
+            n_short=config.get("n_short", 0),
             target_vol=config.get("target_vol", 0.10),
             cost_bps=config.get("cost_bps", 5.0),
             annualization=config.get("annualization", 252),

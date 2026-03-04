@@ -19,7 +19,7 @@ Usage:
 
     summary = distribution_summary(returns)
 
-Reference: docs/quant_lab.tex — Part IV, Chapter 13 (Risk Measures),
+Reference: guidance/quant_lab.pdf — Part IV, Chapter 13 (Risk Measures),
            specifically the lab module on return distributions.
 """
 

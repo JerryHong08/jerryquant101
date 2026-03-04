@@ -22,7 +22,7 @@ Usage:
         SqrtImpactCostModel(eta=0.1),
     ])
 
-Reference: docs/quant_lab.tex — Part IV, Chapter 15 (Execution & Costs)
+Reference: guidance/quant_lab.pdf — Part IV, Chapter 15 (Execution & Costs)
 """
 
 from __future__ import annotations

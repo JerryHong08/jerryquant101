@@ -5,7 +5,7 @@ Replaces 10+ keyword arguments scattered across ``run_alpha_pipeline()``,
 ``build_factor_pipeline()``, ``build_sizing_methods()``, ``run_pipeline_backtest()``,
 and ``run_walk_forward()`` with one structured, validated, YAML-loadable config.
 
-Usage — code::
+Usage — code (long-only, default)::
 
     config = AlphaConfig(
         factor_names=["bbiboll", "vol_ratio"],
@@ -15,6 +15,14 @@ Usage — code::
         rebal_every_n=5,
     )
     results = run_alpha_pipeline(ohlcv, config=config)
+
+Usage — market-neutral long-short::
+
+    config = AlphaConfig(
+        portfolio_mode="long_short",
+        n_long=10,
+        n_short=10,
+    )
 
 Usage — per-factor params::
 
@@ -30,7 +38,7 @@ Usage — YAML file::
 
     config = AlphaConfig.from_yaml("configs/alpha.yaml")
 
-Reference: docs/quant_lab.tex — Part III–IV
+Reference: guidance/quant_lab.pdf — Part III–IV
 """
 
 from __future__ import annotations
@@ -72,13 +80,24 @@ class AlphaConfig:
     signatures into a single, validated object.
 
     Sections:
+        - **Portfolio mode**: ``long_only`` (default) or ``long_short``
         - **Factor selection**: which factors and how to combine them
         - **Per-factor params**: preprocessing + computation per factor
         - **Portfolio construction**: sizing, position counts
         - **Rebalancing**: frequency
         - **Cost model**: transaction costs
         - **Annualization**: trading days per year
+
+    Portfolio modes:
+        - ``long_only``:  Buy top-N stocks by signal.  ``n_short`` is forced
+          to 0.  No forced shorting — avoids betting against stocks the signal
+          says are good (just with weaker conviction).
+        - ``long_short``: Market-neutral — long top-N, short bottom-N.
+          Isolates the factor return from market beta.  Requires ``n_short > 0``.
     """
+
+    # ── Portfolio mode ────────────────────────────────────────────────
+    portfolio_mode: Literal["long_only", "long_short"] = "long_only"
 
     # ── Factor selection ──────────────────────────────────────────────
     factor_names: List[str] = field(default_factory=lambda: ["bbiboll", "vol_ratio"])
@@ -94,7 +113,7 @@ class AlphaConfig:
     # ── Portfolio construction ────────────────────────────────────────
     sizing_method: str = "Signal-Weighted"
     n_long: int = 10
-    n_short: int = 10
+    n_short: int = 0
     target_vol: float = 0.10
     kelly_lookback: int = 60
     kelly_max_position: float = 0.10
@@ -115,6 +134,18 @@ class AlphaConfig:
 
     # ── Metadata ──────────────────────────────────────────────────────
     name: str = "AlphaPipeline"
+
+    def __post_init__(self) -> None:
+        """Validate portfolio_mode / n_short consistency."""
+        if self.portfolio_mode == "long_only" and self.n_short != 0:
+            raise ValueError(
+                f"portfolio_mode='long_only' requires n_short=0, got {self.n_short}. "
+                "Use portfolio_mode='long_short' for market-neutral portfolios."
+            )
+        if self.portfolio_mode == "long_short" and self.n_short <= 0:
+            raise ValueError(
+                f"portfolio_mode='long_short' requires n_short > 0, got {self.n_short}."
+            )
 
     def get_factor_config(self, factor_name: str) -> FactorConfig:
         """Get per-factor config, falling back to defaults."""
@@ -157,6 +188,7 @@ class AlphaConfig:
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to a plain dict (suitable for YAML dump or logging)."""
         d: Dict[str, Any] = {
+            "portfolio_mode": self.portfolio_mode,
             "factor_names": list(self.factor_names),
             "combination_method": self.combination_method,
             "factor_configs": {

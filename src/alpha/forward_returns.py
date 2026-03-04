@@ -15,7 +15,7 @@ Usage:
     )
     # returns_df schema: (date, ticker, forward_return_1d, forward_return_5d, ...)
 
-Reference: docs/quant_lab.tex — Part III, Chapter 9 (Factor Evaluation)
+Reference: guidance/quant_lab.pdf — Part III, Chapter 9 (Factor Evaluation)
 """
 
 from typing import List
