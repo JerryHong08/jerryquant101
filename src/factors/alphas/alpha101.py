@@ -1,15 +1,11 @@
-from __future__ import annotations
+"""alpha101 factors."""
 
-from typing import TYPE_CHECKING
+from __future__ import annotations
 
 import polars as pl
 
-from alpha.preprocessing import preprocess_factor
-from constants import DATE_COL, OHLCV_DATE_COL, TICKER_COL, VALUE_COL
+from constants import OHLCV_DATE_COL, TICKER_COL, VALUE_COL
 from factors.factors import register_factor
-
-if TYPE_CHECKING:
-    from portfolio.alpha_config import FactorConfig
 
 
 @register_factor("alpha101")

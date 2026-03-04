@@ -1,4 +1,4 @@
-"""BBIBOLL deviation factor."""
+"""basic alpha factors."""
 
 from __future__ import annotations
 
@@ -9,11 +9,22 @@ from factors.factors import register_factor
 
 
 @register_factor("bbiboll")
-def _compute_bbiboll_factor(ohlcv: pl.DataFrame, **kwargs) -> pl.DataFrame:
+def _compute_bbiboll_factor(
+    ohlcv: pl.DataFrame,
+    boll_length: int = 11,
+    boll_multiple: int = 6,
+    pct_window: int = 252,
+    **kwargs,
+) -> pl.DataFrame:
     """Raw signal: (close − BBI) / deviation."""
     from indicators.registry import get_indicator
 
-    ohlcv_bb = get_indicator("bbiboll")(ohlcv)
+    ohlcv_bb = get_indicator("bbiboll")(
+        ohlcv,
+        boll_length=boll_length,
+        boll_multiple=boll_multiple,
+        pct_window=pct_window,
+    )
     return ohlcv_bb.with_columns(
         ((pl.col("close") - pl.col("bbi")) / pl.col("dev")).alias(VALUE_COL)
     )

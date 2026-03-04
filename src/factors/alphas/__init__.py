@@ -1,1 +1,2 @@
-from factors.alphas import basic101, momentum, vol_ratio
+import factors.alphas.alpha101  # noqa: F401
+import factors.alphas.basic101  # noqa: F401
