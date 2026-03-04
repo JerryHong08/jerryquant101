@@ -44,8 +44,8 @@ from constants import (
     VALUE_COL,
     WEIGHT_COL,
 )
+from factors.factors import get_factor_fn, list_factors, register_factor
 from portfolio.alpha_config import AlphaConfig, FactorConfig
-from portfolio.factors import get_factor_fn, list_factors, register_factor
 
 # ── Stage 1: Daily Returns ────────────────────────────────────────────────────
 

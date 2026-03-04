@@ -252,7 +252,7 @@ class TestAlphaConfig:
 
 class TestFactorsModule:
     def test_list_factors_has_builtins(self):
-        from portfolio.factors import list_factors
+        from factors.factors import list_factors
 
         factors = list_factors()
         assert "bbiboll" in factors
@@ -260,26 +260,26 @@ class TestFactorsModule:
         assert "momentum" in factors
 
     def test_get_factor_fn_returns_callable(self):
-        from portfolio.factors import get_factor_fn
+        from factors.factors import get_factor_fn
 
         fn = get_factor_fn("vol_ratio")
         assert callable(fn)
 
     def test_get_factor_fn_case_insensitive(self):
-        from portfolio.factors import get_factor_fn
+        from factors.factors import get_factor_fn
 
         fn1 = get_factor_fn("VOL_RATIO")
         fn2 = get_factor_fn("vol_ratio")
         assert fn1 is fn2
 
     def test_get_factor_fn_unknown_raises(self):
-        from portfolio.factors import get_factor_fn
+        from factors.factors import get_factor_fn
 
         with pytest.raises(KeyError, match="Unknown factor"):
             get_factor_fn("nonexistent_xyz")
 
     def test_register_factor(self):
-        from portfolio.factors import get_factor_fn, list_factors, register_factor
+        from factors.factors import get_factor_fn, list_factors, register_factor
 
         def dummy(ohlcv, **kw):
             return pl.DataFrame({"date": [], "ticker": [], "value": []})
@@ -289,7 +289,7 @@ class TestFactorsModule:
         assert get_factor_fn("_test_dummy_7x") is dummy
 
     def test_register_factor_case_normalized(self):
-        from portfolio.factors import get_factor_fn, register_factor
+        from factors.factors import get_factor_fn, register_factor
 
         def dummy2(ohlcv, **kw):
             return pl.DataFrame({"date": [], "ticker": [], "value": []})
