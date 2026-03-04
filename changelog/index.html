@@ -1,0 +1,1660 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A structured quantitative research laboratory for equity alpha">
+      
+      
+        <meta name="author" content="Jerry Hong">
+      
+      
+        <link rel="canonical" href="https://jerryhong08.github.io/jerryquant101/changelog/">
+      
+      
+        <link rel="prev" href="../lessons/quant-notes/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>Changelog - Quant101</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#100-2026-03-02" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Quant101" class="md-header__button md-logo" aria-label="Quant101" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Quant101
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/JerryHong08/jerryquant101" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    JerryHong08/jerryquant101
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Quant101" class="md-nav__button md-logo" aria-label="Quant101" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Quant101
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/JerryHong08/jerryquant101" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    JerryHong08/jerryquant101
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/data-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Module Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Research Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../research/factor-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Factor Research Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../research/position-sizing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Position Sizing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../research/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation & Statistical Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lessons Learned
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Lessons Learned
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lessons/quant-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quant Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#100-2026-03-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.0.0 (2026-03-02)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.0.0 (2026-03-02)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feat-phase-7-alphaconfig-multi-factor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat (Phase 7 — AlphaConfig &amp; Multi-Factor)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix-phase-7-position-sizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix (Phase 7 — Position Sizing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor-phase-7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactor (Phase 7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docs-phase-7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docs (Phase 7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feat-phase-6-backtest-refactor-breaking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat (Phase 6 — Backtest Refactor) ⚠️ BREAKING
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#breaking-changes-phase-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Breaking Changes (Phase 6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix-phase-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix (Phase 6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feat-phase-5-portfolio-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat (Phase 5 — Portfolio Pipeline)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix-phase-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix (Phase 5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feat-phase-45-cleanup-sprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat (Phase 4.5 — Cleanup Sprint)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feat-prior-phase-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat (prior — Phase 4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#020-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.0 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.0 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#010-2025-09-19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.1.0 (2025-09-19)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.1.0 (2025-09-19)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feat_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#100-2026-03-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.0.0 (2026-03-02)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.0.0 (2026-03-02)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feat-phase-7-alphaconfig-multi-factor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat (Phase 7 — AlphaConfig &amp; Multi-Factor)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix-phase-7-position-sizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix (Phase 7 — Position Sizing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor-phase-7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactor (Phase 7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docs-phase-7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docs (Phase 7)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feat-phase-6-backtest-refactor-breaking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat (Phase 6 — Backtest Refactor) ⚠️ BREAKING
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#breaking-changes-phase-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Breaking Changes (Phase 6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix-phase-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix (Phase 6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feat-phase-5-portfolio-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat (Phase 5 — Portfolio Pipeline)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix-phase-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix (Phase 5)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feat-phase-45-cleanup-sprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat (Phase 4.5 — Cleanup Sprint)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feat-prior-phase-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat (prior — Phase 4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#020-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.0 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.0 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#010-2025-09-19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.1.0 (2025-09-19)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.1.0 (2025-09-19)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feat_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>Changelog</h1>
+
+<h2 id="100-2026-03-02">1.0.0 (2026-03-02)<a class="headerlink" href="#100-2026-03-02" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Milestone</strong>: quant101 graduates from a backtesting experiment into a structured
+quant research laboratory.  64 source files (12.8K lines), 201 tests (2.6K lines),
+7 research notebooks, 59-page LaTeX encyclopedia.  All infrastructure needed to
+research, validate, and backtest equity alpha factors is in place.</p>
+</blockquote>
+<h3 id="feat-phase-7-alphaconfig-multi-factor">Feat (Phase 7 — AlphaConfig &amp; Multi-Factor)<a class="headerlink" href="#feat-phase-7-alphaconfig-multi-factor" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>portfolio</strong>: <code>src/portfolio/alpha_config.py</code> — <code>AlphaConfig</code> dataclass: single config object holding factor list (with per-factor <code>FactorConfig</code>: winsorize/normalize/neutralize params, <code>direction: Literal[1, -1]</code>), sizing method, combination method, portfolio construction params (<code>n_long</code>, <code>n_short</code>, <code>target_vol</code>, <code>rebal_every_n</code>). Replaces 10+ keyword args with one object.</li>
+<li><strong>portfolio</strong>: <code>src/portfolio/factors.py</code> — factor function registry: <code>register_factor()</code>, <code>get_factor_fn()</code>, <code>list_factors()</code>. 3 built-in factors: <code>bbiboll</code>, <code>vol_ratio</code>, <code>momentum</code>. Extracted from inline lambdas in <code>pipeline.py</code>.</li>
+<li><strong>portfolio</strong>: Wired IC-weighted combination through <code>build_factor_pipeline()</code> — <code>ic_weight</code>, <code>mean_variance</code>, <code>risk_parity</code> combination methods now fully functional (were dead code).</li>
+<li><strong>portfolio</strong>: <code>FactorConfig.direction</code> field — factors can declare their expected IC sign; pipeline auto-flips signal for short-alpha factors (e.g., <code>direction=-1</code> for BBIBOLL).</li>
+<li><strong>notebook</strong>: <code>notebooks/factor_diagnostics.ipynb</code> — 8-section factor diagnostic notebook: per-factor IC/IR, cumulative L/S returns, direction check, IC correlation matrix, AlphaConfig comparison.</li>
+<li><strong>notebook</strong>: <code>notebooks/pipeline_demo.ipynb</code> — rewritten as 2×2 ablation study isolating sizing (EW vs Signal-Weighted) × rebalancing (daily vs weekly). Key finding: sizing alone accounts for 0.68 Sharpe swing.</li>
+<li><strong>tests</strong>: <code>tests/test_alpha_config.py</code> — 24 tests for AlphaConfig/FactorConfig. <code>tests/test_position_sizing.py</code> — 13 tests (7 rewritten for signal-weighted sizing). <strong>201 tests total, all passing.</strong></li>
+</ul>
+<h3 id="fix-phase-7-position-sizing">Fix (Phase 7 — Position Sizing)<a class="headerlink" href="#fix-phase-7-position-sizing" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>risk</strong>: <code>position_sizing.py</code> — three successive bugs fixed in the "Half-Kelly" sizing method:</li>
+<li><strong>Normalization destroyed Kelly property</strong>: normalizing <code>sum(|w|) = 1</code> discards the leverage signal. Fix: direction from μ sign, leverage not normalized internally.</li>
+<li><strong>All configs identical (Sharpe = 0.343)</strong>: Kelly used <code>|μ_i|/σ_i²</code> where μ came from returns history — completely ignored the factor signal. Fix: two-stage design (factor selects stocks, Kelly sizes by <code>|μ|/σ²</code>).</li>
+<li><strong>Historical μ is stealth momentum</strong>: 60-day rolling mean return has SNR ≈ 0.02 — pure noise that injects momentum bias conflicting with mean-reversion factors. Fix: replaced <code>|μ_i|</code> with <code>|z_i|</code> (cross-sectional z-score of factor signal). Final formula: <code>w_i ∝ direction_i × |z_i| / σ_i²</code>.</li>
+</ul>
+<h3 id="refactor-phase-7">Refactor (Phase 7)<a class="headerlink" href="#refactor-phase-7" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>risk</strong>: Renamed <code>size_half_kelly()</code> → <code>size_signal_weighted()</code> across entire codebase (15 files). Docstring explicitly states "Not true Kelly" — Kelly determines portfolio leverage, not relative allocation. Honest naming prevents misleading implications.</li>
+</ul>
+<h3 id="docs-phase-7">Docs (Phase 7)<a class="headerlink" href="#docs-phase-7" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>docs</strong>: <code>quant_lab.tex</code> Entry 4 — "Kelly Criterion Is a Leverage Tool, Not an Allocation Tool": three-bug journey, 2×2 ablation results, root cause (<code>z/σ²</code> under-weights high-vol opportunities where mean-reversion alpha is strongest), conceptual error (scalar Kelly ignores correlations), multivariate Kelly reference (<code>f* = Σ⁻¹μ</code>), resolution and interview one-liner.</li>
+</ul>
+<h3 id="feat-phase-6-backtest-refactor-breaking">Feat (Phase 6 — Backtest Refactor) ⚠️ BREAKING<a class="headerlink" href="#feat-phase-6-backtest-refactor-breaking" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>backtest</strong>: <code>src/backtest/portfolio_tracker.py</code> — <code>PortfolioTracker</code> class: pure-computation portfolio simulator from weight + return DataFrames. Outputs <code>TrackingResult</code> (frozen dataclass) with <code>portfolio_daily</code>, <code>turnover</code>, <code>position_count</code>, compatible with <code>PerformanceAnalyzer</code>. Supports optional transaction cost via <code>cost_bps</code> parameter.</li>
+<li><strong>backtest</strong>: <code>src/backtest/weight_backtester.py</code> — <code>WeightBacktester</code> class: <strong>alpha→backtest bridge</strong> that accepts portfolio weight DataFrames (output of <code>portfolio.pipeline.run_alpha_pipeline()</code>) and produces full backtest analytics. Methods: <code>run()</code>, <code>run_from_pipeline()</code>, <code>compare()</code>, <code>export()</code>, <code>print_summary()</code>. Returns <code>BacktestResult</code> container with convenience properties (<code>sharpe</code>, <code>total_return</code>, <code>max_drawdown</code>). Auto-preprocesses benchmark (close→benchmark_return).</li>
+<li><strong>backtest</strong>: <code>src/backtest/result_exporter.py</code> — <code>export_legacy_results()</code> function extracted from <code>BacktestEngine.export_results()</code>. Standalone — no engine instance required. Handles quantstats HTML, trades CSV, open positions CSV, portfolio daily CSV, metrics TXT, config TXT. Null benchmark no longer crashes.</li>
+<li><strong>backtest</strong>: Updated <code>__init__.py</code> — exports <code>PortfolioTracker</code>, <code>TrackingResult</code>, <code>WeightBacktester</code>, <code>BacktestResult</code>, <code>export_legacy_results</code>. Version bumped to 2.0.0.</li>
+<li><strong>tests</strong>: <code>tests/test_backtest_refactor.py</code> — 32 tests: <code>TestPortfolioTracker</code> (9), <code>TestWeightBacktester</code> (7), <code>TestResultExporter</code> (4), <code>TestBugFixes</code> (3), <code>TestBacktestExports</code> (9). <strong>164 tests total, all passing.</strong></li>
+</ul>
+<h3 id="breaking-changes-phase-6">Breaking Changes (Phase 6)<a class="headerlink" href="#breaking-changes-phase-6" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>backtest</strong>: <code>engine.py</code> — removed 90-line <code>export_results()</code> body, now delegates to <code>result_exporter.export_legacy_results()</code>. Removed <code>pandas</code> and <code>quantstats</code> imports from engine (moved to result_exporter). Engine is now a thin orchestrator (~150 lines, down from ~310).</li>
+<li><strong>backtest</strong>: <code>backtester.py</code> — rewritten with CLI (<code>argparse</code>). Default mode changed from BBIBOLL strategy to pipeline. Two modes: <code>--mode strategy</code> (legacy) and <code>--mode pipeline</code> (new). New <code>run_pipeline_backtest()</code> function wires <code>portfolio.pipeline</code> → <code>WeightBacktester</code> end-to-end.</li>
+</ul>
+<h3 id="fix-phase-6">Fix (Phase 6)<a class="headerlink" href="#fix-phase-6" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>backtest</strong>: <code>engine.py</code> <code>export_results()</code> — null benchmark crash fixed (guard added before <code>benchmark.with_columns(...)</code>)</li>
+<li><strong>backtest</strong>: <code>strategy_base.py</code> — <code>trade_rules</code> type hint fixed from 2-tuple to 3-tuple <code>tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]</code> to match actual usage in <code>run_backtest()</code></li>
+<li><strong>backtest</strong>: <code>portfolio_tracker.py</code> — datetime resolution mismatch (<code>datetime[ns]</code> vs <code>datetime[μs]</code>) fixed with auto-cast before join in <code>run()</code></li>
+<li><strong>backtest</strong>: <code>engine.py</code> — dead <code>datetime</code> import removed</li>
+<li><strong>backtest</strong>: <code>performance_analyzer.py</code> — dead <code>timedelta</code> import removed</li>
+</ul>
+<h3 id="feat-phase-5-portfolio-pipeline">Feat (Phase 5 — Portfolio Pipeline)<a class="headerlink" href="#feat-phase-5-portfolio-pipeline" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>portfolio</strong>: <code>src/portfolio/pipeline.py</code> — 7-stage signal→weights→returns pipeline: <code>compute_daily_returns()</code>, <code>compute_next_day_returns()</code>, <code>build_factor_pipeline()</code> (with extensible factor registry: bbiboll, vol_ratio, momentum), <code>build_sizing_methods()</code> (all 4 sizing methods), <code>resample_weights()</code>, <code>compute_portfolio_return()</code>, <code>run_alpha_pipeline()</code> (all-in-one). Replaces ~80 lines of boilerplate duplicated across 4 notebooks.</li>
+<li><strong>portfolio</strong>: <code>src/portfolio/walk_forward_runner.py</code> — <code>run_walk_forward()</code> executes pipeline per walk-forward fold, collects IS/OOS Sharpe/return/vol per fold, computes mean OOS Sharpe, Sharpe decay (overfitting signal), and OOS Sharpe std (stability). <code>fold_results_to_dataframe()</code> for analysis.</li>
+<li><strong>data</strong>: <code>src/data/universe.py</code> — named stock universe registry: <code>US_LARGE_CAP_50</code> (50 tickers, sector-organized), <code>US_LARGE_CAP_52</code> (52 tickers), sector mapping dict, <code>get_universe()</code>, <code>list_universes()</code>, <code>register_universe()</code>. Replaces hardcoded ticker lists in every notebook.</li>
+<li><strong>tests</strong>: <code>tests/test_portfolio.py</code> — 25 tests: <code>TestComputeDailyReturns</code> (4), <code>TestComputeNextDayReturns</code> (3), <code>TestResampleWeights</code> (4), <code>TestComputePortfolioReturn</code> (4), <code>TestFactorRegistry</code> (3), <code>TestUniverse</code> (7). <strong>132 tests total, all passing.</strong></li>
+<li><strong>notebook</strong>: <code>notebooks/pipeline_demo.ipynb</code> — demonstrates all 7 pipeline stages end-to-end</li>
+</ul>
+<h3 id="fix-phase-5">Fix (Phase 5)<a class="headerlink" href="#fix-phase-5" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>data</strong>: SQL injection risk in <code>data_loader.py</code> — credential values now escaped with single-quote doubling before interpolation into DuckDB <code>SET</code> statements</li>
+</ul>
+<h3 id="feat-phase-45-cleanup-sprint">Feat (Phase 4.5 — Cleanup Sprint)<a class="headerlink" href="#feat-phase-45-cleanup-sprint" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>tests</strong>: Full pytest suite — <code>tests/conftest.py</code> (shared fixtures: synthetic returns, factor DataFrames, weight DataFrames, turnover arrays), <code>test_validation.py</code> (34 tests), <code>test_execution.py</code> (25 tests), <code>test_risk.py</code> (26 tests), <code>test_alpha.py</code> (22 tests). <strong>107 tests, all passing.</strong></li>
+<li><strong>constants</strong>: <code>src/constants.py</code> — single source of truth for <code>TRADING_DAYS_PER_YEAR=252</code>, column name conventions (<code>DATE_COL</code>, <code>TICKER_COL</code>, <code>VALUE_COL</code>, <code>WEIGHT_COL</code>, <code>RETURN_COL</code>, <code>OHLCV_DATE_COL</code>)</li>
+</ul>
+<h3 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>backtest</strong>: Fee calculation bug in <code>performance_analyzer.py</code> — old formula <code>len(trades) * end_value * fee_rate</code> (nonsensical: multiplied total portfolio by trade count) → fixed to per-position approximation <code>n_trades * avg_position_value * fee_rate</code></li>
+<li><strong>backtest</strong>: Removed dead import <code>from config import all_tickers_dir</code> in <code>backtester.py</code></li>
+<li><strong>backtest</strong>: Replaced 4 hardcoded <code>252</code> magic numbers with <code>TRADING_DAYS_PER_YEAR</code> constant in <code>performance_analyzer.py</code></li>
+</ul>
+<h3 id="refactor">Refactor<a class="headerlink" href="#refactor" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>deps</strong>: Pruned <code>pyproject.toml</code> — removed 13 unused dependencies from main (tensorflow, pytorch-tabnet, redis, flask, flask-socketio, igraph, influxdb-client, pydantic, lxml, anywidget, massive, prometheus-client, optuna). Added missing used deps (numpy, scipy, plotly). Created <code>[ml]</code> and <code>[infra]</code> optional dependency groups. Main deps: 35 → 25.</li>
+<li><strong>config</strong>: Updated pytest <code>testpaths</code> from <code>["src"]</code> to <code>["tests"]</code></li>
+</ul>
+<h3 id="feat-prior-phase-4">Feat (prior — Phase 4)<a class="headerlink" href="#feat-prior-phase-4" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>validation</strong>: <code>walk_forward.py</code> — <code>WalkForwardFold</code> dataclass, <code>walk_forward_split()</code> (rolling/anchored modes), <code>apply_folds_to_dates()</code>, <code>summarize_folds()</code>. Rolling 126d train / 63d test / 5d purged embargo.</li>
+<li><strong>validation</strong>: <code>statistical_tests.py</code> — <code>bootstrap_sharpe_ci()</code> (circular block bootstrap, 10K resamples), <code>sharpe_pvalue()</code> (Lo 2002 adjusted SE), <code>probabilistic_sharpe_ratio()</code> (Bailey &amp; de Prado 2012), <code>deflated_sharpe_ratio()</code> (Bailey &amp; de Prado 2014, adjusts for multiple trials)</li>
+<li><strong>validation</strong>: <code>multiple_testing.py</code> — <code>bonferroni()</code>, <code>holm_bonferroni()</code>, <code>benjamini_hochberg()</code>, <code>apply_all_corrections()</code>. FWER and FDR control for strategy sweeps.</li>
+<li><strong>notebook</strong>: <code>validation.ipynb</code> — full validation gauntlet for 16-config sweep (4 sizing × 4 freq). Walk-forward IS/OOS: HK_W avg OOS SR=1.15, 60% hit rate. Bootstrap: 95% CI=[−0.58, 2.65] includes 0. PSR=91.8%, DSR=34.2% (16 trials). Multiple-testing: 0/16 survive BH correction. <strong>Verdict: no config is statistically significant.</strong></li>
+<li><strong>execution</strong>: <code>cost_model.py</code> — ABC <code>CostModel</code> with <code>estimate()</code> + <code>estimate_array()</code>, 4 implementations: <code>FixedCostModel</code> (flat bps), <code>SpreadCostModel</code> (half bid-ask spread), <code>SqrtImpactCostModel</code> (Almgren-style η·σ·√(participation)), <code>CompositeCostModel</code> (sum of models)</li>
+<li><strong>execution</strong>: <code>cost_analysis.py</code> — <code>compute_turnover()</code> (weight-diff-based, full outer join), <code>compute_net_returns()</code>, <code>sharpe_vs_cost_curve()</code> (sweep), <code>breakeven_cost()</code> (binary search for Sharpe=0)</li>
+<li><strong>notebook</strong>: <code>cost_analysis.ipynb</code> — end-to-end cost analysis + rebalancing frequency experiment + sub-period stability check. Key findings: (1) all methods net-negative at 5 bps with daily rebalancing; Half-Kelly breakeven 1.8 bps. (2) Weekly Half-Kelly SR=1.04 net at 5 bps full-sample, but sub-period check reveals <strong>only 2/4 half-years positive</strong> (2025-H1 SR=−2.59). Full-sample result is an aggregation artifact — alpha is period-dependent. Includes <code>resample_weights()</code>, 4×4 sweep, efficiency frontier, stability heatmap</li>
+<li><strong>risk</strong>: <code>risk_metrics.py</code> — VaR (historical + parametric), CVaR (historical + parametric), drawdown series, max drawdown, skewness, excess kurtosis, tail ratio, <code>risk_summary()</code> all-in-one</li>
+<li><strong>risk</strong>: <code>return_analysis.py</code> — normality tests (Jarque-Bera + Shapiro-Wilk), QQ-plot data, Gaussian comparison histogram, multi-level tail analysis, <code>distribution_summary()</code> all-in-one</li>
+<li><strong>risk</strong>: <code>position_sizing.py</code> — equal-weight, inverse-volatility, volatility-target, half-Kelly long-short sizing; <code>compute_realized_volatility()</code> utility</li>
+<li><strong>notebook</strong>: <code>risk_analysis.ipynb</code> — end-to-end risk analysis (14 code cells): distribution tests, VaR/CVaR comparison, drawdown, position sizing comparison across 4 methods</li>
+<li><strong>config</strong>: Renamed machine_config.yaml → basic_config.yaml, added standalone single-machine mode</li>
+<li><strong>config</strong>: Unified config structure — <code>update.mode</code> replaces <code>machine.role</code>, <code>data.data_dir</code> replaces split server/client dirs</li>
+<li><strong>scripts</strong>: Renamed weekly_update.sh → data_update.sh, added standalone mode (9-task pipeline)</li>
+<li><strong>docs</strong>: Rewrote <code>quant_lab.tex</code> — lab-module structure (5 Parts + Appendices, 17 chapters, 55 pages). Methodology-oriented, not hardcoded architecture. Each chapter: Motivation → Concepts → Implementation → Experiment → Reflection</li>
+</ul>
+<h3 id="refactor_1">Refactor<a class="headerlink" href="#refactor_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>data</strong>: Merged <code>data_fetcher/</code> + <code>data_supply/</code> into unified <code>src/data/</code> package (<code>data/fetcher/</code> + <code>data/loader/</code>)</li>
+<li><strong>strategy</strong>: Renamed <code>strategies/</code> → <code>strategy/</code>, <code>bbibollStrategy.py</code> → <code>bbiboll_strategy.py</code> (PEP 8)</li>
+<li><strong>i18n</strong>: Translated all Chinese comments, docstrings, and print messages to English (~35 items across 3 files)</li>
+<li><strong>config</strong>: Removed hardcoded <code>sppc_dir</code>, deferred <code>splits_data</code> to lazy getter <code>get_splits_data()</code>, removed dead <code>llmContext</code> loader</li>
+<li><strong>cleanup</strong>: Deleted 5 dead files (<code>main.py</code>, 2 backtest examples, <code>plotter.py</code>, <code>cuda_env_test.py</code>)</li>
+</ul>
+<h3 id="fix_1">Fix<a class="headerlink" href="#fix_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>risk</strong>: <code>cvar_parametric()</code> sign error — conditional left-tail mean is μ − σ·φ(z)/(1−α), not μ + σ·φ(z)/(1−α); was producing negative CVaR</li>
+<li><strong>data/fetcher</strong>: <code>csvgz_to_parquet.py</code> — argparse rejected its own default (<code>zstd</code> missing from choices)</li>
+<li><strong>data/fetcher</strong>: <code>splits_fetch.py</code> — removed wrong unused <code>matplotlib.pylab</code> import</li>
+<li><strong>data/fetcher</strong>: <code>fmp_fundamental_fetch.py</code> — print message said "csv" but file writes parquet</li>
+<li><strong>data/fetcher</strong>: <code>indices_fetch.py</code> — removed debug print left in production code</li>
+<li><strong>backtest</strong>: <code>performance_analyzer.py</code> — trading fee now configurable (was hardcoded 0.7%), calmar ratio properly implemented (was stub returning 0.0)</li>
+<li><strong>backtest</strong>: <code>backtester.py</code> — fixed boolean precedence bug (<code>or</code> vs <code>and not</code>), fixed typo "isexported"</li>
+<li><strong>scripts</strong>: <code>write_overview_csv.py</code> — removed wrong unused <code>duckdb</code> import</li>
+</ul>
+<hr />
+<h2 id="020-2026-03-01">0.2.0 (2026-03-01)<a class="headerlink" href="#020-2026-03-01" title="Permanent link">&para;</a></h2>
+<h3 id="feat">Feat<a class="headerlink" href="#feat" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>backtest</strong>: trades_analyzer — post-hoc analysis of open positions across rolling backtest dates with Plotly animated scatter charts</li>
+<li><strong>backtest</strong>: BBIBOLL rolling weekly backtest runner across 60+ date windows</li>
+<li><strong>strategy</strong>: BBIBOLL strategy — BBI + Bollinger Band deviation with stop-loss/take-profit rules</li>
+<li><strong>strategy/indicators</strong>: Decorator-based indicator registry with per-ticker group application</li>
+<li><strong>strategy/indicators</strong>: BBI + Bollinger deviation percentile rank indicator (TA-Lib)</li>
+<li><strong>strategy/indicators</strong>: OBV indicator</li>
+<li><strong>data/loader</strong>: Risk-free rate (IRX) and SPX benchmark loader</li>
+<li><strong>data/loader</strong>: Trading calendar-aware date utilities — weekly/monthly backtest date sequences</li>
+<li><strong>data/loader</strong>: FIGI-based ticker mapping via connected components (tracks name changes/delistings)</li>
+<li><strong>data/fetcher</strong>: Float shares fetcher (FinancialModelingPrep, async paginated)</li>
+<li><strong>data/fetcher</strong>: Index daily aggregates fetcher (SPX, IRX) with incremental updates</li>
+<li><strong>data/fetcher</strong>: Rsync-based multi-machine data sync (server → client)</li>
+<li><strong>scripts</strong>: file_examiner — inspects Polygon data directory tree, reports coverage dates</li>
+<li><strong>scripts</strong>: data_update.sh — mode-aware incremental data refresh orchestrator (standalone/server/client)</li>
+<li><strong>scripts</strong>: low_volume_ticker_update — event-stream state machine for zero-volume ticker tracking</li>
+<li><strong>config</strong>: Machine-role-aware data directory resolution (server/client via YAML)</li>
+<li><strong>config</strong>: Asset overview loader with CSV-based error corrections (add/remove)</li>
+<li><strong>utils</strong>: Configurable logger with console + rotating file handlers</li>
+<li><strong>visualizer</strong>: Interactive candlestick chart (seolpyo-mplchart)</li>
+<li><strong>longport</strong>: Watchlist import from strategy outputs to Longport/Longbridge broker</li>
+<li><strong>live_monitor</strong>: Market Mover Monitor with Redis Stream backend (separated to jerryib_trader repo)</li>
+<li><strong>live_monitor</strong>: News fetcher — momo web, FMP, benzinga</li>
+<li><strong>live_monitor</strong>: Factor engine prototype</li>
+<li><strong>live_monitor</strong>: Trades timespan replayer (v2/v3)</li>
+<li><strong>quantstats</strong>: Integrated QuantStats HTML report generation</li>
+</ul>
+<h3 id="fix_2">Fix<a class="headerlink" href="#fix_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>backtest</strong>: trades_analyzer delisted status bug fixed</li>
+<li><strong>scripts</strong>: versatile → indices_update, changed dir, fixed proxy problem</li>
+<li><strong>data/supply</strong>: Low-volume ticker incremental update fixed</li>
+<li><strong>live_monitor</strong>: Replay mode migrated to Redis Stream</li>
+</ul>
+<h3 id="refactor_2">Refactor<a class="headerlink" href="#refactor_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>src</strong>: Pruned &amp; cleaned up — removed unused modules</li>
+<li><strong>src</strong>: Restructured from <code>src/quant101/*</code> to <code>src/*</code></li>
+<li><strong>src</strong>: Removed Chinese — English as default project language</li>
+<li><strong>config</strong>: data_dir refactored for multi-machine support</li>
+<li><strong>live_monitor</strong>: Decoupled to standalone repository (jerryib_trader)</li>
+<li><strong>live_monitor</strong>: GridTrader backend — Redis ZSET → Redis Stream, InfluxDB integration</li>
+</ul>
+<hr />
+<h2 id="010-2025-09-19">0.1.0 (2025-09-19)<a class="headerlink" href="#010-2025-09-19" title="Permanent link">&para;</a></h2>
+<h3 id="feat_1">Feat<a class="headerlink" href="#feat_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>data/fetcher</strong>: Polygon.io S3 flat file downloader (stocks, options, indices, crypto, forex)</li>
+<li><strong>data/fetcher</strong>: CSV.gz → Parquet converter with schema mapping per data type</li>
+<li><strong>data/fetcher</strong>: All-tickers fetcher (stocks, OTC, indices) via Polygon REST API</li>
+<li><strong>data/fetcher</strong>: Stock splits fetcher with incremental update support</li>
+<li><strong>data/loader</strong>: Core data loader — OHLCV from Parquet/S3, split adjustment, timeframe resampling, caching</li>
+<li><strong>data/loader</strong>: DataPathLoader — file path calculation for Polygon flat files (local + S3)</li>
+<li><strong>backtest</strong>: BacktestEngine with abstract StrategyBase interface</li>
+<li><strong>backtest</strong>: PerformanceAnalyzer — Sharpe, Sortino, CAGR, max drawdown, win rate, payoff ratio</li>
+<li><strong>backtest</strong>: BacktestVisualizer — equity curves, monthly heatmaps, candlestick with signals</li>
+<li><strong>config</strong>: Central configuration with data directory management</li>
+<li><strong>config</strong>: Splits data with CSV-based error correction (add/remove error types)</li>
+<li><strong>visualizer</strong>: Matplotlib plotter via seolpyo-mplchart</li>
+</ul>
+<h3 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>low_volume_tickers.csv</code>: Tickers with extended zero-volume periods (&gt;50 days) are skipped.
+  Most cases are relisted tickers or ticker name reuse, which are hard to distinguish programmatically.
+  This is a known data quality tradeoff — saves time but loses some coverage.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
