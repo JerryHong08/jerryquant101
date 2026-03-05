@@ -2331,10 +2331,11 @@ and why it matters.  Entries are ordered chronologically.
 % ── Entry 4 ──────────────────────────────────────────────────────────────────
 \bigskip\noindent\rule{\textwidth}{0.4pt}
 
-\paragraph{Entry 4 --- Kelly Criterion Is a Leverage Tool, Not an Allocation Tool}
+\paragraph{Entry 4 --- Scalar Kelly vs.\ Multivariate Kelly: Layer Matters}
 \label{exp:kelly-lesson}
 \begin{description}[style=nextline, leftmargin=1.8cm]
-    \item[Date] 2026-03-02 \quad (from \texttt{pipeline\_demo.ipynb} ablation study)
+    \item[Date] 2026-03-02 \quad (from \texttt{pipeline\_demo.ipynb} ablation study;
+          revised 2026-03-05)
 
     \item[Question]
         We implemented ``Half-Kelly'' position sizing:
@@ -2469,11 +2470,41 @@ and why it matters.  Entries are ordered chronologically.
                   $w_i \propto \mathrm{direction}_i \times |z_i| / \sigma_i^2$
                   --- it is a valid conviction~$\times$~inverse-variance
                   sizing method, just not Kelly.
-            \item \textbf{True Kelly deferred} to a future portfolio-level
-                  leverage module that would answer: ``given my
-                  composite alpha signal, should I deploy 0.5$\times$
-                  or 1.5$\times$ capital today?''
+            \item \textbf{Multivariate Kelly belongs at Layer~2
+                  (portfolio construction).}
+                  The correct multi-asset generalization
+                  $\mathbf{f}^* = \Sigma^{-1}\boldsymbol{\mu}$
+                  \emph{produces weights}, not just a scalar leverage.
+                  Half-Kelly ($\mathbf{f}^*/2$) is the practical
+                  version.  This is a legitimate portfolio
+                  construction method --- but it lives at the
+                  \emph{strategy backtest} layer, not the factor
+                  evaluation layer.  At the factor evaluation layer
+                  (alpha research), equal-weight long-short is the
+                  standard.
         \end{enumerate}
+
+        \medskip\noindent
+        \textbf{Where each Kelly variant belongs:}
+        \begin{center}
+        \small
+        \resizebox{\linewidth}{!}{%
+        \begin{tabular}{@{}lll@{}}
+        \toprule
+        \textbf{Variant} & \textbf{Formula} & \textbf{Layer} \\
+        \midrule
+        Scalar ``Kelly'' ($\mu_i/\sigma_i^2$ per stock)
+            & Ignores correlations
+            & Misapplication --- not valid at any layer \\
+        Signal-weighted ($z_i/\sigma_i^2$, normalized)
+            & Conviction $\times$ inverse-var
+            & Layer~2: position sizing \\
+        Multivariate Kelly ($\Sigma^{-1}\mu$)
+            & Full covariance-aware
+            & Layer~2: portfolio construction \\
+        \bottomrule
+        \end{tabular}}%
+        \end{center}
 
     \item[Why It Matters]
         \begin{enumerate}[nosep]
@@ -2484,19 +2515,25 @@ and why it matters.  Entries are ordered chronologically.
                   With the \emph{same} signal, Sharpe ranged from
                   $-0.39$ to $+0.81$ --- a 1.2 swing.  Sizing is
                   a core part of the strategy, not a post-hoc detail.
-            \item \textbf{Kelly requires reliable $\mu$ estimates.}
+            \item \textbf{Kelly requires reliable $\mu$ and $\Sigma$
+                  estimates.}
                   With $|\mathrm{IC}| \approx 0.02$, the expected
-                  return signal is noise.  Kelly amplifies noise.
-                  It becomes useful only when $\mathrm{IC} > 0.05$
-                  and preferably with multivariate correlations.
+                  return signal is noise.  Scalar Kelly amplifies
+                  noise; multivariate Kelly adds $\Sigma^{-1}$
+                  estimation error (covariance inversion is
+                  notoriously unstable for large $N$).  Both become
+                  useful only with $\mathrm{IC} > 0.05$ and
+                  well-conditioned covariance estimates.
         \end{enumerate}
 
         \medskip
         \textbf{Interview one-liner:}
-        \emph{``Kelly tells you how much to bet, not how to split
-        the bet.  Using scalar Kelly for cross-sectional allocation
-        ignores correlations and concentrates into low-vol names ---
-        exactly the wrong thing for a volatility-driven alpha.''}
+        \emph{``Scalar Kelly ignores correlations --- it's a
+        misapplication.  Multivariate Kelly
+        ($\mathbf{f}^*=\Sigma^{-1}\mu$) is a legitimate portfolio
+        construction method, but it belongs at the strategy layer,
+        not the alpha research layer.  At the research layer,
+        equal-weight long-short is the standard.''}
 \end{description}
 
 \bigskip\noindent\rule{\textwidth}{0.4pt}
@@ -2508,13 +2545,12 @@ and why it matters.  Entries are ordered chronologically.
 \paragraph{Entry 5 --- Position Sizing Is Portfolio Construction, Not Just Weighting}
 \label{exp:position-sizing-landscape}
 \begin{description}[style=nextline, leftmargin=1.8cm]
-    \item[Date] 2026-03-04
+    \item[Date] 2026-03-04 \quad (revised 2026-03-05)
 
     \item[Context]
-        After fixing the forced-short bug (Entry~5b below) and renaming
-        Half-Kelly $\to$ Signal-Weighted (Entry~4), we stepped back to
-        examine the position sizing module as a whole.  All four methods
-        share the same two-stage architecture:
+        After renaming Half-Kelly $\to$ Signal-Weighted (Entry~4),
+        we stepped back to examine the position sizing module as a
+        whole.  All four methods share the same two-stage architecture:
 
         \begin{enumerate}[nosep]
             \item \textbf{Selection} --- rank stocks by signal, pick
@@ -2526,23 +2562,67 @@ and why it matters.  Entries are ordered chronologically.
         This is the standard \emph{rank-and-select} approach from
         academic factor research (Fama--French quintile portfolios).
 
-    \item[The Forced-Short Problem]
-        Setting \texttt{n\_short=10} forces the portfolio to short 10
-        stocks even when the signal says they are merely \emph{weaker
-        longs}, not actual short candidates.  Our alpha signal is
-        directional (higher = better), not symmetric around zero.
-        Forcing shorts on a directional signal is a design error.
+    \item[The Long-Short Confusion (and Correction)]
+        We initially believed that setting \texttt{n\_short=10} was a
+        \emph{design bug} --- forcing the portfolio to short stocks
+        that the signal merely ranked lower, not genuinely bearish.
+        We added \texttt{portfolio\_mode} to \texttt{AlphaConfig} and
+        switched the default to \texttt{"long\_only"}.
 
         \medskip
-        \textbf{Fix applied:}  Added \texttt{portfolio\_mode} field to
-        \texttt{AlphaConfig} with validation:
-        \begin{itemize}[nosep]
-            \item \texttt{"long\_only"} (default): \texttt{n\_short=0}.
-            \item \texttt{"long\_short"}: requires \texttt{n\_short > 0}.
-        \end{itemize}
-        Long-only is the correct default for a directional alpha on a
-        50-stock universe.  Long-short makes sense only for
-        market-neutral strategies with a genuinely symmetric signal.
+        \textbf{What we missed:}  Long-short evaluation is not a bug
+        --- it is the \emph{standard methodology} for factor research.
+        The purpose is to construct a \textbf{market-neutral} portfolio
+        that isolates the pure cross-sectional factor return (alpha)
+        from the market return (beta).  If you only go long the top-20
+        stocks and the market rallies 30\%, you cannot tell whether the
+        alpha is real or the market carried you.
+
+        \medskip
+        \textbf{Three layers, three correct answers:}
+
+        \begin{center}
+        \small
+        \resizebox{\linewidth}{!}{
+        \begin{tabular}{@{}llp{7cm}@{}}
+        \toprule
+        \textbf{Layer}  & \textbf{Mode} & \textbf{Why} \\
+        \midrule
+        1. Factor evaluation
+            & Always L/S
+            & Isolate alpha from beta.  Quintile spread, IC, factor
+              returns.  Standard academic method. \\
+        2. Strategy backtest
+            & Depends on mandate
+            & Hedge fund $\to$ long-short.  Long-only fund or retail
+              $\to$ set \texttt{n\_short=0}.  This is where
+              \texttt{portfolio\_mode} lives. \\
+        3. Production execution
+            & Separate system
+            & Execution algos, slippage, margin, order routing.
+              Not in scope yet. \\
+        \bottomrule
+        \end{tabular}}
+        \end{center}
+
+        \medskip
+        \textbf{The \texttt{portfolio\_mode} addition is still
+        correct} --- it prevents accidentally forcing shorts when
+        backtesting a long-only deployment strategy (layer~2).  The
+        mistake was \emph{conflating} layer~1 (evaluation) with
+        layer~2 (backtesting).  At layer~1, long-short is not
+        ``forced shorting'' --- it is intentional isolation of the
+        factor spread.
+
+    \item[Lesson]
+        \begin{quote}
+        \emph{When your factor evaluation shows Long~Q1, Short~Q5,
+        and someone says ``why are we shorting good stocks?''\ ---
+        the answer is: we are not betting against them.  We are
+        measuring whether the \textbf{ranking} has predictive power,
+        independent of market direction.  The short leg is a
+        research tool, not a trading decision.}
+        \end{quote}
 
     \item[Why Fixed $N$?]
         Fixed $N$ has real advantages:

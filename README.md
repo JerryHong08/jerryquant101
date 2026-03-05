@@ -7,7 +7,7 @@ processed with [Polars](https://pola.rs/), backtested with a custom engine, and
 documented as a learning journal in LaTeX.
 
 > **Current version**: 1.0.0 — See [CHANGELOG.md](CHANGELOG.md) for details.
-> **Detailed documentation**: See [guidance/quant_lab.pdf](guidance/quant_lab.pdf) for the full learning guide (59 pages).
+> **Detailed documentation**: See [guidance/quant_lab.pdf](guidance/quant_lab.pdf) for the full learning guides. Appendix B is my Quant Notes taken down from this project.
 > **Online docs**: [https://jerryhong08.github.io/jerryquant101/](https://jerryhong08.github.io/jerryquant101/)
 
 ---

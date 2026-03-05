@@ -252,7 +252,6 @@ def size_volatility_target(
 # ── Signal-Weighted ───────────────────────────────────────────────────────────
 
 
-# not right about long&short
 def size_signal_weighted(
     signal: pl.DataFrame,
     returns_history: pl.DataFrame,

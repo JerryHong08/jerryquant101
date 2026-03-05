@@ -65,7 +65,7 @@ def run_walk_forward(
     combination_method: str = "equal_weight",
     rebal_every_n: int = 5,
     n_long: int = 10,
-    n_short: int = 0,
+    n_short: int = 10,
     target_vol: float = 0.10,
     annualization: int = TRADING_DAYS_PER_YEAR,
     date_col: str = OHLCV_DATE_COL,
